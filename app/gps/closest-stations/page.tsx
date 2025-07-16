@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 
-// import DashboardLayout from "@/components/dashboard-layout";
+import DashboardLayout from "@/components/dashboard-layout";
 
 interface ClosestStationData {
   id: string;
@@ -294,434 +294,443 @@ export default function ClosestStationsPage() {
   }
 
   return (
-    // <DashboardLayout>
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">
-            Closest Charging Stations
-          </h1>
-          <p className="text-slate-400">
-            Find nearby charging stations based on your location or route
-          </p>
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-100">
+              Closest Charging Stations
+            </h1>
+            <p className="text-slate-400">
+              Find nearby charging stations based on your location or route
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Station Search Form */}
-        <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-slate-100">Find Stations</CardTitle>
-            <CardDescription className="text-slate-400">
-              Search for charging stations near you or along your route
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-2 mb-4 bg-slate-800/50 p-1">
-                <TabsTrigger
-                  value="closest"
-                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-                >
-                  Closest Stations
-                </TabsTrigger>
-                <TabsTrigger
-                  value="direction"
-                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-                >
-                  With Direction
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="closest" className="space-y-6">
-                <form onSubmit={handleClosestSubmit} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-slate-300 flex items-center">
-                        <MapPin className="h-4 w-4 mr-2 text-cyan-500" />
-                        Your Location
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="currentLat"
-                            className="text-xs text-slate-400"
-                          >
-                            Latitude
-                          </Label>
-                          <Input
-                            id="currentLat"
-                            placeholder="Latitude"
-                            value={currentLat}
-                            onChange={(e) => setCurrentLat(e.target.value)}
-                            className="bg-slate-800/50 border-slate-700 text-slate-300"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="currentLng"
-                            className="text-xs text-slate-400"
-                          >
-                            Longitude
-                          </Label>
-                          <Input
-                            id="currentLng"
-                            placeholder="Longitude"
-                            value={currentLng}
-                            onChange={(e) => setCurrentLng(e.target.value)}
-                            className="bg-slate-800/50 border-slate-700 text-slate-300"
-                            required
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-1 border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300"
-                        onClick={getCurrentLocation}
-                      >
-                        <Navigation className="mr-2 h-4 w-4" />
-                        Use Current Location
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="stageName"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <Compass className="h-4 w-4 mr-2 text-cyan-500" />
-                        Environment
-                      </Label>
-                      <Select value={stageName} onValueChange={setStageName}>
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select environment" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="development">
-                            Development
-                          </SelectItem>
-                          <SelectItem value="staging">Staging</SelectItem>
-                          <SelectItem value="production">Production</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                    disabled={isLoading}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Station Search Form */}
+          <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="text-slate-100">Find Stations</CardTitle>
+              <CardDescription className="text-slate-400">
+                Search for charging stations near you or along your route
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
+                <TabsList className="grid grid-cols-2 mb-4 bg-slate-800/50 p-1">
+                  <TabsTrigger
+                    value="closest"
+                    className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
                   >
-                    {isLoading ? (
-                      <>
-                        <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="mr-2 h-4 w-4" />
-                        Find Closest Stations
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="direction" className="space-y-6">
-                <form onSubmit={handleDirectionSubmit} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-slate-300 flex items-center">
-                        <MapPin className="h-4 w-4 mr-2 text-cyan-500" />
-                        Your Location
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="currentLat"
-                            className="text-xs text-slate-400"
-                          >
-                            Latitude
-                          </Label>
-                          <Input
-                            id="currentLat"
-                            placeholder="Latitude"
-                            value={currentLat}
-                            onChange={(e) => setCurrentLat(e.target.value)}
-                            className="bg-slate-800/50 border-slate-700 text-slate-300"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="currentLng"
-                            className="text-xs text-slate-400"
-                          >
-                            Longitude
-                          </Label>
-                          <Input
-                            id="currentLng"
-                            placeholder="Longitude"
-                            value={currentLng}
-                            onChange={(e) => setCurrentLng(e.target.value)}
-                            className="bg-slate-800/50 border-slate-700 text-slate-300"
-                            required
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-1 border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300"
-                        onClick={getCurrentLocation}
-                      >
-                        <Navigation className="mr-2 h-4 w-4" />
-                        Use Current Location
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-slate-300 flex items-center">
-                        <Route className="h-4 w-4 mr-2 text-cyan-500" />
-                        Destination
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="destinationLat"
-                            className="text-xs text-slate-400"
-                          >
-                            Latitude
-                          </Label>
-                          <Input
-                            id="destinationLat"
-                            placeholder="Latitude"
-                            value={destinationLat}
-                            onChange={(e) => setDestinationLat(e.target.value)}
-                            className="bg-slate-800/50 border-slate-700 text-slate-300"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="destinationLng"
-                            className="text-xs text-slate-400"
-                          >
-                            Longitude
-                          </Label>
-                          <Input
-                            id="destinationLng"
-                            placeholder="Longitude"
-                            value={destinationLng}
-                            onChange={(e) => setDestinationLng(e.target.value)}
-                            className="bg-slate-800/50 border-slate-700 text-slate-300"
-                            required
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="stageName"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <Compass className="h-4 w-4 mr-2 text-cyan-500" />
-                        Environment
-                      </Label>
-                      <Select value={stageName} onValueChange={setStageName}>
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select environment" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="development">
-                            Development
-                          </SelectItem>
-                          <SelectItem value="staging">Staging</SelectItem>
-                          <SelectItem value="production">Production</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                    disabled={isLoading}
+                    Closest Stations
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="direction"
+                    className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
                   >
-                    {isLoading ? (
-                      <>
-                        <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <Route className="mr-2 h-4 w-4" />
-                        Find Stations on Route
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+                    With Direction
+                  </TabsTrigger>
+                </TabsList>
 
-            {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
-          </CardContent>
-        </Card>
+                <TabsContent value="closest" className="space-y-6">
+                  <form onSubmit={handleClosestSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-slate-300 flex items-center">
+                          <MapPin className="h-4 w-4 mr-2 text-cyan-500" />
+                          Your Location
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="currentLat"
+                              className="text-xs text-slate-400"
+                            >
+                              Latitude
+                            </Label>
+                            <Input
+                              id="currentLat"
+                              placeholder="Latitude"
+                              value={currentLat}
+                              onChange={(e) => setCurrentLat(e.target.value)}
+                              className="bg-slate-800/50 border-slate-700 text-slate-300"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="currentLng"
+                              className="text-xs text-slate-400"
+                            >
+                              Longitude
+                            </Label>
+                            <Input
+                              id="currentLng"
+                              placeholder="Longitude"
+                              value={currentLng}
+                              onChange={(e) => setCurrentLng(e.target.value)}
+                              className="bg-slate-800/50 border-slate-700 text-slate-300"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-1 border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300"
+                          onClick={getCurrentLocation}
+                        >
+                          <Navigation className="mr-2 h-4 w-4" />
+                          Use Current Location
+                        </Button>
+                      </div>
 
-        {/* Map and Station Details */}
-        <div className="lg:col-span-2 space-y-6">
-          <CartoMap
-            center={mapCenter as [number, number]}
-            zoom={14}
-            markers={mapMarkers}
-            routes={mapRoutes}
-            height="400px"
-          />
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="stageName"
+                          className="text-slate-300 flex items-center"
+                        >
+                          <Compass className="h-4 w-4 mr-2 text-cyan-500" />
+                          Environment
+                        </Label>
+                        <Select value={stageName} onValueChange={setStageName}>
+                          <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
+                            <SelectValue placeholder="Select environment" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="development">
+                              Development
+                            </SelectItem>
+                            <SelectItem value="staging">Staging</SelectItem>
+                            <SelectItem value="production">
+                              Production
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
-          {stationData && (
-            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-slate-100">
-                  Nearest Charging Stations
-                </CardTitle>
-                <CardDescription className="text-slate-400">
-                  {activeTab === "closest"
-                    ? "Stations closest to your location"
-                    : "Stations along your route"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {stationData.map((station, index) => (
-                    <div
-                      key={station.id}
-                      className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50"
+                    <Button
+                      type="submit"
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                      disabled={isLoading}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center">
-                          <div
-                            className="h-10 w-10 rounded-full flex items-center justify-center mr-3"
-                            style={{
-                              backgroundColor: `${getAvailabilityColor(
-                                station.available,
-                                station.capacity
-                              )}30`,
-                              color: getAvailabilityColor(
-                                station.available,
-                                station.capacity
-                              ),
-                              borderColor: `${getAvailabilityColor(
-                                station.available,
-                                station.capacity
-                              )}50`,
-                              border: "1px solid",
-                            }}
-                          >
-                            <MapPin className="h-5 w-5" />
+                      {isLoading ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          Find Closest Stations
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="direction" className="space-y-6">
+                  <form onSubmit={handleDirectionSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-slate-300 flex items-center">
+                          <MapPin className="h-4 w-4 mr-2 text-cyan-500" />
+                          Your Location
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="currentLat"
+                              className="text-xs text-slate-400"
+                            >
+                              Latitude
+                            </Label>
+                            <Input
+                              id="currentLat"
+                              placeholder="Latitude"
+                              value={currentLat}
+                              onChange={(e) => setCurrentLat(e.target.value)}
+                              className="bg-slate-800/50 border-slate-700 text-slate-300"
+                              required
+                            />
                           </div>
-                          <div>
-                            <h3 className="text-md font-medium text-slate-200">
-                              {station.name}
-                            </h3>
-                            <p className="text-xs text-slate-400">
-                              ID: {station.id}
-                            </p>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="currentLng"
+                              className="text-xs text-slate-400"
+                            >
+                              Longitude
+                            </Label>
+                            <Input
+                              id="currentLng"
+                              placeholder="Longitude"
+                              value={currentLng}
+                              onChange={(e) => setCurrentLng(e.target.value)}
+                              className="bg-slate-800/50 border-slate-700 text-slate-300"
+                              required
+                            />
                           </div>
                         </div>
-                        <Badge className="bg-slate-800/50 text-slate-300 border-slate-600/50">
-                          {station.distance} km away
-                        </Badge>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-1 border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300"
+                          onClick={getCurrentLocation}
+                        >
+                          <Navigation className="mr-2 h-4 w-4" />
+                          Use Current Location
+                        </Button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div>
-                          <p className="text-xs text-slate-400 mb-1">
-                            Location
-                          </p>
-                          <p className="text-sm text-slate-300">
-                            {station.lat.toFixed(6)}, {station.lng.toFixed(6)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-1">
-                            Availability
-                          </p>
-                          <p className="text-sm text-slate-300">
-                            {station.available} of {station.capacity} slots
-                          </p>
+                      <div className="space-y-2">
+                        <Label className="text-slate-300 flex items-center">
+                          <Route className="h-4 w-4 mr-2 text-cyan-500" />
+                          Destination
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="destinationLat"
+                              className="text-xs text-slate-400"
+                            >
+                              Latitude
+                            </Label>
+                            <Input
+                              id="destinationLat"
+                              placeholder="Latitude"
+                              value={destinationLat}
+                              onChange={(e) =>
+                                setDestinationLat(e.target.value)
+                              }
+                              className="bg-slate-800/50 border-slate-700 text-slate-300"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="destinationLng"
+                              className="text-xs text-slate-400"
+                            >
+                              Longitude
+                            </Label>
+                            <Input
+                              id="destinationLng"
+                              placeholder="Longitude"
+                              value={destinationLng}
+                              onChange={(e) =>
+                                setDestinationLng(e.target.value)
+                              }
+                              className="bg-slate-800/50 border-slate-700 text-slate-300"
+                              required
+                            />
+                          </div>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">Availability</span>
-                          <span
-                            style={{
-                              color: getAvailabilityColor(
-                                station.available,
-                                station.capacity
-                              ),
-                            }}
-                          >
-                            {Math.round(
-                              (station.available / station.capacity) * 100
-                            )}
-                            %
-                          </span>
-                        </div>
-                        <Progress
-                          value={(station.available / station.capacity) * 100}
-                          className="h-1.5 bg-slate-700"
+                        <Label
+                          htmlFor="stageName"
+                          className="text-slate-300 flex items-center"
                         >
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${
-                                (station.available / station.capacity) * 100
-                              }%`,
-                              backgroundColor: getAvailabilityColor(
-                                station.available,
-                                station.capacity
-                              ),
-                            }}
-                          />
-                        </Progress>
-                      </div>
-
-                      <div className="mt-3 flex justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300"
-                          onClick={() => {
-                            // In a real app, this would navigate to directions
-                            window.open(
-                              `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`,
-                              "_blank"
-                            );
-                          }}
-                        >
-                          <Navigation className="mr-2 h-4 w-4" />
-                          Get Directions
-                        </Button>
+                          <Compass className="h-4 w-4 mr-2 text-cyan-500" />
+                          Environment
+                        </Label>
+                        <Select value={stageName} onValueChange={setStageName}>
+                          <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
+                            <SelectValue placeholder="Select environment" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="development">
+                              Development
+                            </SelectItem>
+                            <SelectItem value="staging">Staging</SelectItem>
+                            <SelectItem value="production">
+                              Production
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Route className="mr-2 h-4 w-4" />
+                          Find Stations on Route
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+
+              {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
+            </CardContent>
+          </Card>
+
+          {/* Map and Station Details */}
+          <div className="lg:col-span-2 space-y-6">
+            <CartoMap
+              center={mapCenter as [number, number]}
+              zoom={14}
+              markers={mapMarkers}
+              routes={mapRoutes}
+              height="400px"
+            />
+
+            {stationData && (
+              <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-slate-100">
+                    Nearest Charging Stations
+                  </CardTitle>
+                  <CardDescription className="text-slate-400">
+                    {activeTab === "closest"
+                      ? "Stations closest to your location"
+                      : "Stations along your route"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {stationData.map((station, index) => (
+                      <div
+                        key={station.id}
+                        className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center">
+                            <div
+                              className="h-10 w-10 rounded-full flex items-center justify-center mr-3"
+                              style={{
+                                backgroundColor: `${getAvailabilityColor(
+                                  station.available,
+                                  station.capacity
+                                )}30`,
+                                color: getAvailabilityColor(
+                                  station.available,
+                                  station.capacity
+                                ),
+                                borderColor: `${getAvailabilityColor(
+                                  station.available,
+                                  station.capacity
+                                )}50`,
+                                border: "1px solid",
+                              }}
+                            >
+                              <MapPin className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h3 className="text-md font-medium text-slate-200">
+                                {station.name}
+                              </h3>
+                              <p className="text-xs text-slate-400">
+                                ID: {station.id}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge className="bg-slate-800/50 text-slate-300 border-slate-600/50">
+                            {station.distance} km away
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <p className="text-xs text-slate-400 mb-1">
+                              Location
+                            </p>
+                            <p className="text-sm text-slate-300">
+                              {station.lat.toFixed(6)}, {station.lng.toFixed(6)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-1">
+                              Availability
+                            </p>
+                            <p className="text-sm text-slate-300">
+                              {station.available} of {station.capacity} slots
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400">Availability</span>
+                            <span
+                              style={{
+                                color: getAvailabilityColor(
+                                  station.available,
+                                  station.capacity
+                                ),
+                              }}
+                            >
+                              {Math.round(
+                                (station.available / station.capacity) * 100
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <Progress
+                            value={(station.available / station.capacity) * 100}
+                            className="h-1.5 bg-slate-700"
+                          >
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${
+                                  (station.available / station.capacity) * 100
+                                }%`,
+                                backgroundColor: getAvailabilityColor(
+                                  station.available,
+                                  station.capacity
+                                ),
+                              }}
+                            />
+                          </Progress>
+                        </div>
+
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300"
+                            onClick={() => {
+                              // In a real app, this would navigate to directions
+                              window.open(
+                                `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`,
+                                "_blank"
+                              );
+                            }}
+                          >
+                            <Navigation className="mr-2 h-4 w-4" />
+                            Get Directions
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

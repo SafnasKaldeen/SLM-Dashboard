@@ -18,7 +18,6 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2,
   MapPin,
@@ -36,43 +35,8 @@ import {
   Activity,
 } from "lucide-react";
 
-interface TrackingPoint {
-  longDir: string;
-  long: number;
-  lat: number;
-  ctime: number;
-  latDir: string;
-  tboxId: string;
-  tbox_id: string;
-  timestamp: string;
-}
-
-interface ScooterTrackingMapProps {
-  dateRange?: { from: Date; to: Date };
-}
-
-interface FilterState {
-  paths: boolean;
-  startPoints: boolean;
-  endPoints: boolean;
-  currentPositions: boolean;
-}
-
-interface ScooterFilters {
-  [key: string]: boolean;
-}
-
-interface TimeRange {
-  start: number | null;
-  end: number | null;
-}
-
 // Custom Leaflet Icons
-const createCustomIcon = (
-  color: string,
-  iconSvg: string,
-  size: [number, number] = [24, 24]
-) => {
+const createCustomIcon = (color, iconSvg, size = [24, 24]) => {
   return L.divIcon({
     html: `
       <div style="
@@ -134,11 +98,11 @@ const addLeafletCustomStyles = () => {
     }
     
     .leaflet-popup-content-wrapper {
-      background: rgba(15, 23, 42, 0.9);
+      background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
       color: white;
       border-radius: 12px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      border: 1px solid #475569;
+      border: 1px solid rgba(255,255,255,0.1);
     }
     
     .leaflet-popup-content {
@@ -149,8 +113,8 @@ const addLeafletCustomStyles = () => {
     }
     
     .leaflet-popup-tip {
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid #475569;
+      background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+      border: 1px solid rgba(255,255,255,0.1);
     }
     
     .leaflet-popup-close-button {
@@ -187,7 +151,7 @@ const addLeafletCustomStyles = () => {
     
     .info-value {
       font-weight: 600;
-      color: #06b6d4;
+      color: #60a5fa;
     }
     
     .time-badge {
@@ -195,11 +159,11 @@ const addLeafletCustomStyles = () => {
       align-items: center;
       gap: 4px;
       padding: 3px 8px;
-      background: rgba(6, 182, 212, 0.2);
-      border: 1px solid rgba(6, 182, 212, 0.3);
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.3);
       border-radius: 12px;
       font-size: 11px;
-      color: #67e8f9;
+      color: #93c5fd;
       margin-top: 8px;
     }
   `;
@@ -207,287 +171,276 @@ const addLeafletCustomStyles = () => {
 };
 
 // Hardcoded GPS tracking data
-const trackingData: TrackingPoint[] = [
-  // Starting point - leaving parking area
+const trackingData = [
+  // Scooter 1
   {
     longDir: "E",
     long: 79.985743,
-    lat: 6.696449,
+    lat: 6.696449166666667,
     ctime: 1738601954,
     latDir: "N",
     tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     timestamp: "2025-02-03 22:29:14+05:30",
   },
-  // Moving north on main road
   {
     longDir: "E",
-    long: 79.986234,
-    lat: 6.698123,
+    long: 79.98676700000001,
+    lat: 6.698796000000001,
     ctime: 1738601985,
     latDir: "N",
     tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     timestamp: "2025-02-03 22:29:45+05:30",
   },
-  // Continuing straight north
   {
     longDir: "E",
-    long: 79.986891,
-    lat: 6.700456,
+    long: 79.987891,
+    lat: 6.701143,
     ctime: 1738602016,
     latDir: "N",
     tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     timestamp: "2025-02-03 22:30:16+05:30",
   },
-  // Right turn - heading east
   {
     longDir: "E",
-    long: 79.989456,
-    lat: 6.701245,
+    long: 79.989015,
+    lat: 6.70349,
     ctime: 1738602047,
     latDir: "N",
     tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     timestamp: "2025-02-03 22:30:47+05:30",
   },
-  // Following curved road eastward
   {
     longDir: "E",
-    long: 79.992123,
-    lat: 6.701789,
+    long: 79.990139,
+    lat: 6.705837,
     ctime: 1738602078,
     latDir: "N",
     tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
     timestamp: "2025-02-03 22:31:18+05:30",
   },
-  // Slight curve south
+
+  // Scooter 2
   {
     longDir: "E",
-    long: 79.994834,
-    lat: 6.700956,
-    ctime: 1738602109,
+    long: 79.975123,
+    lat: 6.710234,
+    ctime: 1738601920,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:31:49+05:30",
+    tboxId: "bc123456-7890-1234-5678-9abcdef12345",
+    tbox_id: "bc123456-7890-1234-5678-9abcdef12345",
+    timestamp: "2025-02-03 22:28:40+05:30",
   },
-  // Traffic light stop - same position for longer time
   {
     longDir: "E",
-    long: 79.995567,
-    lat: 6.700123,
-    ctime: 1738602140,
+    long: 79.976247,
+    lat: 6.712581,
+    ctime: 1738601951,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:32:20+05:30",
+    tboxId: "bc123456-7890-1234-5678-9abcdef12345",
+    tbox_id: "bc123456-7890-1234-5678-9abcdef12345",
+    timestamp: "2025-02-03 22:29:11+05:30",
   },
-  // Moving again - slight southeast
   {
     longDir: "E",
-    long: 79.996891,
-    lat: 6.699789,
-    ctime: 1738602171,
+    long: 79.977371,
+    lat: 6.714928,
+    ctime: 1738601982,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:32:51+05:30",
+    tboxId: "bc123456-7890-1234-5678-9abcdef12345",
+    tbox_id: "bc123456-7890-1234-5678-9abcdef12345",
+    timestamp: "2025-02-03 22:29:42+05:30",
   },
-  // Left turn - heading north again
   {
     longDir: "E",
-    long: 79.997234,
-    lat: 6.701456,
-    ctime: 1738602202,
+    long: 79.978495,
+    lat: 6.717275,
+    ctime: 1738602013,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:33:22+05:30",
+    tboxId: "bc123456-7890-1234-5678-9abcdef12345",
+    tbox_id: "bc123456-7890-1234-5678-9abcdef12345",
+    timestamp: "2025-02-03 22:30:13+05:30",
   },
-  // Following winding road north
   {
     longDir: "E",
-    long: 79.998567,
-    lat: 6.703123,
-    ctime: 1738602233,
+    long: 79.979619,
+    lat: 6.719622,
+    ctime: 1738602044,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:33:53+05:30",
+    tboxId: "bc123456-7890-1234-5678-9abcdef12345",
+    tbox_id: "bc123456-7890-1234-5678-9abcdef12345",
+    timestamp: "2025-02-03 22:30:44+05:30",
   },
-  // Sharp right turn - heading east
+
+  // Scooter 3
   {
     longDir: "E",
-    long: 80.000923,
-    lat: 6.703734,
-    ctime: 1738602264,
+    long: 79.995,
+    lat: 6.685,
+    ctime: 1738601800,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:34:24+05:30",
+    tboxId: "def78901-2345-6789-0123-456789abcdef",
+    tbox_id: "def78901-2345-6789-0123-456789abcdef",
+    timestamp: "2025-02-03 22:26:40+05:30",
   },
-  // Continuing east on highway
   {
     longDir: "E",
-    long: 80.003456,
-    lat: 6.70489,
-    ctime: 1738602295,
+    long: 79.996124,
+    lat: 6.687347,
+    ctime: 1738601831,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:34:55+05:30",
+    tboxId: "def78901-2345-6789-0123-456789abcdef",
+    tbox_id: "def78901-2345-6789-0123-456789abcdef",
+    timestamp: "2025-02-03 22:27:11+05:30",
   },
-  // Gentle curve south
   {
     longDir: "E",
-    long: 80.005789,
-    lat: 6.703567,
-    ctime: 1738602326,
+    long: 79.997248,
+    lat: 6.689694,
+    ctime: 1738601862,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:35:26+05:30",
+    tboxId: "def78901-2345-6789-0123-456789abcdef",
+    tbox_id: "def78901-2345-6789-0123-456789abcdef",
+    timestamp: "2025-02-03 22:27:42+05:30",
   },
-  // Exit ramp - heading southwest
   {
     longDir: "E",
-    long: 80.006567,
-    lat: 6.701234,
-    ctime: 1738602357,
+    long: 79.998372,
+    lat: 6.692041,
+    ctime: 1738601893,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:35:57+05:30",
+    tboxId: "def78901-2345-6789-0123-456789abcdef",
+    tbox_id: "def78901-2345-6789-0123-456789abcdef",
+    timestamp: "2025-02-03 22:28:13+05:30",
   },
-  // Roundabout - circular motion
   {
     longDir: "E",
-    long: 80.007234,
-    lat: 6.69989,
-    ctime: 1738602388,
+    long: 79.999496,
+    lat: 6.694388,
+    ctime: 1738601924,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:36:28+05:30",
+    tboxId: "def78901-2345-6789-0123-456789abcdef",
+    tbox_id: "def78901-2345-6789-0123-456789abcdef",
+    timestamp: "2025-02-03 22:28:44+05:30",
   },
-  // Exiting roundabout - heading south
+
+  // Additional points for other scooters
   {
     longDir: "E",
-    long: 80.007123,
-    lat: 6.697567,
-    ctime: 1738602419,
+    long: 79.96,
+    lat: 6.72,
+    ctime: 1738601700,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:36:59+05:30",
+    tboxId: "abc12345-6789-0123-4567-89abcdef0123",
+    tbox_id: "abc12345-6789-0123-4567-89abcdef0123",
+    timestamp: "2025-02-03 22:25:00+05:30",
   },
-  // Residential area - slower movement
   {
     longDir: "E",
-    long: 80.006456,
-    lat: 6.695234,
-    ctime: 1738602450,
+    long: 79.9615,
+    lat: 6.7225,
+    ctime: 1738601760,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:37:30+05:30",
+    tboxId: "abc12345-6789-0123-4567-89abcdef0123",
+    tbox_id: "abc12345-6789-0123-4567-89abcdef0123",
+    timestamp: "2025-02-03 22:26:00+05:30",
   },
-  // Left turn into side street
   {
     longDir: "E",
-    long: 80.007789,
-    lat: 6.69489,
-    ctime: 1738602481,
+    long: 79.963,
+    lat: 6.725,
+    ctime: 1738601820,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:38:01+05:30",
+    tboxId: "abc12345-6789-0123-4567-89abcdef0123",
+    tbox_id: "abc12345-6789-0123-4567-89abcdef0123",
+    timestamp: "2025-02-03 22:27:00+05:30",
   },
-  // Parking maneuver - backing up slightly
   {
     longDir: "E",
-    long: 80.008567,
-    lat: 6.694567,
-    ctime: 1738602512,
+    long: 79.9645,
+    lat: 6.7275,
+    ctime: 1738601880,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:38:32+05:30",
+    tboxId: "abc12345-6789-0123-4567-89abcdef0123",
+    tbox_id: "abc12345-6789-0123-4567-89abcdef0123",
+    timestamp: "2025-02-03 22:28:00+05:30",
   },
-  // Final destination - parked
   {
     longDir: "E",
-    long: 80.008234,
-    lat: 6.694234,
-    ctime: 1738602543,
+    long: 79.966,
+    lat: 6.73,
+    ctime: 1738601940,
     latDir: "N",
-    tboxId: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    tbox_id: "06347782-5fae-4e42-bdfb-b32aa6a633d7",
-    timestamp: "2025-02-03 22:39:03+05:30",
+    tboxId: "abc12345-6789-0123-4567-89abcdef0123",
+    tbox_id: "abc12345-6789-0123-4567-89abcdef0123",
+    timestamp: "2025-02-03 22:29:00+05:30",
   },
 ];
 
-export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
-  const [loading, setLoading] = useState(true);
+const ScooterTrackingMap = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterState>({
+  const [filters, setFilters] = useState({
     paths: true,
     startPoints: true,
     endPoints: true,
     currentPositions: true,
   });
-  const [scooterFilters, setScooterFilters] = useState<ScooterFilters>({});
-  const [timeRange, setTimeRange] = useState<TimeRange>({
-    start: null,
-    end: null,
-  });
-  const [currentTime, setCurrentTime] = useState<number | null>(null);
+  const [scooterFilters, setScooterFilters] = useState({});
+  const [timeRange, setTimeRange] = useState({ start: null, end: null });
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(null);
 
   useEffect(() => {
     addLeafletCustomStyles();
 
-    // Simulate API call
-    setTimeout(() => {
-      // Initialize scooter filters
-      const uniqueScooters = [
-        ...new Set(trackingData.map((point) => point.tbox_id)),
-      ];
-      const initialScooterFilters: ScooterFilters = {};
-      uniqueScooters.forEach((scooterId) => {
-        initialScooterFilters[scooterId] = true;
-      });
-      setScooterFilters(initialScooterFilters);
+    // Initialize scooter filters
+    const uniqueScooters = [
+      ...new Set(trackingData.map((point) => point.tbox_id)),
+    ];
+    const initialScooterFilters = {};
+    uniqueScooters.forEach((scooterId) => {
+      initialScooterFilters[scooterId] = true;
+    });
+    setScooterFilters(initialScooterFilters);
 
-      // Set time range
-      const times = trackingData.map((point) => point.ctime);
-      setTimeRange({
-        start: Math.min(...times),
-        end: Math.max(...times),
-      });
+    // Set time range
+    const times = trackingData.map((point) => point.ctime);
+    setTimeRange({
+      start: Math.min(...times),
+      end: Math.max(...times),
+    });
 
-      setLoading(false);
-    }, 1500);
-  }, [dateRange]);
+    setTimeout(() => setIsLoading(false), 500);
+  }, []);
 
-  const toggleFilter = (filterType: keyof FilterState) => {
+  const toggleFilter = (filterType) => {
     setFilters((prev) => ({
       ...prev,
       [filterType]: !prev[filterType],
     }));
   };
 
-  const toggleScooterFilter = (scooterId: string) => {
+  const toggleScooterFilter = (scooterId) => {
     setScooterFilters((prev) => ({
       ...prev,
       [scooterId]: !prev[scooterId],
     }));
   };
 
+  const formatTimestamp = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   const getScooterPaths = () => {
-    const paths: { [key: string]: [number, number][] } = {};
+    const paths = {};
     const filteredData = trackingData.filter(
       (point) =>
         scooterFilters[point.tbox_id] &&
@@ -504,21 +457,21 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
     return paths;
   };
 
-  const getScooterColor = (scooterId: string) => {
+  const getScooterColor = (scooterId) => {
     const colors = [
-      "#06b6d4",
+      "#3b82f6",
       "#ef4444",
       "#10b981",
       "#f59e0b",
       "#8b5cf6",
-      "#3b82f6",
+      "#06b6d4",
     ];
     const index = Object.keys(scooterFilters).indexOf(scooterId);
     return colors[index % colors.length];
   };
 
   const getScooterPoints = () => {
-    const points: { [key: string]: TrackingPoint[] } = {};
+    const points = {};
     const filteredData = trackingData.filter(
       (point) =>
         scooterFilters[point.tbox_id] &&
@@ -541,35 +494,22 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
   const paths = getScooterPaths();
   const points = getScooterPoints();
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[400px]">
-        <div className="flex flex-col items-center">
-          <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-          <p className="mt-2 text-sm text-slate-300">
-            Loading tracking data...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full space-y-4">
-      {/* Stats Cards */}
+      {/* Stats and Controls */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-cyan-400">
+                <p className="text-sm font-medium text-blue-600">
                   Active Scooters
                 </p>
-                <p className="text-2xl font-bold text-slate-100">
+                <p className="text-2xl font-bold text-blue-700">
                   {Object.values(scooterFilters).filter(Boolean).length}
                 </p>
               </div>
-              <Activity className="w-8 h-8 text-cyan-500" />
+              <Activity className="w-8 h-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
@@ -578,8 +518,8 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-400">GPS Points</p>
-                <p className="text-2xl font-bold text-slate-100">
+                <p className="text-sm font-medium text-green-600">GPS Points</p>
+                <p className="text-2xl font-bold text-green-700">
                   {trackingData.length}
                 </p>
               </div>
@@ -592,12 +532,12 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-400">
+                <p className="text-sm font-medium text-purple-600">
                   Total Distance
                 </p>
-                <p className="text-2xl font-bold text-slate-100">15.2km</p>
+                <p className="text-2xl font-bold text-purple-700">15.2km</p>
               </div>
-              <Route className="w-8 h-8 text-blue-500" />
+              <Route className="w-8 h-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>
@@ -606,8 +546,8 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-orange-400">Time Span</p>
-                <p className="text-2xl font-bold text-slate-100">4m 26s</p>
+                <p className="text-sm font-medium text-orange-600">Time Span</p>
+                <p className="text-2xl font-bold text-orange-700">4m 26s</p>
               </div>
               <Clock className="w-8 h-8 text-orange-500" />
             </div>
@@ -620,160 +560,159 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
         <Card className="lg:col-span-1 bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-cyan-500" />
-              <CardTitle className="text-lg text-slate-100">
+              <Filter className="w-5 h-5 text-indigo-600" />
+              <CardTitle className="text-lg text-gray-800">
                 Filters & Controls
               </CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Tabs defaultValue="elements">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="elements">Elements</TabsTrigger>
-                <TabsTrigger value="scooters">Scooters</TabsTrigger>
-              </TabsList>
+            {/* Map Elements */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-gray-600">
+                Map Elements
+              </h4>
 
-              <TabsContent value="elements" className="space-y-2">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <Route className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Paths
+                  </span>
+                </div>
+                <button
+                  onClick={() => toggleFilter("paths")}
+                  className={`p-1 rounded-full transition-colors ${
+                    filters.paths
+                      ? "text-blue-600 hover:bg-blue-100"
+                      : "text-gray-400 hover:bg-gray-100"
+                  }`}
+                >
+                  {filters.paths ? (
+                    <Eye className="w-4 h-4" />
+                  ) : (
+                    <EyeOff className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <Play className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Start Points
+                  </span>
+                </div>
+                <button
+                  onClick={() => toggleFilter("startPoints")}
+                  className={`p-1 rounded-full transition-colors ${
+                    filters.startPoints
+                      ? "text-green-600 hover:bg-green-100"
+                      : "text-gray-400 hover:bg-gray-100"
+                  }`}
+                >
+                  {filters.startPoints ? (
+                    <Eye className="w-4 h-4" />
+                  ) : (
+                    <EyeOff className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <Pause className="w-4 h-4 text-red-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    End Points
+                  </span>
+                </div>
+                <button
+                  onClick={() => toggleFilter("endPoints")}
+                  className={`p-1 rounded-full transition-colors ${
+                    filters.endPoints
+                      ? "text-red-600 hover:bg-red-100"
+                      : "text-gray-400 hover:bg-gray-100"
+                  }`}
+                >
+                  {filters.endPoints ? (
+                    <Eye className="w-4 h-4" />
+                  ) : (
+                    <EyeOff className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Scooter Filters */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-gray-600">
+                Scooters ({uniqueScooters.length})
+              </h4>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {uniqueScooters.map((scooterId, index) => (
+                  <div
+                    key={scooterId}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-900/50 border-slate-700/50 backdrop-blur-sm"
+                  >
                     <div className="flex items-center gap-2">
-                      <Route className="w-4 h-4 text-cyan-500" />
-                      <span className="text-sm font-medium text-slate-300">
-                        Paths
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: getScooterColor(scooterId) }}
+                      ></div>
+                      <span className="text-xs font-medium text-gray-700">
+                        Scooter {index + 1}
                       </span>
                     </div>
                     <button
-                      onClick={() => toggleFilter("paths")}
+                      onClick={() => toggleScooterFilter(scooterId)}
                       className={`p-1 rounded-full transition-colors ${
-                        filters.paths
-                          ? "text-cyan-500 hover:bg-cyan-500/10"
-                          : "text-slate-500 hover:bg-slate-700/50"
+                        scooterFilters[scooterId]
+                          ? "text-indigo-600 hover:bg-indigo-100"
+                          : "text-gray-400 hover:bg-gray-100"
                       }`}
                     >
-                      {filters.paths ? (
-                        <Eye className="w-4 h-4" />
+                      {scooterFilters[scooterId] ? (
+                        <Eye className="w-3 h-3" />
                       ) : (
-                        <EyeOff className="w-4 h-4" />
+                        <EyeOff className="w-3 h-3" />
                       )}
                     </button>
                   </div>
+                ))}
+              </div>
+            </div>
 
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
-                    <div className="flex items-center gap-2">
-                      <Play className="w-4 h-4 text-green-500" />
-                      <span className="text-sm font-medium text-slate-300">
-                        Start Points
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => toggleFilter("startPoints")}
-                      className={`p-1 rounded-full transition-colors ${
-                        filters.startPoints
-                          ? "text-green-500 hover:bg-green-500/10"
-                          : "text-slate-500 hover:bg-slate-700/50"
-                      }`}
-                    >
-                      {filters.startPoints ? (
-                        <Eye className="w-4 h-4" />
-                      ) : (
-                        <EyeOff className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
-                    <div className="flex items-center gap-2">
-                      <Pause className="w-4 h-4 text-red-500" />
-                      <span className="text-sm font-medium text-slate-300">
-                        End Points
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => toggleFilter("endPoints")}
-                      className={`p-1 rounded-full transition-colors ${
-                        filters.endPoints
-                          ? "text-red-500 hover:bg-red-500/10"
-                          : "text-slate-500 hover:bg-slate-700/50"
-                      }`}
-                    >
-                      {filters.endPoints ? (
-                        <Eye className="w-4 h-4" />
-                      ) : (
-                        <EyeOff className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="scooters" className="space-y-2">
-                <div className="max-h-48 overflow-y-auto space-y-1">
-                  {uniqueScooters.map((scooterId, index) => (
-                    <div
-                      key={scooterId}
-                      className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{
-                            backgroundColor: getScooterColor(scooterId),
-                          }}
-                        />
-                        <span className="text-xs font-medium text-slate-300">
-                          Scooter {index + 1}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => toggleScooterFilter(scooterId)}
-                        className={`p-1 rounded-full transition-colors ${
-                          scooterFilters[scooterId]
-                            ? "text-cyan-500 hover:bg-cyan-500/10"
-                            : "text-slate-500 hover:bg-slate-700/50"
-                        }`}
-                      >
-                        {scooterFilters[scooterId] ? (
-                          <Eye className="w-3 h-3" />
-                        ) : (
-                          <EyeOff className="w-3 h-3" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-2 border-t border-slate-700/50">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        const allOn: ScooterFilters = {};
-                        uniqueScooters.forEach((id) => (allOn[id] = true));
-                        setScooterFilters(allOn);
-                        setFilters({
-                          paths: true,
-                          startPoints: true,
-                          endPoints: true,
-                          currentPositions: true,
-                        });
-                      }}
-                      className="flex-1 px-2 py-1 text-xs font-medium text-cyan-400 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-cyan-500/10 transition-colors"
-                    >
-                      Show All
-                    </button>
-                    <button
-                      onClick={() => {
-                        const allOff: ScooterFilters = {};
-                        uniqueScooters.forEach((id) => (allOff[id] = false));
-                        setScooterFilters(allOff);
-                      }}
-                      className="flex-1 px-2 py-1 text-xs font-medium text-slate-400 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors"
-                    >
-                      Hide All
-                    </button>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+            {/* Quick Actions */}
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const allOn = {};
+                    uniqueScooters.forEach((id) => (allOn[id] = true));
+                    setScooterFilters(allOn);
+                    setFilters({
+                      paths: true,
+                      startPoints: true,
+                      endPoints: true,
+                      currentPositions: true,
+                    });
+                  }}
+                  className="flex-1 px-2 py-1 text-xs font-medium text-indigo-600 bg-slate-900/50 border-slate-700/50 backdrop-blur-sm rounded-lg hover:bg-indigo-100 transition-colors"
+                >
+                  Show All
+                </button>
+                <button
+                  onClick={() => {
+                    const allOff = {};
+                    uniqueScooters.forEach((id) => (allOff[id] = false));
+                    setScooterFilters(allOff);
+                  }}
+                  className="flex-1 px-2 py-1 text-xs font-medium text-gray-600 bg-slate-900/50 border-slate-700/50 backdrop-blur-sm rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  Hide All
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -793,7 +732,7 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
             </div>
           </CardHeader>
           <CardContent className="h-[600px] relative z-0 p-0">
-            {loading ? (
+            {isLoading ? (
               <div className="flex flex-col justify-center items-center h-full bg-gray-900 rounded-b-lg">
                 <Loader2 className="w-12 h-12 animate-spin text-indigo-400 mb-4" />
                 <p className="text-gray-300 animate-pulse">
@@ -1118,6 +1057,6 @@ export function ScooterTrackingMap({ dateRange }: ScooterTrackingMapProps) {
       </Card>
     </div>
   );
-}
+};
 
 export default ScooterTrackingMap;

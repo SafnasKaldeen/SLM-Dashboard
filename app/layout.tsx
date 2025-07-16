@@ -24,14 +24,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      suppressHydrationWarning
       className={isDarkMode ? "dark" : ""}
       style={isDarkMode ? { colorScheme: "dark" } : {}}
     >
       <body>
-        <div className="scrollbar-thin scrollbar-track-slate-800 scrollbar-thumb-slate-600 hover:scrollbar-thumb-slate-500">
-          <DashboardLayout>{children}</DashboardLayout>
-        </div>
+        <DashboardLayout>{children}</DashboardLayout>
       </body>
     </html>
   );

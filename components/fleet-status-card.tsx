@@ -1,24 +1,21 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Battery, Cpu, MapPin, AlertTriangle } from "lucide-react";
-import StatusItem from "./status-item";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card"
+import { Battery, Cpu, MapPin, AlertTriangle } from "lucide-react"
+import StatusItem from "./status-item"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface FleetStatusCardProps {
   data: {
-    totalScooters: number;
-    activeScooters: number;
-    inactiveScooters: number;
-    alertsCount: number;
-    batteryAvg: number;
-    motorHealth: number;
-  };
-  isLoading: boolean;
+    totalScooters: number
+    activeScooters: number
+    inactiveScooters: number
+    alertsCount: number
+    batteryAvg: number
+    motorHealth: number
+  }
+  isLoading: boolean
 }
 
-export default function FleetStatusCard({
-  data,
-  isLoading,
-}: FleetStatusCardProps) {
+export default function FleetStatusCard({ data, isLoading }: FleetStatusCardProps) {
   if (isLoading) {
     return (
       <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
@@ -38,47 +35,26 @@ export default function FleetStatusCard({
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
-  const {
-    totalScooters,
-    activeScooters,
-    inactiveScooters,
-    alertsCount,
-    batteryAvg,
-    motorHealth,
-  } = data;
+  const { totalScooters, activeScooters, inactiveScooters, alertsCount, batteryAvg, motorHealth } = data
 
   // Calculate status based on values
-  const getAlertStatus = (count: number) =>
-    count > 10 ? "critical" : count > 5 ? "warning" : "normal";
-  const getBatteryStatus = (avg: number) =>
-    avg < 30 ? "critical" : avg < 50 ? "warning" : "normal";
-  const getMotorStatus = (health: number) =>
-    health < 70 ? "critical" : health < 85 ? "warning" : "normal";
+  const getAlertStatus = (count: number) => (count > 10 ? "critical" : count > 5 ? "warning" : "normal")
+  const getBatteryStatus = (avg: number) => (avg < 30 ? "critical" : avg < 50 ? "warning" : "normal")
+  const getMotorStatus = (health: number) => (health < 70 ? "critical" : health < 85 ? "warning" : "normal")
 
   return (
     <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
       <CardContent className="p-6">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <StatusItem
-            label="Total Scooters"
-            value={totalScooters}
-            icon={<MapPin className="h-5 w-5" />}
-          />
-          <StatusItem
-            label="Active"
-            value={activeScooters}
-            status="normal"
-            icon={<MapPin className="h-5 w-5" />}
-          />
+          <StatusItem label="Total Scooters" value={totalScooters} icon={<MapPin className="h-5 w-5" />} />
+          <StatusItem label="Active" value={activeScooters} status="normal" icon={<MapPin className="h-5 w-5" />} />
           <StatusItem
             label="Inactive"
             value={inactiveScooters}
-            status={
-              inactiveScooters > totalScooters * 0.3 ? "warning" : "normal"
-            }
+            status={inactiveScooters > totalScooters * 0.3 ? "warning" : "normal"}
             icon={<MapPin className="h-5 w-5" />}
           />
           <StatusItem
@@ -102,5 +78,5 @@ export default function FleetStatusCard({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

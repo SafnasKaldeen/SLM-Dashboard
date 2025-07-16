@@ -3,7 +3,6 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { MainSidebar } from "@/components/main-sidebar";
 import { Header } from "@/components/header";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -50,21 +49,17 @@ export default function DashboardLayout({
 
         <div className="flex h-screen">
           <SidebarProvider>
-            {/* Fixed width sidebar with ScrollArea */}
+            {/* Fixed width sidebar */}
             <div className="w-64 shrink-0">
-              <ScrollArea className="h-screen">
-                <MainSidebar />
-              </ScrollArea>
+              <MainSidebar />
             </div>
 
-            {/* Main content with ScrollArea */}
+            {/* Main content with left margin to avoid overlap */}
             <div className="flex-1 flex flex-col">
               <Header />
-              <ScrollArea className="flex-1">
-                <main className="py-6">
-                  <div className="container mx-auto">{children}</div>
-                </main>
-              </ScrollArea>
+              <main className="flex-1 overflow-auto py-6">
+                <div className="container mx-auto">{children}</div>
+              </main>
             </div>
           </SidebarProvider>
         </div>

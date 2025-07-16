@@ -1,7 +1,7 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react"
+import { Loader2, AlertTriangle } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -12,64 +12,50 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
-} from "recharts";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+} from "recharts"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 
 interface BatteryAnomalyDetectionProps {
-  dateRange: { from: Date; to: Date };
-  batteryId: string;
+  dateRange: { from: Date; to: Date }
+  batteryId: string
 }
 
-export function BatteryAnomalyDetection({
-  dateRange,
-  batteryId,
-}: BatteryAnomalyDetectionProps) {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any[]>([]);
-  const [anomalies, setAnomalies] = useState<any[]>([]);
+export function BatteryAnomalyDetection({ dateRange, batteryId }: BatteryAnomalyDetectionProps) {
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<any[]>([])
+  const [anomalies, setAnomalies] = useState<any[]>([])
 
   useEffect(() => {
     // Simulate API call
     setTimeout(() => {
       // Generate voltage data with some anomalies
-      const voltageData = [];
-      const anomalyList = [];
-      const startDate = new Date(dateRange.from);
-      const endDate = new Date(dateRange.to);
+      const voltageData = []
+      const anomalyList = []
+      const startDate = new Date(dateRange.from)
+      const endDate = new Date(dateRange.to)
 
       // Base voltage
-      const baseVoltage = 3.82;
+      const baseVoltage = 3.82
 
-      let dayCounter = 0;
-      for (
-        let date = new Date(startDate);
-        date <= endDate;
-        date.setDate(date.getDate() + 1)
-      ) {
-        dayCounter++;
+      let dayCounter = 0
+      for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+        dayCounter++
 
         // Normal voltage with small random variations
-        let voltage = baseVoltage + (Math.random() * 0.04 - 0.02);
+        let voltage = baseVoltage + (Math.random() * 0.04 - 0.02)
 
         // Create some anomalies
-        let hasAnomaly = false;
-        let anomalyType = "";
-        let severity = "";
+        let hasAnomaly = false
+        let anomalyType = ""
+        let severity = ""
 
         // Voltage drop anomaly around day 7
         if (dayCounter === 7) {
-          voltage -= 0.15;
-          hasAnomaly = true;
-          anomalyType = "Voltage Drop";
-          severity = "medium";
+          voltage -= 0.15
+          hasAnomaly = true
+          anomalyType = "Voltage Drop"
+          severity = "medium"
 
           anomalyList.push({
             date: `Feb ${date.getDate()}`,
@@ -77,15 +63,15 @@ export function BatteryAnomalyDetection({
             value: voltage.toFixed(2) + "V",
             severity: "medium",
             description: "Sudden voltage drop detected during discharge cycle",
-          });
+          })
         }
 
         // Voltage spike anomaly around day 14
         if (dayCounter === 14) {
-          voltage += 0.12;
-          hasAnomaly = true;
-          anomalyType = "Voltage Spike";
-          severity = "low";
+          voltage += 0.12
+          hasAnomaly = true
+          anomalyType = "Voltage Spike"
+          severity = "low"
 
           anomalyList.push({
             date: `Feb ${date.getDate()}`,
@@ -93,15 +79,15 @@ export function BatteryAnomalyDetection({
             value: voltage.toFixed(2) + "V",
             severity: "low",
             description: "Unexpected voltage increase during charging",
-          });
+          })
         }
 
         // Unstable voltage around day 21
         if (dayCounter === 21) {
-          voltage = baseVoltage + 0.08;
-          hasAnomaly = true;
-          anomalyType = "Voltage Instability";
-          severity = "high";
+          voltage = baseVoltage + 0.08
+          hasAnomaly = true
+          anomalyType = "Voltage Instability"
+          severity = "high"
 
           anomalyList.push({
             date: `Feb ${date.getDate()}`,
@@ -109,7 +95,7 @@ export function BatteryAnomalyDetection({
             value: voltage.toFixed(2) + "V",
             severity: "high",
             description: "Significant voltage fluctuations under constant load",
-          });
+          })
         }
 
         voltageData.push({
@@ -118,61 +104,44 @@ export function BatteryAnomalyDetection({
           hasAnomaly,
           anomalyType,
           severity,
-        });
+        })
       }
 
-      setData(voltageData);
-      setAnomalies(anomalyList);
-      setLoading(false);
-    }, 1500);
-  }, [dateRange, batteryId]);
+      setData(voltageData)
+      setAnomalies(anomalyList)
+      setLoading(false)
+    }, 1500)
+  }, [dateRange, batteryId])
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case "low":
-        return (
-          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/50">
-            Low
-          </Badge>
-        );
+        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/50">Low</Badge>
       case "medium":
-        return (
-          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/50">
-            Medium
-          </Badge>
-        );
+        return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/50">Medium</Badge>
       case "high":
-        return (
-          <Badge className="bg-red-500/20 text-red-400 border-red-500/50">
-            High
-          </Badge>
-        );
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/50">High</Badge>
       default:
-        return <Badge>{severity}</Badge>;
+        return <Badge>{severity}</Badge>
     }
-  };
+  }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[400px]">
         <div className="flex flex-col items-center">
           <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-          <p className="mt-2 text-sm text-slate-300">
-            Analyzing battery data...
-          </p>
+          <p className="mt-2 text-sm text-slate-300">Analyzing battery data...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={data}
-            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-          >
+          <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
             <XAxis dataKey="date" stroke="#94a3b8" />
             <YAxis domain={[3.6, 4.0]} stroke="#94a3b8" />
@@ -193,24 +162,17 @@ export function BatteryAnomalyDetection({
               stroke="#06b6d4"
               dot={(props: any) => {
                 if (props.payload.hasAnomaly) {
-                  let color = "#3b82f6";
-                  if (props.payload.severity === "medium") color = "#f59e0b";
-                  if (props.payload.severity === "high") color = "#ef4444";
+                  let color = "#3b82f6" // low severity
+                  if (props.payload.severity === "medium") color = "#f59e0b"
+                  if (props.payload.severity === "high") color = "#ef4444"
 
                   return (
-                    <svg
-                      key={`${props.payload.date}-${props.payload.anomalyType}`} // <-- ✅ Unique key
-                      x={props.cx - 6}
-                      y={props.cy - 6}
-                      width={12}
-                      height={12}
-                      fill={color}
-                    >
+                    <svg x={props.cx - 6} y={props.cy - 6} width={12} height={12} fill={color}>
                       <circle cx="6" cy="6" r="6" />
                     </svg>
-                  );
+                  )
                 }
-                return null;
+                return null
               }}
             />
           </LineChart>
@@ -236,23 +198,12 @@ export function BatteryAnomalyDetection({
             </TableHeader>
             <TableBody>
               {anomalies.map((anomaly, index) => (
-                <TableRow
-                  key={index}
-                  className="border-slate-700/30 hover:bg-slate-800/30"
-                >
-                  <TableCell className="font-medium text-slate-300">
-                    {anomaly.date}
-                  </TableCell>
-                  <TableCell className="text-slate-300">
-                    {anomaly.type}
-                  </TableCell>
-                  <TableCell className="text-slate-300">
-                    {anomaly.value}
-                  </TableCell>
+                <TableRow key={index} className="border-slate-700/30 hover:bg-slate-800/30">
+                  <TableCell className="font-medium text-slate-300">{anomaly.date}</TableCell>
+                  <TableCell className="text-slate-300">{anomaly.type}</TableCell>
+                  <TableCell className="text-slate-300">{anomaly.value}</TableCell>
                   <TableCell>{getSeverityBadge(anomaly.severity)}</TableCell>
-                  <TableCell className="text-slate-300">
-                    {anomaly.description}
-                  </TableCell>
+                  <TableCell className="text-slate-300">{anomaly.description}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -260,5 +211,5 @@ export function BatteryAnomalyDetection({
         </div>
       </div>
     </div>
-  );
+  )
 }

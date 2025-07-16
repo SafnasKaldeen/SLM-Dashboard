@@ -1,20 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import FleetStatusCard from "./fleet-status-card";
-
+import ScooterStatusTable from "./scooter-status-table";
+import MotorOverview from "./motor-overview";
+import AlertsOverview from "./alerts-overview";
+import BatteryAnalyticsChart from "@/components/BatteryAnalyticsChart";
 import dynamic from "next/dynamic";
-
-// Dynamically import ScooterMap with SSR disabled
-const ScooterMap = dynamic(() => import("@/components/ScooterMap"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-[700px] text-slate-400">
-      Loading map...
-    </div>
-  ),
-});
+// import { FleetMap } from "./fleet/fleet-map";
+import ScooterMap from "@/components/ScooterMap";
 
 // Mock data - replace with your actual API calls
 const mockFleetData = {
@@ -56,7 +58,51 @@ export default function DashboardOverview() {
   return (
     <div className="space-y-6">
       <FleetStatusCard data={fleetData} isLoading={isLoading} />
+
+      {/* <Tabs defaultValue="scooters" className="w-full">
+        <TabsList className="grid grid-cols-4 mb-4 bg-slate-800/50 p-1">
+          <TabsTrigger
+            value="scooters"
+            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+          >
+            Scooter Status
+          </TabsTrigger>
+          <TabsTrigger
+            value="battery"
+            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+          >
+            Battery Analytics
+          </TabsTrigger>
+          <TabsTrigger
+            value="motor"
+            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+          >
+            Motor Performance
+          </TabsTrigger>
+          <TabsTrigger
+            value="alerts"
+            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
+          >
+            System Alerts
+          </TabsTrigger>
+        </TabsList> */}
+
+      {/* <TabsContent value="scooters" className="space-y-6"> */}
       <ScooterMap />
+      {/* </TabsContent> */}
+
+      {/* <TabsContent value="battery" className="space-y-6">
+          <BatteryAnalyticsChart />
+        </TabsContent>
+
+        <TabsContent value="motor" className="space-y-6">
+          <MotorOverview />
+        </TabsContent> */}
+
+      {/* <TabsContent value="alerts" className="space-y-6">
+          <AlertsOverview />
+        </TabsContent> */}
+      {/* </Tabs> */}
     </div>
   );
 }

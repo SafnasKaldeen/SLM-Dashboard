@@ -3,16 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AlertsOverview from "@/components/alerts-overview";
-
-import dynamic from "next/dynamic";
-
-const ScooterTrackingMap = dynamic(
-  () => import("@/components/fleet/ScooterTrackingMap"),
-  {
-    ssr: false,
-    loading: () => <div>Loading map...</div>,
-  }
-);
+import ScooterTrackingMap from "@/components/fleet/ScooterTrackingMap";
 
 export default function AnalyticsPage() {
   return (

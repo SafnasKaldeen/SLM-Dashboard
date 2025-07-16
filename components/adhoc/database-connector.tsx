@@ -21,9 +21,7 @@ import {
   RefreshCw,
   Clock,
   Table,
-  Activity,
 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface DatabaseConnection {
   id: string;
@@ -391,88 +389,52 @@ export function DatabaseConnector({
 
       {/* Selected Connection Details */}
       {selectedConnection && (
-        <Card className="bg-slate-800/60 border border-slate-700/30 hover:bg-slate-800/70 transition-all duration-300 hover:shadow-xl hover:shadow-slate-900/20">
+        <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-3">
-              <div className="relative">
-                <CheckCircle className="h-6 w-6 text-green-400 drop-shadow-sm" />
-                <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
-              </div>
-              <span className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
-                Selected Connection: {selectedConnection.name}
-              </span>
+            <CardTitle className="text-white flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-400" />
+              Selected Connection: {selectedConnection.name}
             </CardTitle>
             <CardDescription className="text-slate-400">
-              <Activity className="inline h-4 w-4 mr-1 text-slate-500" />
               Ready to query data from this connection
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:items-start">
-              <div className="space-y-4 h-full">
-                <div className="flex items-center gap-2 mb-3">
-                  <Database className="h-5 w-5 text-slate-400" />
-                  <h4 className="text-sm font-semibold text-white tracking-wide">
-                    Available Tables
-                  </h4>
-                </div>
-                <ScrollArea className="h-48">
-                  <div className="space-y-2 pr-4">
-                    {selectedConnection.tables.map((table, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30 hover:bg-slate-900/50 transition-all duration-200 group"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-white mb-2">
+                  Available Tables
+                </h4>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {selectedConnection.tables.map((table, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-slate-300">{table.name}</span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-slate-400 border-slate-600"
                       >
-                        <span className="text-slate-300 font-medium group-hover:text-white transition-colors">
-                          {table.name}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-slate-400 border-slate-600/50 bg-slate-900/30 group-hover:border-slate-500 group-hover:text-slate-300"
-                        >
-                          {table.rows?.toLocaleString() || "N/A"} rows
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-              <div className="space-y-4 h-full">
-                <div className="flex items-center gap-2 mb-3">
-                  <Clock className="h-5 w-5 text-slate-400" />
-                  <h4 className="text-sm font-semibold text-white tracking-wide">
-                    Connection Info
-                  </h4>
-                </div>
-                <div className="space-y-3 h-full">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-                    <span className="text-sm text-slate-400">Type</span>
-                    <Badge className="text-xs text-slate-300 bg-slate-700/50 border-slate-600/50">
-                      {selectedConnection.type.toUpperCase()}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-                    <span className="text-sm text-slate-400">Status</span>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <span className="text-sm text-green-400 font-medium">
-                        {selectedConnection.status}
-                      </span>
+                        {table.rows?.toLocaleString() || "N/A"} rows
+                      </Badge>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-                    <span className="text-sm text-slate-400">Connected</span>
-                    <span className="text-sm text-slate-300 font-mono">
-                      {formatLastConnected(selectedConnection.lastConnected)}
-                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-white mb-2">
+                  Connection Info
+                </h4>
+                <div className="space-y-1 text-sm text-slate-400">
+                  <div>Type: {selectedConnection.type.toUpperCase()}</div>
+                  <div>Status: {selectedConnection.status}</div>
+                  <div>
+                    Connected:{" "}
+                    {formatLastConnected(selectedConnection.lastConnected)}
                   </div>
                   {selectedConnection.config.database && (
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/30">
-                      <span className="text-sm text-slate-400">Database</span>
-                      <span className="text-sm text-slate-300 font-mono">
-                        {selectedConnection.config.database}
-                      </span>
-                    </div>
+                    <div>Database: {selectedConnection.config.database}</div>
                   )}
                 </div>
               </div>

@@ -11,7 +11,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Car, TrendingUp, BarChart3 } from "lucide-react";
 import {
   Battery,
   Zap,
@@ -54,77 +53,74 @@ export default function FleetPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-400">
-                  Total Vehicles
-                </p>
-                <p className="text-2xl font-bold text-slate-100">128</p>
-                <div className="flex items-center text-xs text-green-400">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  +5.2% from last month
-                </div>
-              </div>
-              <div className="p-3 bg-blue-500/20 rounded-lg">
-                <Car className="h-6 w-6 text-blue-400" />
-              </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-slate-100 text-lg flex items-center">
+              <Users className="mr-2 h-5 w-5 text-blue-500" />
+              Total Vehicles
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-400">128</div>
+            <div className="flex items-center mt-1">
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
+                +12
+              </Badge>
+              <span className="text-xs text-slate-400 ml-2">
+                from last month
+              </span>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-400">Active Now</p>
-                <p className="text-2xl font-bold text-slate-100">72</p>
-                <div className="flex items-center text-xs text-green-400">
-                  <Activity className="h-3 w-3 mr-1" />
-                  56% utilization
-                </div>
-              </div>
-              <div className="p-3 bg-green-500/20 rounded-lg">
-                <Activity className="h-6 w-6 text-green-400" />
-              </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-slate-100 text-lg flex items-center">
+              <Activity className="mr-2 h-5 w-5 text-cyan-500" />
+              Active Vehicles
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-cyan-400">112</div>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs text-slate-400">87.5% of fleet</span>
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
+                +5
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-400">
-                  Avg Battery
-                </p>
-                <p className="text-2xl font-bold text-slate-100">78%</p>
-                <div className="flex items-center text-xs text-yellow-400">
-                  <BarChart3 className="h-3 w-3 mr-1" />
-                  Fleet average
-                </div>
-              </div>
-              <div className="p-3 bg-yellow-500/20 rounded-lg">
-                <BarChart3 className="h-6 w-6 text-yellow-400" />
-              </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-slate-100 text-lg flex items-center">
+              <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" />
+              Maintenance Due
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-amber-400">8</div>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs text-slate-400">6.3% of fleet</span>
+              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/50">
+                Attention
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-400">Alerts</p>
-                <p className="text-2xl font-bold text-slate-100">3</p>
-                <div className="flex items-center text-xs text-red-400">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  Requires attention
-                </div>
-              </div>
-              <div className="p-3 bg-red-500/20 rounded-lg">
-                <AlertTriangle className="h-6 w-6 text-red-400" />
-              </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-slate-100 text-lg flex items-center">
+              <Battery className="mr-2 h-5 w-5 text-green-500" />
+              Avg. Battery Health
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-400">92%</div>
+            <div className="mt-2">
+              <Progress value={92} className="h-2 bg-slate-700">
+                <div className="h-full bg-gradient-to-r from-green-500 to-cyan-500 rounded-full" />
+              </Progress>
             </div>
           </CardContent>
         </Card>

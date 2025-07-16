@@ -1,37 +1,40 @@
 // app/api/RunSQLQuery/route.ts  (Next.js 13+ app router example)
 
 import { type NextRequest, NextResponse } from "next/server";
+import MongoDBManager from "@/lib/mongodb"; // Your MongoDB manager singleton
 import snowflake from "snowflake-sdk";
-import fs from "fs";
-
-// Load your private key PEM string once (adjust path)
-const PRIVATE_KEY_PEM = fs.readFileSync("./secrets/rsa_key.p8", "utf8");
 
 export async function POST(request: NextRequest) {
   try {
-    const { sql } = await request.json();
+    const { connectionId, sql } = await request.json();
 
-    if (!sql) {
+    if (!connectionId || !sql) {
       return NextResponse.json(
-        { error: "SQL query is required" },
+        { error: "Connection ID and SQL query are required" },
         { status: 400 }
       );
     }
 
-    // Hardcoded Snowflake config
-    const config = {
-      account: process.env.SNOWFLAKE_ACCOUNT,
-        username: process.env.SNOWFLAKE_USERNAME,
-        privateKey: PRIVATE_KEY_PEM,
-      warehouse: "SNOWFLAKE_LEARNING_WH",
-      database: "ADHOC",
-      schema: "PUBLIC",
-      role: "SYSADMIN",
-      authenticator: "SNOWFLAKE_JWT",
-    };
+    // Fetch connection info from MongoDB
+    const connection = await MongoDBManager.getConnectionById(connectionId);
+    if (!connection) {
+      return NextResponse.json(
+        { error: "Connection not found" },
+        { status: 404 }
+      );
+    }
+
+    if (connection.type !== "snowflake") {
+      return NextResponse.json(
+        { error: `Unsupported connection type: ${connection.type}` },
+        { status: 400 }
+      );
+    }
 
     // Execute SQL query on Snowflake
-    const result = await executeSnowflakeQuery(config, sql);
+    const result = await executeSnowflakeQuery(connection.config, sql);
+    
+    // console.log("Query excecuted successfully:" , result)
 
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
@@ -47,12 +50,10 @@ async function executeSnowflakeQuery(config: any, sql: string) {
   const connection = snowflake.createConnection({
     account: config.account,
     username: config.username,
-    privateKey: config.privateKey,
+    password: config.password,
     warehouse: config.warehouse,
     database: config.database,
-    schema: config.schema,
-    role: config.role,
-    authenticator: config.authenticator,
+    schema: config.schema || "PUBLIC",
   });
 
   // Connect to Snowflake

@@ -266,159 +266,96 @@ const catalog = {
       },
     },
   },
-
-  relationships: [
-    {
-      left_table: "order_items",
-      left_column: "product_id",
-      right_table: "products",
-      right_column: "product_id",
-      type: "many-to-one",
-    },
-    {
-      left_table: "order_items",
-      left_column: "order_id",
-      right_table: "orders",
-      right_column: "order_id",
-      type: "many-to-one",
-    },
-    {
-      left_table: "orders",
-      left_column: "customer_id",
-      right_table: "customers",
-      right_column: "customer_id",
-      type: "many-to-one",
-    },
-    {
-      left_table: "campaign_performance",
-      left_column: "campaign_id",
-      right_table: "marketing_campaigns",
-      right_column: "campaign_id",
-      type: "many-to-one",
-    },
-  ],
-
-  measures: {
-    campaign_roi: {
-      label: "Campaign ROI",
-      formula: "(SUM(revenue_attributed) - SUM(cost)) / NULLIF(SUM(cost), 0)",
-      table: "campaign_performance",
-    },
-    total_returned_quantity: {
-      expression: "SUM(CAST(order_items.quantity AS INTEGER))",
-      description:
-        "Total quantity of returned products by summing quantities from order_items joined via returns",
-      requiredJoins: [
-        {
-          fromTable: "returns",
-          fromColumn: "order_item_id",
-          toTable: "order_items",
-          toColumn: "order_item_id",
-        },
-      ],
-      baseTable: "returns",
-    },
-  },
-
-  default_filters: {
-    orders: {
-      order_date: {
-        operator: ">=",
-        value: "CURRENT_DATE - INTERVAL '6 months'",
-      },
-      status: {
-        operator: "!=",
-        value: "'cancelled'",
-      },
-    },
-    returns: {
-      return_date: {
-        operator: ">=",
-        value: "CURRENT_DATE - INTERVAL '6 months'",
-      },
-    },
-  },
-
   accessControl: {
     customers: {
-      read: ["admin", "manager", "analyst"],
+      read: ["admin", "manager", "support", "analyst"],
       write: ["admin", "manager"],
+      columnConstraints: {
+        email: ["admin", "manager"],
+        phone: ["admin", "manager"],
+        date_of_birth: ["admin"],
+        loyalty_tier: ["admin", "manager"],
+      },
     },
     orders: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    order_items: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    products: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    categories: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    suppliers: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    inventory_movements: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    warehouses: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    employees: {
-      read: ["admin", "manager"],
-      write: ["admin", "manager"],
-    },
-    departments: {
-      read: ["admin", "manager"],
+      read: ["admin", "manager", "analyst", "support"],
       write: ["admin", "manager"],
     },
     payroll: {
-      read: ["admin", "manager"],
-      write: ["admin", "manager"],
+      read: ["admin", "hr"],
+      write: ["admin"],
+      columnConstraints: {
+        gross_pay: ["admin"],
+        net_pay: ["admin"],
+        tax_deduction: ["admin"],
+        benefits_deduction: ["admin"],
+      },
     },
-    attendance: {
-      read: ["admin", "manager"],
-      write: ["admin", "manager"],
-    },
-    returns: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
+    employees: {
+      read: ["admin", "hr", "manager"],
+      write: ["admin", "hr"],
+      columnConstraints: {
+        salary: ["admin"],
+      },
     },
     reviews: {
-      read: ["admin", "manager", "analyst"],
+      read: ["admin", "manager", "support", "analyst"],
+      write: ["admin", "manager", "support"],
+      columnConstraints: {
+        review_text: ["admin", "support"],
+      },
+    },
+    support_tickets: {
+      read: ["admin", "support"],
+      write: ["admin", "support"],
+    },
+    inventory_movements: {
+      read: ["admin", "manager", "warehouse_manager"],
+      write: ["admin", "warehouse_manager"],
+    },
+    marketing_campaigns: {
+      read: ["admin", "marketing", "manager"],
+      write: ["admin", "marketing"],
+    },
+    campaign_performance: {
+      read: ["admin", "marketing", "analyst"],
+      write: ["admin", "marketing"],
+    },
+    website_traffic: {
+      read: ["admin", "marketing", "analyst"],
+      write: ["admin"],
+    },
+    returns: {
+      read: ["admin", "support", "manager"],
+      write: ["admin", "support"],
+    },
+    products: {
+      read: ["admin", "manager", "analyst", "support"],
       write: ["admin", "manager"],
     },
-    regions: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
+    suppliers: {
+      read: ["admin", "manager"],
+      write: ["admin"],
+    },
+    warehouses: {
+      read: ["admin", "manager", "warehouse_manager"],
+      write: ["admin", "warehouse_manager"],
+    },
+    departments: {
+      read: ["admin", "hr"],
+      write: ["admin"],
+    },
+    attendance: {
+      read: ["admin", "hr", "manager"],
+      write: ["admin", "hr"],
     },
     sales_targets: {
       read: ["admin", "manager", "analyst"],
       write: ["admin", "manager"],
     },
-    marketing_campaigns: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    campaign_performance: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    website_traffic: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
-    },
-    support_tickets: {
-      read: ["admin", "manager", "analyst"],
-      write: ["admin", "manager"],
+    regions: {
+      read: ["admin", "manager"],
+      write: ["admin"],
     },
   },
 };
