@@ -5,7 +5,7 @@ import snowflake from "snowflake-sdk";
 import fs from "fs";
 
 // Load your private key PEM string once (adjust path)
-const PRIVATE_KEY_PEM = fs.readFileSync("./secrets/rsa_key.p8", "utf8");
+const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const config = {
       account: process.env.SNOWFLAKE_ACCOUNT,
         username: process.env.SNOWFLAKE_USERNAME,
-        privateKey: PRIVATE_KEY_PEM,
+        privateKey: privateKey,
       warehouse: "SNOWFLAKE_LEARNING_WH",
       database: "ADHOC",
       schema: "PUBLIC",

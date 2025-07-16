@@ -6,22 +6,17 @@ class SnowflakeConnectionManager {
   private static isConnecting = false;
   private static isConnected = false;
 
-  // Load PEM string directly
-  private static loadPrivateKey(): string {
-    const privateKeyPath = './secrets/rsa_key.p8';
-    return fs.readFileSync(privateKeyPath, 'utf8'); // ✅ raw PEM string
-  }
 
   public static getConnection(): snowflake.Connection {
     if (!this.instance) {
       console.log('[Snowflake] Initializing new connection instance...');
 
-      const privateKey = this.loadPrivateKey(); // ✅ now it's a string
+      const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
       this.instance = snowflake.createConnection({
         account: process.env.SNOWFLAKE_ACCOUNT,
         username: process.env.SNOWFLAKE_USERNAME,
-        privateKey: privateKey || process.env.SNOWFLAKE_PRIVATE_KEY,
+        privateKey: privateKey,
         warehouse: 'SNOWFLAKE_LEARNING_WH',
         database: 'DB_DUMP',
         schema: 'PUBLIC',
