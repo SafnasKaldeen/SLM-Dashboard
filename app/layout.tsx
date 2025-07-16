@@ -1,0 +1,38 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { cookies } from "next/headers";
+
+import DashboardLayout from "@/components/dashboard-layout";
+
+export const metadata: Metadata = {
+  title: "SL-Mobility",
+  description: "This is the analytics dashboard for SL-Mobility.",
+  generator: "Safnas Kaldeen",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  // Determine theme on the server to ensure consistent rendering
+  const cookieStore = cookies();
+  // const theme = cookieStore.get("theme") || { value: "dark" };
+  const theme = { value: "dark" };
+  const isDarkMode = theme?.value === "dark";
+
+  return (
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={isDarkMode ? "dark" : ""}
+      style={isDarkMode ? { colorScheme: "dark" } : {}}
+    >
+      <body>
+        <div className="scrollbar-thin scrollbar-track-slate-800 scrollbar-thumb-slate-600 hover:scrollbar-thumb-slate-500">
+          <DashboardLayout>{children}</DashboardLayout>
+        </div>
+      </body>
+    </html>
+  );
+}
