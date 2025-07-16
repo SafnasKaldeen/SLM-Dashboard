@@ -1,0 +1,152 @@
+import type { AgentDatabase } from "./types"
+
+export const mockDatabase: AgentDatabase = {
+  scooterIssues: [
+    {
+      id: "scooter_001",
+      type: "Motor Malfunction",
+      symptoms: ["no acceleration", "motor noise", "power loss"],
+      solution: "Replace motor controller unit and recalibrate system",
+      severity: "high",
+      estimatedRepairTime: 120,
+    },
+    {
+      id: "scooter_002",
+      type: "Battery Connection",
+      symptoms: ["intermittent power", "battery not charging", "loose connection"],
+      solution: "Clean battery contacts and replace connection cables",
+      severity: "medium",
+      estimatedRepairTime: 45,
+    },
+    {
+      id: "scooter_003",
+      type: "Brake System",
+      symptoms: ["brake not working", "squeaking noise", "brake lever loose"],
+      solution: "Replace brake pads and adjust brake cable tension",
+      severity: "high",
+      estimatedRepairTime: 90,
+    },
+    {
+      id: "scooter_004",
+      type: "Lighting System",
+      symptoms: ["headlight not working", "taillight dim", "indicator malfunction"],
+      solution: "Replace LED bulbs and check wiring connections",
+      severity: "low",
+      estimatedRepairTime: 30,
+    },
+  ],
+
+  batteryStations: [
+    {
+      id: "station_001",
+      location: "Downtown Plaza",
+      status: "operational",
+      batterySlots: 12,
+      availableBatteries: 8,
+      lastMaintenance: new Date("2024-01-10"),
+      commonIssues: ["slot jamming", "payment reader issues"],
+    },
+    {
+      id: "station_002",
+      location: "University Campus",
+      status: "maintenance",
+      batterySlots: 8,
+      availableBatteries: 0,
+      lastMaintenance: new Date("2024-01-15"),
+      commonIssues: ["screen malfunction", "battery swap mechanism stuck"],
+    },
+    {
+      id: "station_003",
+      location: "Shopping Mall",
+      status: "operational",
+      batterySlots: 16,
+      availableBatteries: 12,
+      lastMaintenance: new Date("2024-01-08"),
+      commonIssues: ["cleanliness issues", "lighting problems"],
+    },
+  ],
+
+  paymentRecords: [
+    {
+      id: "pay_001",
+      customerId: "customer_001",
+      amount: 15.5,
+      status: "completed",
+      transactionDate: new Date("2024-01-14"),
+      paymentMethod: "credit_card",
+    },
+    {
+      id: "pay_002",
+      customerId: "customer_002",
+      amount: 25.0,
+      status: "failed",
+      transactionDate: new Date("2024-01-15"),
+      paymentMethod: "debit_card",
+    },
+    {
+      id: "pay_003",
+      customerId: "customer_003",
+      amount: 12.75,
+      status: "refunded",
+      transactionDate: new Date("2024-01-13"),
+      paymentMethod: "mobile_payment",
+    },
+  ],
+
+  customers: [
+    {
+      id: "customer_001",
+      email: "john.doe@email.com",
+      name: "John Doe",
+      subscriptionType: "premium",
+      totalRides: 145,
+      lastActivity: new Date("2024-01-15"),
+      complaints: ["complaint_001"],
+    },
+    {
+      id: "customer_002",
+      email: "jane.smith@email.com",
+      name: "Jane Smith",
+      subscriptionType: "basic",
+      totalRides: 67,
+      lastActivity: new Date("2024-01-14"),
+      complaints: [],
+    },
+    {
+      id: "customer_003",
+      email: "mike.johnson@email.com",
+      name: "Mike Johnson",
+      subscriptionType: "enterprise",
+      totalRides: 289,
+      lastActivity: new Date("2024-01-15"),
+      complaints: ["complaint_002", "complaint_003"],
+    },
+  ],
+
+  technicalSolutions: [
+    {
+      id: "tech_001",
+      problemType: "App Login Issues",
+      keywords: ["login", "password", "app", "authentication"],
+      solution: "Clear app cache, restart app, or reset password through email verification",
+      successRate: 0.92,
+      averageResolutionTime: 15,
+    },
+    {
+      id: "tech_002",
+      problemType: "QR Code Scanning",
+      keywords: ["qr", "scan", "unlock", "camera"],
+      solution: "Clean QR code, ensure good lighting, update app to latest version",
+      successRate: 0.88,
+      averageResolutionTime: 10,
+    },
+    {
+      id: "tech_003",
+      problemType: "GPS Location Issues",
+      keywords: ["location", "gps", "map", "find"],
+      solution: "Enable location services, refresh app, check network connection",
+      successRate: 0.85,
+      averageResolutionTime: 20,
+    },
+  ],
+}
