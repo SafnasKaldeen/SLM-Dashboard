@@ -296,7 +296,7 @@ export function MainSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="py-2">
+      <SidebarContent className="py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
         {/* Dashboard */}
         <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
@@ -316,9 +316,7 @@ export function MainSidebar() {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
-
         <SidebarSeparator className="my-2 bg-slate-800" />
-
         {/* Menu Categories */}
         {menuCategories.map((category) => (
           <Collapsible
@@ -383,9 +381,7 @@ export function MainSidebar() {
             </SidebarGroup>
           </Collapsible>
         ))}
-
         <SidebarSeparator className="my-2 bg-slate-800" />
-
         {/* Settings */}
         <SidebarGroup className="px-2 py-1">
           <SidebarMenu>

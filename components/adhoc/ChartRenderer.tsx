@@ -763,6 +763,8 @@ export default function ChartRenderer({
 
   const itemsPerPage = 10;
 
+  console.log(data);
+
   // Convert array data to object format
   const processedData = useMemo(() => {
     if (!data || !columns || data.length === 0) return [];

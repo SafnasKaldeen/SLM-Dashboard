@@ -519,89 +519,11 @@ export function DatabaseConnector({
                       {formatLastConnected(selectedConnection.lastConnected)}
                     </dd>
                   </div>
-
-                  {/* New additional info */}
-                  {selectedConnection.config.host && (
+                  {selectedConnection.config.database && (
                     <div>
-                      <dt className="font-semibold inline">Host:</dt>{" "}
+                      <dt className="font-semibold inline">Database:</dt>{" "}
                       <dd className="inline">
-                        {selectedConnection.config.host}
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.config.port && (
-                    <div>
-                      <dt className="font-semibold inline">Port:</dt>{" "}
-                      <dd className="inline">
-                        {selectedConnection.config.port}
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.config.user && (
-                    <div>
-                      <dt className="font-semibold inline">User:</dt>{" "}
-                      <dd className="inline">
-                        {selectedConnection.config.user}
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.config.region && (
-                    <div>
-                      <dt className="font-semibold inline">Region:</dt>{" "}
-                      <dd className="inline">
-                        {selectedConnection.config.region}
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.config.warehouse && (
-                    <div>
-                      <dt className="font-semibold inline">Warehouse:</dt>{" "}
-                      <dd className="inline">
-                        {selectedConnection.config.warehouse}
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.config.role && (
-                    <div>
-                      <dt className="font-semibold inline">Role:</dt>{" "}
-                      <dd className="inline">
-                        {selectedConnection.config.role}
-                      </dd>
-                    </div>
-                  )}
-                  {typeof selectedConnection.config.ssl === "boolean" && (
-                    <div>
-                      <dt className="font-semibold inline">SSL Enabled:</dt>{" "}
-                      <dd className="inline">
-                        {selectedConnection.config.ssl ? "Yes" : "No"}
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.config.timeout && (
-                    <div>
-                      <dt className="font-semibold inline">Timeout:</dt>{" "}
-                      <dd className="inline">
-                        {selectedConnection.config.timeout}s
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.createdAt && (
-                    <div>
-                      <dt className="font-semibold inline">Created At:</dt>{" "}
-                      <dd className="inline">
-                        {new Date(
-                          selectedConnection.createdAt
-                        ).toLocaleString()}
-                      </dd>
-                    </div>
-                  )}
-                  {selectedConnection.lastError && (
-                    <div>
-                      <dt className="font-semibold inline text-red-500">
-                        Last Error:
-                      </dt>{" "}
-                      <dd className="inline text-red-400">
-                        {selectedConnection.lastError}
+                        {selectedConnection.config.database}
                       </dd>
                     </div>
                   )}

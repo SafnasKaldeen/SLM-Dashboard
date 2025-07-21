@@ -37,90 +37,16 @@ import {
 
 interface AnalysisHistoryProps {
   onHistorySelect: (analysis: any) => void;
+  onQueryRerun: (sql: string, analysis: any) => Promise<void>;
+  selectedConnection: any;
 }
 
-const mockHistoryData = [
-  {
-    id: "analysis_1",
-    title: "Show me revenue by area for the last 6 months",
-    subtitle: "Revenue Analysis",
-    timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-    executionTime: 1.45,
-    rowCount: 10,
-    status: "success",
-    sql: "SELECT AREA, SUM(AMOUNT) as TOTAL_REVENUE FROM REVENUE_TRANSACTIONS...",
-  },
-  {
-    id: "analysis_2",
-    title: "Which stations have the highest utilization rates?",
-    subtitle: "Station Performance",
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    executionTime: 0.78,
-    rowCount: 8,
-    status: "success",
-    sql: "SELECT STATION_NAME, COUNT(*) as TOTAL_SWAPS FROM STATIONS...",
-  },
-  {
-    id: "analysis_3",
-    title: "Show me batteries with health scores below 70%",
-    subtitle: "Battery Health",
-    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-    executionTime: 0.67,
-    rowCount: 8,
-    status: "success",
-    sql: "SELECT BATTERY_ID, HEALTH_SCORE FROM BATTERY_HEALTH WHERE...",
-  },
-  {
-    id: "analysis_4",
-    title: "Show hourly usage patterns throughout the day",
-    subtitle: "Usage Patterns",
-    timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-    executionTime: 0.45,
-    rowCount: 18,
-    status: "success",
-    sql: "SELECT EXTRACT(HOUR FROM TIMESTAMP) as HOUR, COUNT(*) FROM...",
-  },
-  {
-    id: "analysis_5",
-    title: "Compare revenue trends across different areas",
-    subtitle: "Revenue Analysis",
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    executionTime: 1.23,
-    rowCount: 15,
-    status: "success",
-    sql: "SELECT AREA, DATE_TRUNC('month', TIMESTAMP) as MONTH, SUM(AMOUNT)...",
-  },
-  {
-    id: "analysis_6",
-    title: "Find stations that need maintenance",
-    subtitle: "Station Performance",
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    executionTime: 0.89,
-    rowCount: 5,
-    status: "success",
-    sql: "SELECT STATION_ID, LAST_MAINTENANCE, STATUS FROM STATIONS WHERE...",
-  },
-  {
-    id: "analysis_7",
-    title: "What's the average revenue per battery swap?",
-    subtitle: "Revenue Analysis",
-    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    executionTime: 0.32,
-    rowCount: 1,
-    status: "success",
-    sql: "SELECT AVG(AMOUNT) as AVG_REVENUE FROM REVENUE_TRANSACTIONS...",
-  },
-  {
-    id: "analysis_8",
-    title: "Battery health distribution across the fleet",
-    subtitle: "Battery Health",
-    timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
-    executionTime: 1.12,
-    rowCount: 12,
-    status: "success",
-    sql: "SELECT HEALTH_SCORE_RANGE, COUNT(*) FROM BATTERY_HEALTH GROUP BY...",
-  },
-];
+interface QueryResult {
+  columns: string[];
+  data: any[];
+  executionTime: number;
+  rowCount: number;
+}
 
 const categories = [
   "All Categories",
@@ -128,6 +54,7 @@ const categories = [
   "Station Performance",
   "Battery Health",
   "Usage Patterns",
+  "E-Commerce Insights",
 ];
 
 const timeFilters = [
@@ -177,7 +104,27 @@ const LoadingSpinner = () => (
   </div>
 );
 
-export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
+// Helper function to convert data to ChartRenderer format
+const convertToChartFormat = (data: any[], columns: string[]): any[] => {
+  // If data is already in array format (like your expected format), return as is
+  if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0])) {
+    return data;
+  }
+
+  // If data is array of objects, convert to array of arrays
+  if (Array.isArray(data) && data.length > 0 && typeof data[0] === "object") {
+    return data.map((row) => columns.map((col) => row[col]));
+  }
+
+  // If no data, return empty array
+  return [];
+};
+
+export function AnalysisHistory({
+  onHistorySelect,
+  onQueryRerun,
+  selectedConnection,
+}: AnalysisHistoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedTimeFilter, setSelectedTimeFilter] = useState("all");
@@ -185,8 +132,9 @@ export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track IDs currently being deleted
+  // Track IDs currently being deleted and rerun
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
+  const [rerunningIds, setRerunningIds] = useState<string[]>([]);
 
   // Fetch data from Mongo API endpoint
   useEffect(() => {
@@ -195,7 +143,7 @@ export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
       setError(null);
       try {
         const res = await fetch(
-          "/api/query-history?connectionId=bss_demo_warehouse"
+          "/api/query-history?connectionId=default_snowflake"
         );
         if (!res.ok) throw new Error("Failed to fetch query history");
         const data = await res.json();
@@ -216,9 +164,12 @@ export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
     fetchHistory();
   }, []);
 
-  // Combine mock data + fetched Mongo data
   const combinedHistory = useMemo(() => {
-    return [...mongoHistory, ...mockHistoryData];
+    // Return in reverse order, newest first
+    return [...mongoHistory].sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
   }, [mongoHistory]);
 
   const formatTimeAgo = (timestamp: Date) => {
@@ -296,8 +247,103 @@ export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
     );
   }, [combinedHistory, searchTerm, selectedCategory, selectedTimeFilter]);
 
-  const handleQueryRerun = (analysis: any) => {
-    onHistorySelect(analysis);
+  // Updated rerun handler that calls the API and formats data correctly
+  const handleQueryRerun = async (analysis: any) => {
+    if (!selectedConnection) {
+      alert("Please select a database connection first");
+      return;
+    }
+
+    if (!analysis.sql) {
+      alert("No SQL query found for this analysis");
+      return;
+    }
+
+    try {
+      setRerunningIds((ids) => [...ids, analysis.id]);
+
+      // Call the RunSQLQuery API
+      const response = await fetch("/api/RunSQLQuery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sql: analysis.sql,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Query execution failed");
+      }
+
+      const data = await response.json();
+      console.log("Raw API response:", data);
+
+      const { columns, rows, executionTime, rowCount } = data.result;
+
+      // Convert to the format expected by ChartRenderer
+      const formattedData = convertToChartFormat(rows, columns);
+
+      console.log("Formatted data for ChartRenderer:", formattedData);
+      console.log("Columns:", columns);
+
+      // Call the parent component's rerun handler with the formatted results
+      const queryResult: QueryResult = {
+        columns,
+        data: formattedData, // Now in array of arrays format
+        executionTime,
+        rowCount,
+      };
+
+      await onQueryRerun(analysis.sql, queryResult);
+    } catch (error: any) {
+      console.error("Error rerunning query:", error);
+      alert(`Error rerunning query: ${error.message}`);
+    } finally {
+      setRerunningIds((ids) => ids.filter((id) => id !== analysis.id));
+    }
+  };
+
+  // Updated history select handler to format data correctly
+  const handleHistorySelect = (analysis: any) => {
+    // If we have stored result data, format it correctly
+    if (analysis.result && analysis.result.data) {
+      const formattedData = convertToChartFormat(
+        analysis.result.data,
+        analysis.result.columns || []
+      );
+
+      const formattedAnalysis = {
+        ...analysis,
+        result: {
+          ...analysis.result,
+          data: formattedData,
+        },
+      };
+
+      onHistorySelect(formattedAnalysis);
+    } else {
+      // Fallback - create mock data in the expected format if no stored data
+      const mockResult: QueryResult = {
+        columns: ["ID", "NAME", "VALUE", "SCORE"],
+        data: [
+          [42, `${analysis.title} Result`, 15, 5],
+          [11, `${analysis.subtitle} Data`, 4, 2],
+          [13, "Sample Product", 30, 2],
+        ],
+        executionTime: analysis.executionTime || 1.0,
+        rowCount: 3,
+      };
+
+      const mockAnalysis = {
+        ...analysis,
+        result: mockResult,
+      };
+
+      onHistorySelect(mockAnalysis);
+    }
   };
 
   // DELETE handler
@@ -314,7 +360,7 @@ export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
         throw new Error(data.error || "Failed to delete");
       }
 
-      // Remove the deleted item from mongoHistory only (don't remove mock data)
+      // Remove the deleted item from mongoHistory
       setMongoHistory((prev) => prev.filter((item) => item.id !== id));
     } catch (err: any) {
       alert(`Error deleting item: ${err.message}`);
@@ -440,7 +486,8 @@ export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
           {filteredHistory.map((analysis) => (
             <Card
               key={analysis.id}
-              className="bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-colors"
+              className="bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-colors cursor-pointer"
+              onClick={() => handleHistorySelect(analysis)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
@@ -490,19 +537,40 @@ export function AnalysisHistory({ onHistorySelect }: AnalysisHistoryProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleQueryRerun(analysis)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleQueryRerun(analysis);
+                      }}
+                      disabled={
+                        rerunningIds.includes(analysis.id) ||
+                        !selectedConnection
+                      }
                       className="text-cyan-400 hover:text-cyan-300 hover:bg-slate-700"
                     >
-                      <Play className="h-4 w-4 mr-1" />
-                      Rerun
+                      {rerunningIds.includes(analysis.id) ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-1" />
+                      )}
+                      {rerunningIds.includes(analysis.id)
+                        ? "Running..."
+                        : "Rerun"}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="text-slate-400 hover:text-red-400 hover:bg-slate-700"
-                      onClick={() => handleDelete(analysis.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(analysis.id);
+                      }}
+                      disabled={deletingIds.includes(analysis.id)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deletingIds.includes(analysis.id) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                     <ChevronRight className="h-4 w-4 text-slate-500" />
                   </div>

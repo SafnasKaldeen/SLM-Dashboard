@@ -134,13 +134,13 @@ export default function AdhocAnalysisPage() {
     setCurrentResult(result);
     setActiveTab("visualization");
 
-    // Add to history
     const newAnalysis: AnalysisResult = {
       id: `analysis_${Date.now()}`,
       query,
       result,
       timestamp: new Date(),
     };
+
     setAnalysisHistory((prev) => [newAnalysis, ...prev]);
   };
 
@@ -418,7 +418,11 @@ export default function AdhocAnalysisPage() {
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-0">
-                  <AnalysisHistory onHistorySelect={handleHistorySelect} />
+                  <AnalysisHistory
+                    onHistorySelect={handleHistorySelect}
+                    selectedConnection={selectedConnection}
+                    onQueryRerun={handleQueryExecute}
+                  />
                 </TabsContent>
 
                 <TabsContent value="access" className="mt-0">

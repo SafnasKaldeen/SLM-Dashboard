@@ -57,7 +57,7 @@ export default function DashboardLayout({
             {/* Main content with left margin to avoid overlap */}
             <div className="flex-1 flex flex-col">
               <Header />
-              <main className="flex-1 overflow-auto py-6">
+              <main className="flex-1 overflow-auto py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
                 <div className="container mx-auto">{children}</div>
               </main>
             </div>
