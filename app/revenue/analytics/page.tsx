@@ -11,7 +11,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { RevenueAnalyticsChart } from "@/components/revenue/revenue-analytics-chart";
-import { default as TrendSection } from "@/components/revenue/trend_section"; // If it's a default export
+import { default as TrendSection } from "@/components/revenue/trend_section";
 import { RevenueHeatmap } from "@/components/revenue/revenue-heatmap";
 import { RevenueComparison } from "@/components/revenue/revenue-comparison";
 import { CustomerSegmentAnalysis } from "@/components/revenue/customer-segment-analysis";
@@ -97,26 +97,29 @@ export default function RevenueAnalyticsPage() {
         </div>
       </div>
 
-      {/* Filters Section */}
-      <Card className="border-dashed">
+      {/* Filters Section - Fixed z-index and positioning issues */}
+      <Card className="border-dashed relative z-10">
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-lg flex items-center gap-2 relative z-20">
             <BarChart3 className="w-5 h-5" /> Analytics Filters
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="relative z-20">
             Customize your analysis by selecting areas, stations, and time
             periods
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <RevenueFilters onFiltersChange={handleFiltersChange} />
+        <CardContent className="relative z-10">
+          {/* Added a container div with proper z-index management */}
+          <div className="relative z-10">
+            <RevenueFilters onFiltersChange={handleFiltersChange} />
+          </div>
         </CardContent>
       </Card>
 
-      {/* Main Analytics Tabs */}
+      {/* Main Analytics Tabs - Adjusted z-index to be lower than filters */}
       <Tabs
         defaultValue="trends"
-        className="space-y-6"
+        className="space-y-6 relative z-0"
         onValueChange={(val) => setActiveTab(val)}
       >
         <div className="flex items-center justify-between">
@@ -134,7 +137,6 @@ export default function RevenueAnalyticsPage() {
             <TabsTrigger disabled value="comparison">
               Compare
             </TabsTrigger>
-
             <TabsTrigger disabled value="chat">
               Chat
             </TabsTrigger>
@@ -162,9 +164,7 @@ export default function RevenueAnalyticsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* <SimulateLoading skeleton={<ChartSkeleton />}> */}
                 <ExpenseAnalysis filters={filters} />
-                {/* </SimulateLoading> */}
               </CardContent>
             </Card>
           </TabsContent>
@@ -183,55 +183,11 @@ export default function RevenueAnalyticsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* <SimulateLoading skeleton={<ChartSkeleton />}> */}
                 <ProfitabilityAnalysis filters={filters} />
-                {/* </SimulateLoading> */}
               </CardContent>
             </Card>
           </TabsContent>
         )}
-
-        {/* Pivot */}
-        {/* {activeTab === "pivot" && (
-          <TabsContent value="pivot">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Table className="w-5 h-5" /> Pivot Table
-                </CardTitle>
-                <CardDescription>
-                  Create custom analysis by dragging dimensions and metrics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimulateLoading skeleton={<PivotSkeleton />}>
-                  <PivotTableAnalysis filters={filters} />
-                </SimulateLoading>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )} */}
-
-        {/* Chat */}
-        {/* {activeTab === "chat" && (
-          <TabsContent value="chat">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" /> Data Chat Assistant
-                </CardTitle>
-                <CardDescription>
-                  Ask questions about your data to receive AI-powered answers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimulateLoading skeleton={<ChatSkeleton />}>
-                  <DataChatInterface filters={filters} />
-                </SimulateLoading>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )} */}
 
         {/* Heatmap */}
         {activeTab === "geographic" && (

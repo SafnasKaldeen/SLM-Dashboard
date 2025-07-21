@@ -71,19 +71,48 @@ export default function AdhocAnalysisPage() {
   const [analysisHistory, setAnalysisHistory] = useState<AnalysisResult[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Load connections on mount
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         const response = await fetch("/api/connections");
-        const connections = await response.json();
+        const connections: DatabaseConnection[] = await response.json();
 
-        if (connections.length > 0) {
-          setSelectedConnection(connections[0]);
-          // Only auto-advance if we have a connected connection
-          if (connections[0].status === "connected") {
-            setActiveTab("ai-query");
-          }
+        // Define your default Snowflake connection
+        const defaultConnection: DatabaseConnection = {
+          id: "default_snowflake",
+          name: "SLM Warehouse",
+          type: "snowflake",
+          status: "connected",
+          lastConnected: new Date(),
+          tables: [],
+          config: {
+            account:
+              process.env.NEXT_PUBLIC_SNOWFLAKE_ACCOUNT ||
+              "default-account.snowflakecomputing.com",
+            warehouse: "SNOWFLAKE_LEARNING_WH",
+            database: "ADHOC",
+            schema: "PUBLIC",
+            role: "SYSADMIN",
+            // add other config if needed
+          },
+        };
+
+        // Check if default connection already exists in the fetched connections
+        const hasDefault = connections.some(
+          (conn) => conn.id === defaultConnection.id
+        );
+
+        // If default not present, add it
+        const allConnections = hasDefault
+          ? connections
+          : [defaultConnection, ...connections];
+
+        // Set selected connection to default
+        setSelectedConnection(defaultConnection);
+
+        // Optionally, you can auto-advance to "ai-query" tab if default is connected
+        if (defaultConnection.status === "connected") {
+          setActiveTab("ai-query");
         }
       } catch (error) {
         console.error("Error loading connections:", error);

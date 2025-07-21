@@ -38,18 +38,21 @@ export const useRevenue = (filters?: RevenueFilters) => {
 
     const fetchRevenueData = async () => {
       setLoading(true);
-
+      console.log("🔍 Fetching revenue data with filters:", filters);
       const fromDate = filters.dateRange.from.toISOString().split("T")[0];
       const toDate = filters.dateRange.to.toISOString().split("T")[0];
 
       // console.log(filters.aggregation);
 
+      const formatArray = (arr: string[]) =>
+      `[${arr.map((val) => `'${val}'`).join(",")}]`;
+
       const sql = `
         CALL GET_REVENUE_METRICS_NEW(
           '${fromDate}'::DATE,
           '${toDate}'::DATE,
-          ${filters.selectedAreas.length > 0 ? `'${filters.selectedAreas.join(",")}'` : "NULL"},
-          ${filters.selectedStations.length > 0 ? `'${filters.selectedStations.join(",")}'` : "NULL"},
+          ${filters.selectedAreas.length > 0 ? formatArray(filters.selectedAreas) : "NULL"},
+          ${filters.selectedStations.length > 0 ? formatArray(filters.selectedStations) : "NULL"},
           ${filters.aggregation.length > 0 ? `'${filters.aggregation}'` : "NULL"}
         )
       `;

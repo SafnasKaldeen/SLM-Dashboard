@@ -23,18 +23,23 @@ import {
   Table,
 } from "lucide-react";
 
+interface TableInfo {
+  name: string;
+  rows?: number;
+}
+
 interface DatabaseConnection {
   id: string;
   name: string;
   type: string;
   status: "connected" | "disconnected";
   lastConnected: Date;
-  tables: any[];
+  tables: TableInfo[];
   config: Record<string, string>;
 }
 
 interface DatabaseConnectorProps {
-  onConnectionSelect: (connection: DatabaseConnection) => void;
+  onConnectionSelect: (connection: DatabaseConnection | null) => void;
   selectedConnection: DatabaseConnection | null;
 }
 
@@ -47,10 +52,70 @@ export function DatabaseConnector({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load connections on mount
+  // SQL Query state
+  const [sqlQuery, setSqlQuery] = useState("");
+  const [queryResult, setQueryResult] = useState<any | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  const [isQueryRunning, setIsQueryRunning] = useState(false);
+
+  // Default Snowflake connection (tables will be replaced dynamically)
+  const defaultSnowflakeConnection: DatabaseConnection = {
+    id: "default_snowflake",
+    name: "SLM Warehouse",
+    type: "snowflake",
+    status: "connected",
+    lastConnected: new Date(),
+    tables: [], // initially empty, will fetch real tables
+    config: {
+      account:
+        process.env.NEXT_PUBLIC_SNOWFLAKE_ACCOUNT ||
+        "default-account.snowflakecomputing.com",
+      warehouse: "SNOWFLAKE_LEARNING_WH",
+      database: "ADHOC",
+      schema: "PUBLIC",
+      role: "SYSADMIN",
+      // username, privateKey etc. should come from env/config securely
+    },
+  };
+
   useEffect(() => {
     loadConnections();
   }, []);
+
+  // Fetch real tables via your existing /api/RunSQLQuery
+  const fetchTablesForConnection = async (
+    conn: DatabaseConnection
+  ): Promise<TableInfo[]> => {
+    if (conn.type !== "snowflake") return [];
+
+    const schema = conn.config.schema || "PUBLIC";
+    const sql = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '${schema.toUpperCase()}' ORDER BY TABLE_NAME`;
+
+    try {
+      const response = await fetch("/api/RunSQLQuery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tables: ${response.statusText}`);
+      }
+
+      const json = await response.json();
+
+      if (!json.success || !json.result || !Array.isArray(json.result.rows)) {
+        throw new Error("Invalid response structure");
+      }
+
+      return json.result.rows.map((row: any) => ({
+        name: row.TABLE_NAME,
+      }));
+    } catch (err) {
+      console.error("Error fetching tables for connection", conn.name, err);
+      return [];
+    }
+  };
 
   const loadConnections = async () => {
     try {
@@ -58,98 +123,93 @@ export function DatabaseConnector({
       setError(null);
 
       const response = await fetch("/api/connections");
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       const data = await response.json();
+      const connectionsArray: DatabaseConnection[] = Array.isArray(data)
+        ? data
+        : [];
 
-      // Ensure data is an array
-      const connectionsArray = Array.isArray(data) ? data : [];
+      // Enrich Snowflake connections with real tables
+      const enrichedConnections = await Promise.all(
+        connectionsArray.map(async (conn) => {
+          if (conn.type === "snowflake") {
+            const tables = await fetchTablesForConnection(conn);
+            return {
+              ...conn,
+              tables,
+              lastConnected: new Date(conn.lastConnected),
+            };
+          }
+          return {
+            ...conn,
+            lastConnected: new Date(conn.lastConnected),
+          };
+        })
+      );
 
-      // Convert date strings back to Date objects
-      const processedConnections = connectionsArray.map((conn: any) => ({
-        ...conn,
-        lastConnected: new Date(conn.lastConnected),
-      }));
+      // Add default Snowflake connection if missing, fetch tables for it
+      const hasDefault = enrichedConnections.some(
+        (c) => c.id === defaultSnowflakeConnection.id
+      );
+      if (!hasDefault) {
+        const defaultTables = await fetchTablesForConnection(
+          defaultSnowflakeConnection
+        );
+        enrichedConnections.unshift({
+          ...defaultSnowflakeConnection,
+          tables: defaultTables,
+          lastConnected: new Date(),
+        });
+      }
 
-      setConnections(processedConnections);
+      setConnections(enrichedConnections);
 
-      // Auto-select first connection if none selected
-      if (!selectedConnection && processedConnections.length > 0) {
-        onConnectionSelect(processedConnections[0]);
+      if (!selectedConnection && enrichedConnections.length > 0) {
+        onConnectionSelect(enrichedConnections[0]);
       }
     } catch (error) {
       console.error("Error loading connections:", error);
       setError("Failed to load connections. Please try again.");
 
-      // Fallback to mock data for development
-      const mockConnections: DatabaseConnection[] = [
-        {
-          id: "mock_snowflake_1",
-          name: "Snowflake Production",
-          type: "snowflake",
-          status: "connected",
-          lastConnected: new Date(),
-          tables: [
-            { name: "REVENUE_TRANSACTIONS", rows: 125000 },
-            { name: "STATIONS", rows: 450 },
-            { name: "BATTERY_SWAPS", rows: 89000 },
-            { name: "BATTERY_HEALTH", rows: 2500 },
-            { name: "USERS", rows: 15000 },
-          ],
-          config: {
-            account: "demo-account.snowflakecomputing.com",
-            database: "PRODUCTION_DB",
-            warehouse: "COMPUTE_WH",
-          },
-        },
-        {
-          id: "mock_csv_1",
-          name: "Revenue Data CSV",
-          type: "csv",
-          status: "connected",
-          lastConnected: new Date(Date.now() - 3600000), // 1 hour ago
-          tables: [{ name: "revenue_data", rows: 5000 }],
-          config: {
-            filename: "revenue_data.csv",
-            size: "2.5MB",
-          },
-        },
-      ];
-
-      setConnections(mockConnections);
-      if (!selectedConnection && mockConnections.length > 0) {
-        onConnectionSelect(mockConnections[0]);
+      // Fallback mock with default snowflake
+      setConnections([defaultSnowflakeConnection]);
+      if (!selectedConnection) {
+        onConnectionSelect(defaultSnowflakeConnection);
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleConnectionAdd = async (newConnection: DatabaseConnection) => {
+  // Run SQL query via backend API
+  const runQuery = async () => {
+    if (!sqlQuery.trim()) {
+      setQueryError("Please enter a SQL query.");
+      return;
+    }
+    setQueryError(null);
+    setIsQueryRunning(true);
+    setQueryResult(null);
+
     try {
-      // Save to backend
-      const response = await fetch("/api/connections", {
+      const response = await fetch("/api/RunSQLQuery", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newConnection),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql: sqlQuery }),
       });
+      const json = await response.json();
 
       if (!response.ok) {
-        throw new Error("Failed to save connection");
+        setQueryError(json.error || "Query failed");
+      } else {
+        setQueryResult(json.result);
       }
-
-      // Add to local state
-      setConnections((prev) => [newConnection, ...prev]);
-      onConnectionSelect(newConnection);
-    } catch (error) {
-      console.error("Error saving connection:", error);
-      // Still add to local state for demo purposes
-      setConnections((prev) => [newConnection, ...prev]);
-      onConnectionSelect(newConnection);
+    } catch (err: any) {
+      setQueryError(err.message || "Query failed");
+    } finally {
+      setIsQueryRunning(false);
     }
   };
 
@@ -162,10 +222,8 @@ export function DatabaseConnector({
       console.error("Error deleting connection:", error);
     }
 
-    // Remove from local state
     setConnections((prev) => prev.filter((conn) => conn.id !== connectionId));
 
-    // If deleted connection was selected, select another one
     if (selectedConnection?.id === connectionId) {
       const remaining = connections.filter((conn) => conn.id !== connectionId);
       onConnectionSelect(remaining.length > 0 ? remaining[0] : null);
@@ -186,10 +244,11 @@ export function DatabaseConnector({
         return "🗄️";
     }
   };
+
   const formatLastConnected = (date: Date | string) => {
-    const parsedDate = new Date(date); // <-- Convert string to Date
+    const parsedDate = new Date(date);
     const now = new Date();
-    const diffMs = now.getTime() - parsedDate.getTime(); // safe now
+    const diffMs = now.getTime() - parsedDate.getTime();
 
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
@@ -387,67 +446,180 @@ export function DatabaseConnector({
         </div>
       )}
 
-      {/* Selected Connection Details */}
+      {/* Selected Connection Details and SQL Runner */}
       {selectedConnection && (
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-400" />
-              Selected Connection: {selectedConnection.name}
+        <Card className="bg-slate-900 border border-slate-700 shadow-md">
+          <CardHeader className="border-b border-slate-700">
+            <CardTitle className="text-white flex items-center gap-2 text-lg font-semibold">
+              <CheckCircle className="h-6 w-6 text-green-400" />
+              Selected Connection:{" "}
+              <span className="ml-1 text-cyan-400">
+                {selectedConnection.name}
+              </span>
             </CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardDescription className="text-slate-400 mt-1">
               Ready to query data from this connection
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-sm font-medium text-white mb-2">
+
+          <CardContent className="py-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Tables Section */}
+              <section>
+                <h4 className="text-sm font-semibold text-white mb-3 border-b border-slate-700 pb-1">
                   Available Tables
                 </h4>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {selectedConnection.tables.map((table, index) => (
+                <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+                  {selectedConnection.tables.length === 0 && (
+                    <p className="text-slate-500 text-sm italic">
+                      No tables available
+                    </p>
+                  )}
+                  {selectedConnection.tables.map((table) => (
                     <div
-                      key={index}
-                      className="flex items-center justify-between text-sm"
+                      key={table.name}
+                      className="flex items-center justify-between px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-default"
                     >
-                      <span className="text-slate-300">{table.name}</span>
+                      <span className="text-sm text-slate-300 font-medium truncate">
+                        {table.name}
+                      </span>
                       <Badge
                         variant="outline"
-                        className="text-xs text-slate-400 border-slate-600"
+                        className="text-xs text-slate-400 border-slate-600 bg-transparent px-2 py-0.5 rounded"
                       >
-                        {table.rows?.toLocaleString() || "N/A"} rows
+                        {table.rows?.toLocaleString() ?? "N/A"} rows
                       </Badge>
                     </div>
                   ))}
                 </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-white mb-2">
+              </section>
+
+              {/* Connection Info & SQL Runner Section */}
+              <section>
+                <h4 className="text-sm font-semibold text-white mb-3 border-b border-slate-700 pb-1">
                   Connection Info
                 </h4>
-                <div className="space-y-1 text-sm text-slate-400">
-                  <div>Type: {selectedConnection.type.toUpperCase()}</div>
-                  <div>Status: {selectedConnection.status}</div>
+
+                <dl className="space-y-1 text-sm text-slate-400 mb-6">
                   <div>
-                    Connected:{" "}
-                    {formatLastConnected(selectedConnection.lastConnected)}
+                    <dt className="font-semibold inline">Type:</dt>{" "}
+                    <dd className="inline">
+                      {selectedConnection.type.toUpperCase()}
+                    </dd>
                   </div>
-                  {selectedConnection.config.database && (
-                    <div>Database: {selectedConnection.config.database}</div>
+                  <div>
+                    <dt className="font-semibold inline">Status:</dt>{" "}
+                    <dd className="inline capitalize">
+                      {selectedConnection.status}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold inline">Connected:</dt>{" "}
+                    <dd className="inline">
+                      {formatLastConnected(selectedConnection.lastConnected)}
+                    </dd>
+                  </div>
+
+                  {/* New additional info */}
+                  {selectedConnection.config.host && (
+                    <div>
+                      <dt className="font-semibold inline">Host:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.host}
+                      </dd>
+                    </div>
                   )}
-                </div>
-              </div>
+                  {selectedConnection.config.port && (
+                    <div>
+                      <dt className="font-semibold inline">Port:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.port}
+                      </dd>
+                    </div>
+                  )}
+                  {selectedConnection.config.user && (
+                    <div>
+                      <dt className="font-semibold inline">User:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.user}
+                      </dd>
+                    </div>
+                  )}
+                  {selectedConnection.config.region && (
+                    <div>
+                      <dt className="font-semibold inline">Region:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.region}
+                      </dd>
+                    </div>
+                  )}
+                  {selectedConnection.config.warehouse && (
+                    <div>
+                      <dt className="font-semibold inline">Warehouse:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.warehouse}
+                      </dd>
+                    </div>
+                  )}
+                  {selectedConnection.config.role && (
+                    <div>
+                      <dt className="font-semibold inline">Role:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.role}
+                      </dd>
+                    </div>
+                  )}
+                  {typeof selectedConnection.config.ssl === "boolean" && (
+                    <div>
+                      <dt className="font-semibold inline">SSL Enabled:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.ssl ? "Yes" : "No"}
+                      </dd>
+                    </div>
+                  )}
+                  {selectedConnection.config.timeout && (
+                    <div>
+                      <dt className="font-semibold inline">Timeout:</dt>{" "}
+                      <dd className="inline">
+                        {selectedConnection.config.timeout}s
+                      </dd>
+                    </div>
+                  )}
+                  {selectedConnection.createdAt && (
+                    <div>
+                      <dt className="font-semibold inline">Created At:</dt>{" "}
+                      <dd className="inline">
+                        {new Date(
+                          selectedConnection.createdAt
+                        ).toLocaleString()}
+                      </dd>
+                    </div>
+                  )}
+                  {selectedConnection.lastError && (
+                    <div>
+                      <dt className="font-semibold inline text-red-500">
+                        Last Error:
+                      </dt>{" "}
+                      <dd className="inline text-red-400">
+                        {selectedConnection.lastError}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </section>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Connection Dialog */}
+      {/* Connection Dialog for adding new connections */}
       <ConnectionDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        onConnectionAdd={handleConnectionAdd}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onConnectionAdded={async () => {
+          setIsDialogOpen(false);
+          await loadConnections();
+        }}
       />
     </div>
   );

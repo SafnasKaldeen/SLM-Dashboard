@@ -16,8 +16,9 @@ import AlertsOverview from "./alerts-overview";
 import BatteryAnalyticsChart from "@/components/BatteryAnalyticsChart";
 import dynamic from "next/dynamic";
 // import { FleetMap } from "./fleet/fleet-map";
-import ScooterMap from "@/components/ScooterMap";
-
+const ScooterMap = dynamic(() => import("@/components/ScooterMap"), {
+  ssr: false,
+});
 // Mock data - replace with your actual API calls
 const mockFleetData = {
   totalScooters: 120,
