@@ -49,10 +49,10 @@ export interface RevenueFilters {
 }
 
 export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
-  // Default to last year with monthly aggregation
+  // Calculate exactly one year: from first day of this month last year to last day of last month
   const today = new Date();
-  const defaultFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
-  const defaultTo = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const defaultFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1); // First day of this month last year
+  const defaultTo = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of last month
   const defaultRange: DateRange = { from: defaultFrom, to: defaultTo };
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -66,7 +66,7 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<"from" | "to">("from");
 
-  // Set default to history (all available data with monthly aggregation)
+  // Set default to exactly one year
   const [quickTime, setQuickTime] = useState<string>("last_year");
 
   const { data: areaStations, loading } = useAreaStations();
@@ -113,8 +113,9 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
 
   const clearAllFilters = () => {
     const today = new Date();
-    const lastYearFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
-    const lastYearTo = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    // Reset to exactly one year
+    const oneYearFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+    const oneYearTo = new Date(today.getFullYear(), today.getMonth(), 0);
 
     const cleared: RevenueFilters = {
       selectedAreas: [],
@@ -123,7 +124,7 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
       revenueRange: {},
       paymentMethods: [],
       aggregation: "monthly",
-      dateRange: { from: lastYearFrom, to: lastYearTo },
+      dateRange: { from: oneYearFrom, to: oneYearTo },
     };
 
     setFilters(cleared);
@@ -248,16 +249,19 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
         aggregation = "monthly";
         break;
       case "last_month":
+        // Last month: first day to last day of previous month
         newFrom = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         newTo = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
       case "last_3_months":
-        newFrom = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-        newTo = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        // Last 3 months: first day of 3 months ago to last day of last month
+        newFrom = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+        newTo = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
       case "last_year":
+        // Exactly one year: first day of this month last year to last day of last month
         newFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
-        newTo = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        newTo = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
       default:
         return;
@@ -375,7 +379,7 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
 
     // Final filter range object with adjusted dates
     const filterRange = {
-      from: adjustedFrom,
+      from: originalFrom,
       to: originalTo,
       extraDate,
     };

@@ -75,7 +75,7 @@ export function TopPerformingStations({
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <div className="text-center">
           <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p>No stations found for the selected filters</p>
+          <p>No stations found for the selected filters. Try adjusting them.</p>
         </div>
       </div>
     );
@@ -84,15 +84,28 @@ export function TopPerformingStations({
   const getBadge = (index: number) => {
     if (index === 0)
       return (
-        <Badge className="text-[12px] bg-yellow-400 text-black">🥇 Gold</Badge>
+        <Badge
+          className="text-[12px] bg-yellow-400 text-black cursor-help"
+          title="Top 1 Station"
+        >
+          🥇 Gold
+        </Badge>
       );
     if (index === 1)
       return (
-        <Badge className="text-[12px] bg-gray-300 text-black">🥈 Silver</Badge>
+        <Badge
+          className="text-[12px] bg-gray-300 text-black cursor-help"
+          title="Top 2 Station"
+        >
+          🥈 Silver
+        </Badge>
       );
     if (index === 2)
       return (
-        <Badge className="text-[12px] bg-orange-300 text-black">
+        <Badge
+          className="text-[12px] bg-orange-300 text-black cursor-help"
+          title="Top 3 Station"
+        >
           🥉 Bronze
         </Badge>
       );
@@ -102,7 +115,10 @@ export function TopPerformingStations({
   return (
     <div className="space-y-4">
       {sortedStations.map((station, index) => {
-        const utilizationRate = parseFloat(station.STATION_UTILIZATION) || 0;
+        const utilizationRate = parseFloat(station.STATION_UTILIZATION);
+        const displayUtilization = !isNaN(utilizationRate)
+          ? `${utilizationRate.toFixed(1)}% utilization`
+          : "No data";
 
         const displayPercentage =
           maxRevenue > 0 ? (station.LATEST_NET_REVENUE / maxRevenue) * 100 : 0;
@@ -119,27 +135,35 @@ export function TopPerformingStations({
                     <span className="text-xs font-medium text-muted-foreground">
                       #{index + 1}
                     </span>
-                    <p className="text-sm font-medium leading-none">
+                    <p
+                      className="text-sm font-medium leading-none truncate max-w-[160px]"
+                      title={station.STATIONNAME}
+                    >
                       {station.STATIONNAME}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <MapPin className="h-3 w-3" />
-                    <span>{station.LOCATIONNAME}</span>
+                    <span title={station.LOCATIONNAME}>
+                      {station.LOCATIONNAME}
+                    </span>
                     <span>•</span>
-                    <span>{utilizationRate.toFixed(1)}% utilization</span>
+                    <span>{displayUtilization}</span>
                   </div>
                 </div>
                 <div className="text-right space-y-1">
                   <p className="text-sm font-medium text-green-600">
                     {typeof station.LATEST_NET_REVENUE === "number" &&
                     !isNaN(station.LATEST_NET_REVENUE)
-                      ? station.LATEST_NET_REVENUE.toLocaleString(undefined, {
-                          maximumFractionDigits: 2,
-                        })
+                      ? `LKR ${station.LATEST_NET_REVENUE.toLocaleString(
+                          undefined,
+                          {
+                            maximumFractionDigits: 2,
+                          }
+                        )}`
                       : "N/A"}
                   </p>
-                  <div className="flex items-end pb-2 flex-row gap-1">
+                  <div className="flex items-center flex-row gap-1">
                     <div className="px-3">{getBadge(index)}</div>
                     <Badge
                       variant={

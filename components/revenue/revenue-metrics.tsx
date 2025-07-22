@@ -100,7 +100,7 @@ export function RevenueMetrics({ data, loading, error }: RevenueMetricsProps) {
     },
     {
       title: "Station Utilization Rate",
-      value: `${utilizationRate}%`,
+      value: `${utilizationRate.toFixed(2)}%`,
       prev:
         prevUtilization != null ? `Prev: ${prevUtilization.toFixed(1)}%` : null,
       icon: TrendingDown,

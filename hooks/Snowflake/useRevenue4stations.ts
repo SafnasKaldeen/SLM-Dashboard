@@ -9,42 +9,54 @@ export interface RevenueByAreaData {
   TRIPS?: number;
 }
 
+const isValidDate = (d: any): d is Date => d instanceof Date && !isNaN(d.getTime());
+
+// Format date as YYYY-MM-DD in local time (no timezone shift)
+const formatDateLocal = (date: Date) => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export const useRevenueByArea = (filters?: RevenueFilters) => {
   const [data, setData] = useState<RevenueByAreaData[] | null>(null);
-  const [Arealoading, setArealoading] = useState(true);
+  const [Arealoading, setArealoading] = useState(false);
+
+  // Extract normalized date strings to avoid timezone shifts in dependency
+  const fromDate = filters?.dateRange?.from && isValidDate(filters.dateRange.from)
+    ? formatDateLocal(filters.dateRange.from)
+    : undefined;
+
+  const toDate = filters?.dateRange?.to && isValidDate(filters.dateRange.to)
+    ? formatDateLocal(filters.dateRange.to)
+    : undefined;
+
+  const selectedAreas = filters?.selectedAreas ?? [];
+  const selectedStations = filters?.selectedStations ?? [];
 
   useEffect(() => {
-    if (
-  !filters ||
-  !filters.dateRange ||
-  !(filters.dateRange.from instanceof Date) ||
-  !(filters.dateRange.to instanceof Date)
-) {
-  console.warn("❌ Skipping fetch: Missing or invalid dateRange");
-  setArealoading(false);
-  return;
-}
-
+    if (!fromDate || !toDate) {
+      console.warn("❌ Skipping fetch: Missing or invalid dateRange", filters);
+      return;
+    }
 
     const fetchRevenueData = async () => {
       setArealoading(true);
 
-      const fromDate = filters.dateRange.from.toISOString().split("T")[0];
-      const toDate = filters.dateRange.to.toISOString().split("T")[0];
-
-      const areasList = filters.selectedAreas.length
-        ? `'${filters.selectedAreas.join("','")}'`
+      const areasList = selectedAreas.length
+        ? `'${selectedAreas.join("','")}'`
         : null;
 
-      const stationsList = filters.selectedStations.length
-        ? `'${filters.selectedStations.join("','")}'`
+      const stationsList = selectedStations.length
+        ? `'${selectedStations.join("','")}'`
         : null;
 
       const sql = `
         SELECT
           LOCATIONNAME AS AREA,
           STATIONNAME AS STATION,
-          SUM(TOTAL_REVENUE) AS TOTAL_REVENUE,
+          SUM(TOTAL_REVENUE) AS TOTAL_REVENUE
         FROM MY_REVENUESUMMARY
         WHERE DATE BETWEEN '${fromDate}' AND '${toDate}'
           ${areasList ? `AND AREA IN (${areasList})` : ""}
@@ -52,7 +64,7 @@ export const useRevenueByArea = (filters?: RevenueFilters) => {
         GROUP BY AREA, STATION
         ORDER BY AREA
       `;
-
+      // console.log("Fetching revenue data with SQL:", sql);
       try {
         const response = await fetch("/api/query", {
           method: "POST",
@@ -61,14 +73,15 @@ export const useRevenueByArea = (filters?: RevenueFilters) => {
         });
 
         const result = await response.json();
+
         if (Array.isArray(result)) {
           setData(result);
         } else {
-          console.warn("⚠️ Unexpected result:", result);
+          console.warn("⚠️ Unexpected result format:", result);
           setData(null);
         }
       } catch (error) {
-        console.error("❌ Error:", error);
+        console.error("❌ Error fetching revenue data:", error);
         setData(null);
       } finally {
         setArealoading(false);
@@ -76,7 +89,12 @@ export const useRevenueByArea = (filters?: RevenueFilters) => {
     };
 
     fetchRevenueData();
-  }, [filters]);
+  }, [
+    fromDate,
+    toDate,
+    JSON.stringify(selectedAreas),
+    JSON.stringify(selectedStations),
+  ]);
 
   return { data, Arealoading };
 };

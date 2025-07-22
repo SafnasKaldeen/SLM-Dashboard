@@ -70,7 +70,7 @@ export const useTopStations = (filters?: RevenueFilters) => {
         });
 
         const result = await response.json();
-        console.log("✅ Raw result from stored procedure:", result[0]);
+        // console.log("✅ Raw result from stored procedure:", result[0]);
 
         if (
           Array.isArray(result) &&

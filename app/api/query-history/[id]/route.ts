@@ -30,18 +30,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, context: { params: { id: string } } | Promise<{ params: { id: string } }>) {
   try {
+    // Await context before accessing params
+    const { params } = await context;
     const id = params.id;
-    if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
 
-    const objectId = new ObjectId(id);
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
+    }
 
     await client.connect();
     const db = client.db(dbName);
     const collection = db.collection("query_history");
 
-    const result = await collection.deleteOne({ _id: objectId });
+    // Delete by your custom id field (not _id)
+    const result = await collection.deleteOne({ id });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
@@ -53,3 +57,4 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+

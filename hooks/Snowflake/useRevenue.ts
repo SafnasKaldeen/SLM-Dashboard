@@ -1,63 +1,72 @@
 import { useEffect, useState } from "react";
 import { RevenueFilters } from "@/components/revenue/revenue-filters";
 
-// Define the expected structure from the stored procedure
 export interface RevenueMetrics {
   PERIOD: string;
   NET_REVENUE: number;
 }
 
 export interface RevenueApiResponse {
-    ACTIVE_STATIONS: number;
-    AVG_NET_REVENUE_PER_PERIOD: number;
-    "TOTAL REVENUE": number;
-    "previous segment ACTIVE_STATIONS": number;
-    "previous segment AVG_NET_REVENUE_PER_PERIOD": number;
-    "previous segment TOTAL REVENUE": number;
-    UTILIZATION_RATE: number;
-        "previous segment UTILIZATION_RATE"?: number;
-
+  ACTIVE_STATIONS: number;
+  AVG_NET_REVENUE_PER_PERIOD: number;
+  "TOTAL REVENUE": number;
+  "previous segment ACTIVE_STATIONS": number;
+  "previous segment AVG_NET_REVENUE_PER_PERIOD": number;
+  "previous segment TOTAL REVENUE": number;
+  UTILIZATION_RATE: number;
+  "previous segment UTILIZATION_RATE"?: number;
   data: RevenueMetrics[];
-  // "STATION_UTILIZATION": string;
 }
+
+// Helper: Check if a value is a valid Date
+const isValidDate = (d: any): d is Date => d instanceof Date && !isNaN(d.getTime());
+
+// Helper: Format date in local timezone YYYY-MM-DD (no ISO to avoid UTC shift)
+const formatDateLocal = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export const useRevenue = (filters?: RevenueFilters) => {
   const [data, setData] = useState<RevenueApiResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  // Extract and format dates once, with validation (only date part, no time)
+  const fromDate = filters?.dateRange?.from && isValidDate(filters.dateRange.from)
+    ? formatDateLocal(filters.dateRange.from)
+    : undefined;
+  const toDate = filters?.dateRange?.to && isValidDate(filters.dateRange.to)
+    ? formatDateLocal(filters.dateRange.to)
+    : undefined;
 
   useEffect(() => {
-    if (
-      !filters ||
-      !filters.dateRange ||
-      !(filters.dateRange.from instanceof Date) ||
-      !(filters.dateRange.to instanceof Date)
-    ) {
+    if (!fromDate || !toDate) {
       console.warn("❌ Skipping fetch: Missing or invalid dateRange");
       return;
     }
 
     const fetchRevenueData = async () => {
       setLoading(true);
-      console.log("🔍 Fetching revenue data with filters:", filters);
-      const fromDate = filters.dateRange.from.toISOString().split("T")[0];
-      const toDate = filters.dateRange.to.toISOString().split("T")[0];
 
-      // console.log(filters.aggregation);
-
-      const formatArray = (arr: string[]) =>
-      `[${arr.map((val) => `'${val}'`).join(",")}]`;
+      // Format arrays as SQL lists or use NULL
+      const formatArray = (arr?: string[]) =>
+        arr && arr.length > 0
+          ? `[${arr.map((v) => `'${v}'`).join(",")}]`
+          : "NULL";
 
       const sql = `
         CALL GET_REVENUE_METRICS_NEW(
           '${fromDate}'::DATE,
           '${toDate}'::DATE,
-          ${filters.selectedAreas.length > 0 ? formatArray(filters.selectedAreas) : "NULL"},
-          ${filters.selectedStations.length > 0 ? formatArray(filters.selectedStations) : "NULL"},
-          ${filters.aggregation.length > 0 ? `'${filters.aggregation}'` : "NULL"}
+          ${formatArray(filters?.selectedAreas)},
+          ${formatArray(filters?.selectedStations)},
+          ${filters?.aggregation && filters.aggregation.length > 0 ? `'${filters.aggregation}'` : "NULL"}
         )
       `;
 
-      console.log("🔍 Executing SQL:", sql);
+      console.log("📤 Executing SQL query:", sql);
 
       try {
         const response = await fetch("/api/query", {
@@ -67,14 +76,9 @@ export const useRevenue = (filters?: RevenueFilters) => {
         });
 
         const result = await response.json();
-        console.log("✅ Revenue result from stored procedure:", result[0]);
 
-        // Match the shape returned from the backend
-        if (
-          Array.isArray(result) &&
-          result.length > 0 &&
-          result[0]?.GET_REVENUE_METRICS_NEW
-        ) {
+        // The stored procedure should return an array with an object containing GET_REVENUE_METRICS_NEW
+        if (Array.isArray(result) && result.length > 0 && result[0]?.GET_REVENUE_METRICS_NEW) {
           setData(result[0].GET_REVENUE_METRICS_NEW);
         } else {
           console.warn("⚠️ Unexpected response shape", result);
@@ -89,7 +93,13 @@ export const useRevenue = (filters?: RevenueFilters) => {
     };
 
     fetchRevenueData();
-  }, [filters]);
+  }, [
+    fromDate,   // use formatted date strings to avoid unnecessary re-renders caused by time shifts
+    toDate,
+    JSON.stringify(filters?.selectedAreas ?? []),
+    JSON.stringify(filters?.selectedStations ?? []),
+    filters?.aggregation,
+  ]);
 
   return { data, loading };
 };

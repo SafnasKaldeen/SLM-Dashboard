@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useMemo, useEffect } from "react";
 import {
   Card,
@@ -18,6 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import {
   History,
   Search,
@@ -33,6 +42,9 @@ import {
   ChevronRight,
   Loader2,
   ShoppingCart,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 
 interface AnalysisHistoryProps {
@@ -104,6 +116,42 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Toast notification component
+const Toast = ({
+  type,
+  message,
+  onClose,
+}: {
+  type: "success" | "error";
+  message: string;
+  onClose: () => void;
+}) => (
+  <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+    <div
+      className={`flex items-center gap-3 p-4 rounded-lg shadow-lg border ${
+        type === "success"
+          ? "bg-green-900/90 border-green-700 text-green-100"
+          : "bg-red-900/90 border-red-700 text-red-100"
+      } backdrop-blur-sm`}
+    >
+      {type === "success" ? (
+        <CheckCircle className="h-5 w-5 text-green-400" />
+      ) : (
+        <XCircle className="h-5 w-5 text-red-400" />
+      )}
+      <span className="text-sm font-medium">{message}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClose}
+        className="h-6 w-6 p-0 hover:bg-transparent"
+      >
+        <XCircle className="h-4 w-4" />
+      </Button>
+    </div>
+  </div>
+);
+
 // Helper function to convert data to ChartRenderer format
 const convertToChartFormat = (data: any[], columns: string[]): any[] => {
   // If data is already in array format (like your expected format), return as is
@@ -136,6 +184,24 @@ export function AnalysisHistory({
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
   const [rerunningIds, setRerunningIds] = useState<string[]>([]);
 
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<any>(null);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  // Animation states
+  const [deletingAnimations, setDeletingAnimations] = useState<string[]>([]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   // Fetch data from Mongo API endpoint
   useEffect(() => {
     const fetchHistory = async () => {
@@ -156,6 +222,7 @@ export function AnalysisHistory({
         setMongoHistory(processed);
       } catch (err: any) {
         setError(err.message || "Unknown error");
+        showToast("error", "Failed to load query history");
       } finally {
         setLoading(false);
       }
@@ -250,12 +317,12 @@ export function AnalysisHistory({
   // Updated rerun handler that calls the API and formats data correctly
   const handleQueryRerun = async (analysis: any) => {
     if (!selectedConnection) {
-      alert("Please select a database connection first");
+      showToast("error", "Please select a database connection first");
       return;
     }
 
     if (!analysis.sql) {
-      alert("No SQL query found for this analysis");
+      showToast("error", "No SQL query found for this analysis");
       return;
     }
 
@@ -298,9 +365,10 @@ export function AnalysisHistory({
       };
 
       await onQueryRerun(analysis.sql, queryResult);
+      showToast("success", "Query executed successfully");
     } catch (error: any) {
       console.error("Error rerunning query:", error);
-      alert(`Error rerunning query: ${error.message}`);
+      showToast("error", `Error rerunning query: ${error.message}`);
     } finally {
       setRerunningIds((ids) => ids.filter((id) => id !== analysis.id));
     }
@@ -346,31 +414,120 @@ export function AnalysisHistory({
     }
   };
 
-  // DELETE handler
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this query history?")) return;
+  // Open delete confirmation dialog
+  const handleDeleteClick = (analysis: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setItemToDelete(analysis);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirm delete
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
 
     try {
-      setDeletingIds((ids) => [...ids, id]);
-      const res = await fetch(`/api/query-history/${id}`, {
+      setDeletingIds((ids) => [...ids, itemToDelete.id]);
+      setDeletingAnimations((ids) => [...ids, itemToDelete.id]);
+      setDeleteDialogOpen(false);
+
+      console.log("Deleting history item with ID:", itemToDelete.id);
+      const res = await fetch(`/api/query-history/${itemToDelete.id}`, {
         method: "DELETE",
       });
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to delete");
       }
 
-      // Remove the deleted item from mongoHistory
-      setMongoHistory((prev) => prev.filter((item) => item.id !== id));
+      // Wait for animation before removing from state
+      setTimeout(() => {
+        setMongoHistory((prev) =>
+          prev.filter((item) => item.id !== itemToDelete.id)
+        );
+        setDeletingAnimations((ids) =>
+          ids.filter((id) => id !== itemToDelete.id)
+        );
+        showToast("success", "Query deleted successfully");
+      }, 300);
     } catch (err: any) {
-      alert(`Error deleting item: ${err.message}`);
+      setDeletingAnimations((ids) =>
+        ids.filter((id) => id !== itemToDelete.id)
+      );
+      showToast("error", `Error deleting item: ${err.message}`);
     } finally {
-      setDeletingIds((ids) => ids.filter((deleteId) => deleteId !== id));
+      setDeletingIds((ids) =>
+        ids.filter((deleteId) => deleteId !== itemToDelete.id)
+      );
+      setItemToDelete(null);
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Toast notification */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-slate-800 border-slate-700">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-red-500/10">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <AlertDialogTitle className="text-white">
+                  Delete Query History
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-slate-400">
+                  Are you sure you want to delete this analysis?
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+
+          {itemToDelete && (
+            <div className="my-4 p-4 bg-slate-900/50 rounded-lg border border-slate-600">
+              <div className="flex items-center gap-2 mb-2">
+                {getCategoryIcon(itemToDelete.subtitle)}
+                <span className="text-white font-medium">
+                  {itemToDelete.title}
+                </span>
+              </div>
+              <Badge
+                variant="outline"
+                className="text-xs border-slate-600 text-slate-300"
+              >
+                {itemToDelete.subtitle}
+              </Badge>
+              <p className="text-xs text-slate-400 mt-2">
+                This action cannot be undone. The query and its results will be
+                permanently removed.
+              </p>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Header */}
       <Card className="bg-slate-800/50 border-slate-700">
         <CardHeader>
@@ -486,8 +643,11 @@ export function AnalysisHistory({
           {filteredHistory.map((analysis) => (
             <Card
               key={analysis.id}
-              className="bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-colors cursor-pointer"
-              onClick={() => handleHistorySelect(analysis)}
+              className={`bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-all duration-300 cursor-pointer ${
+                deletingAnimations.includes(analysis.id)
+                  ? "animate-out slide-out-to-right-2 fade-out-50 duration-300"
+                  : "animate-in fade-in-50 slide-in-from-left-2 duration-300"
+              }`}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
@@ -543,7 +703,8 @@ export function AnalysisHistory({
                       }}
                       disabled={
                         rerunningIds.includes(analysis.id) ||
-                        !selectedConnection
+                        !selectedConnection ||
+                        deletingAnimations.includes(analysis.id)
                       }
                       className="text-cyan-400 hover:text-cyan-300 hover:bg-slate-700"
                     >
@@ -559,12 +720,12 @@ export function AnalysisHistory({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-slate-400 hover:text-red-400 hover:bg-slate-700"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(analysis.id);
-                      }}
-                      disabled={deletingIds.includes(analysis.id)}
+                      className="text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                      onClick={(e) => handleDeleteClick(analysis, e)}
+                      disabled={
+                        deletingIds.includes(analysis.id) ||
+                        deletingAnimations.includes(analysis.id)
+                      }
                     >
                       {deletingIds.includes(analysis.id) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -572,7 +733,6 @@ export function AnalysisHistory({
                         <Trash2 className="h-4 w-4" />
                       )}
                     </Button>
-                    <ChevronRight className="h-4 w-4 text-slate-500" />
                   </div>
                 </div>
               </CardContent>

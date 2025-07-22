@@ -1437,22 +1437,22 @@ export default function ChartRenderer({
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                <Button
+                {/* <Button
                   variant="outline"
                   size="sm"
                   className="border-slate-600 text-slate-300 bg-transparent"
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   Filter
-                </Button>
-                <Button
+                </Button> */}
+                {/* <Button
                   variant="outline"
                   size="sm"
                   className="border-slate-600 text-slate-300 bg-transparent"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export
-                </Button>
+                </Button> */}
               </div>
             </div>
 
@@ -1643,9 +1643,47 @@ export default function ChartRenderer({
 
         {/* Main Content - Chart Display */}
         <div className="lg:col-span-3">
+          {/* Chart Display */}
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white flex items-center gap-2">
+                  {getChartIcon(chartConfig.type)}
+                  {chartConfig.title ||
+                    `${
+                      chartConfig.type.charAt(0).toUpperCase() +
+                      chartConfig.type.slice(1)
+                    } View`}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {/* <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-white"
+                  >
+                    {chartConfig.showLegend ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" />
+                    )}
+                  </Button> */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-slate-600 text-slate-300 bg-transparent"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>{renderChart()}</CardContent>
+          </Card>
+
           {/* Field Configuration Panel */}
           {chartConfig.type !== "table" && (
-            <Card className="bg-slate-800/50 border-slate-700 mb-6">
+            <Card className="bg-slate-800/50 border-slate-700 mt-6">
               <CardHeader>
                 <CardTitle className="text-white text-sm flex items-center gap-2">
                   <Settings className="h-4 w-4" />
@@ -1666,44 +1704,6 @@ export default function ChartRenderer({
               </CardContent>
             </Card>
           )}
-
-          {/* Chart Display */}
-          <Card className="bg-slate-800/50 border-slate-700">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-white flex items-center gap-2">
-                  {getChartIcon(chartConfig.type)}
-                  {chartConfig.title ||
-                    `${
-                      chartConfig.type.charAt(0).toUpperCase() +
-                      chartConfig.type.slice(1)
-                    } View`}
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-slate-400 hover:text-white"
-                  >
-                    {chartConfig.showLegend ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-slate-600 text-slate-300 bg-transparent"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>{renderChart()}</CardContent>
-          </Card>
         </div>
       </div>
     </div>

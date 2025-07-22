@@ -1788,7 +1788,7 @@ export default function VisualizationBuilder({
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-white flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
+                  {/* <Eye className="h-5 w-5" /> */}
                   {title || "Visualization Preview"}
                 </CardTitle>
                 <div className="flex items-center gap-2">
