@@ -48,8 +48,10 @@ export function useStationUtilization(params: StationUtilizationParams) {
       setError(null);
 
       try {
-        const fromDate = params.dateRange.from.toISOString().slice(0, 10);
-        const toDate = params.dateRange.to.toISOString().slice(0, 10);
+
+      const fromDate = params.dateRange.from.toLocaleDateString('en-CA');
+      const toDate = params.dateRange.to.toLocaleDateString('en-CA');
+
 
         const areas =
           params.selectedAreas.length > 0
@@ -75,7 +77,7 @@ export function useStationUtilization(params: StationUtilizationParams) {
           )
         `;
 
-        console.log("🔍 Executing SQL:", sql);
+        // console.log("🔍 Executing SQL:", sql);
 
         const res = await fetch("/api/query", {
           method: "POST",

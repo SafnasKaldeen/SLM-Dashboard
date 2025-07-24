@@ -34,28 +34,6 @@ const TrendSection = ({ filters }) => {
     datewiseData,
   } = useSwaps(filters);
 
-  // 🔍 Debug logging
-  React.useEffect(() => {
-    console.log("🔄 TrendSection Debug:", {
-      filters,
-      loading,
-      error,
-      totalSwaps,
-      totalRevenue,
-      revenuePerSwap,
-      averageSwapTime,
-      performanceComparison,
-    });
-  }, [
-    filters,
-    loading,
-    error,
-    totalSwaps,
-    totalRevenue,
-    revenuePerSwap,
-    averageSwapTime,
-  ]);
-
   // ✅ Calculate growth percentages for display
   const formatGrowthPercentage = (growth) => {
     if (growth === null || growth === undefined || isNaN(growth)) return null;

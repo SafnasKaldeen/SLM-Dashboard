@@ -1,9 +1,34 @@
 "use client";
 
+const config = {
+  xAxis: "category",
+  yAxis: "value",
+  colorBy: "name",
+};
+
+const chartDataSample = [
+  { name: "Product A", value: 30, category: "Electronics" },
+  { name: "Product B", value: 45, category: "Groceries" },
+  { name: "Product C", value: 60, category: "Electronics" },
+  { name: "Product D", value: 20, category: "Clothing" },
+  { name: "Product E", value: 50, category: "Groceries" },
+  { name: "Product F", value: 70, category: "Clothing" },
+  { name: "Product G", value: 90, category: "Electronics" },
+  { name: "Product H", value: 80, category: "Groceries" },
+  { name: "Product I", value: 100, category: "Clothing" },
+];
+
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import BarChartComponent from "./BarChartComponent";
+import LineChartComponent from "./LineChartComponent";
+import AreaChartComponent from "./AreaChartComponent";
+import PieChartComponent from "./PieChartComponent";
+import KPIComponent from "./KPIComponent";
+import ScatterChartComponent from "./ScatterChartComponent";
+import TreemapChartComponent from "./TreemapChartComponent";
 import {
   Select,
   SelectContent,
@@ -66,7 +91,10 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { CanvasMap } from "./canvas-map";
+import CustomizableMap from "./canvas-map";
+import { sub } from "date-fns";
+import RadialBarChartComponent from "./RadialBarChartComponent";
+import Heatmap from "./Heatmap";
 
 // Mock Map Component (since MapChart import is not available)
 const DynamicMap = ({ data, config }: any) => (
@@ -106,6 +134,8 @@ interface ChartConfig {
   xAxis?: string;
   yAxis?: string;
   colorBy?: string;
+  column?: string;
+  subCategory?: string;
   sizeBy?: string;
   latField?: string;
   longField?: string;
@@ -162,19 +192,19 @@ const CHART_TYPES = [
     icon: MapPin,
     description: "Interactive map visualization",
   },
-  // {
-  //   id: "treemap",
-  //   name: "Treemap",
-  //   icon: Grid3X3,
-  //   description: "Hierarchical data",
-  // },
-  // {
-  //   id: "radialbar",
-  //   name: "Radial Bar",
-  //   icon: TrendingUp,
-  //   description: "Circular progress",
-  // },
-  // { id: "heatmap", name: "Heatmap", icon: Layers, description: "Data density" },
+  {
+    id: "treemap",
+    name: "Treemap",
+    icon: Grid3X3,
+    description: "Hierarchical data",
+  },
+  {
+    id: "radialbar",
+    name: "Radial Bar",
+    icon: TrendingUp,
+    description: "Circular progress",
+  },
+  { id: "heatmap", name: "Heatmap", icon: Layers, description: "Data density" },
 ];
 
 const COLOR_SCHEMES = {
@@ -256,7 +286,7 @@ const FieldConfiguration = ({
   categoricalColumns,
   geographicColumns,
 }: any) => {
-  if (chartConfig.type === "table" || chartConfig.type === "kpi") {
+  if (chartConfig.type === "table" || chartConfig.type === "") {
     return null;
   }
 
@@ -447,93 +477,22 @@ const FieldConfiguration = ({
   }
 
   // Standard chart field configuration
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label className="text-slate-300 text-sm">
-          {chartConfig.type === "pie" || chartConfig.type === "treemap"
-            ? "Category"
-            : "X-Axis"}
-        </Label>
-        <Select
-          value={chartConfig.xAxis || "none"}
-          onValueChange={(value) =>
-            setChartConfig({
-              ...chartConfig,
-              xAxis: value === "none" ? undefined : value,
-            })
-          }
-        >
-          <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-            <SelectValue placeholder="Select column" />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-800 border-slate-600">
-            <SelectItem value="none" className="text-white hover:bg-slate-700">
-              Select column
-            </SelectItem>
-            {columns.map((col: string) => (
-              <SelectItem
-                key={col}
-                value={col}
-                className="text-white hover:bg-slate-700"
-              >
-                {col}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-slate-300 text-sm">
-          {chartConfig.type === "pie" || chartConfig.type === "treemap"
-            ? "Value"
-            : "Y-Axis"}
-        </Label>
-        <Select
-          value={chartConfig.yAxis || "none"}
-          onValueChange={(value) =>
-            setChartConfig({
-              ...chartConfig,
-              yAxis: value === "none" ? undefined : value,
-            })
-          }
-        >
-          <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-            <SelectValue placeholder="Select column" />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-800 border-slate-600">
-            <SelectItem value="none" className="text-white hover:bg-slate-700">
-              Select column
-            </SelectItem>
-            {numericColumns.map((col: string) => (
-              <SelectItem
-                key={col}
-                value={col}
-                className="text-white hover:bg-slate-700"
-              >
-                {col}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Advanced Options for scatter and other charts */}
-      {(chartConfig.type === "scatter" ||
-        chartConfig.type === "bar" ||
-        chartConfig.type === "line") && (
-        <>
+  if (chartConfig.type !== "kpi") {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="text-slate-300 text-sm">
-              Color By (Optional)
+              {chartConfig.type === "pie" || chartConfig.type === "treemap"
+                ? "Category"
+                : "X-Axis"}
             </Label>
             <Select
-              value={chartConfig.colorBy || "none"}
+              value={chartConfig.xAxis || "none"}
               onValueChange={(value) =>
                 setChartConfig({
                   ...chartConfig,
-                  colorBy: value === "none" ? undefined : value,
+                  xAxis: value === "none" ? undefined : value,
                 })
               }
             >
@@ -545,9 +504,9 @@ const FieldConfiguration = ({
                   value="none"
                   className="text-white hover:bg-slate-700"
                 >
-                  None
+                  Select column
                 </SelectItem>
-                {categoricalColumns.map((col: string) => (
+                {columns.map((col: string) => (
                   <SelectItem
                     key={col}
                     value={col}
@@ -560,17 +519,61 @@ const FieldConfiguration = ({
             </Select>
           </div>
 
-          {chartConfig.type === "scatter" && (
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">
+              {chartConfig.type === "pie" || chartConfig.type === "treemap"
+                ? "Value"
+                : "Y-Axis"}
+            </Label>
+            <Select
+              value={chartConfig.yAxis || "none"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  yAxis: value === "none" ? undefined : value,
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="none"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Select column
+                </SelectItem>
+                {numericColumns.map((col: string) => (
+                  <SelectItem
+                    key={col}
+                    value={col}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {col}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Advanced Options for scatter and other charts */}
+        {(chartConfig.type === "scatter" ||
+          chartConfig.type === "area" ||
+          chartConfig.type === "bar" ||
+          chartConfig.type === "line") && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-slate-300 text-sm">
-                Size By (Optional)
+                Color By (Optional)
               </Label>
               <Select
-                value={chartConfig.sizeBy || "none"}
+                value={chartConfig.colorBy || "none"}
                 onValueChange={(value) =>
                   setChartConfig({
                     ...chartConfig,
-                    sizeBy: value === "none" ? undefined : value,
+                    colorBy: value === "none" ? undefined : value,
                   })
                 }
               >
@@ -584,7 +587,7 @@ const FieldConfiguration = ({
                   >
                     None
                   </SelectItem>
-                  {numericColumns.map((col: string) => (
+                  {categoricalColumns.map((col: string) => (
                     <SelectItem
                       key={col}
                       value={col}
@@ -596,96 +599,400 @@ const FieldConfiguration = ({
                 </SelectContent>
               </Select>
             </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-};
 
-// Chart Options Component
-const ChartOptions = ({ chartConfig, setChartConfig }: any) => (
-  <Card className="bg-slate-800/50 border-slate-700">
-    <CardHeader className="pb-4">
-      <CardTitle className="text-white flex items-center gap-2">
-        <Settings className="h-5 w-5" />
-        Chart Options
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      <div className="space-y-2">
-        <Label className="text-slate-300 text-sm">Color Scheme</Label>
-        <Select
-          value={chartConfig.colorScheme}
-          onValueChange={(value) =>
-            setChartConfig({ ...chartConfig, colorScheme: value })
-          }
-        >
-          <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-800 border-slate-600">
-            {Object.entries(COLOR_SCHEMES).map(([name, colors]) => (
-              <SelectItem
-                key={name}
-                value={name}
-                className="text-white hover:bg-slate-700"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {colors.slice(0, 4).map((color, i) => (
-                      <div
-                        key={i}
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
+            {chartConfig.type === "scatter" && (
+              <div className="space-y-2">
+                <Label className="text-slate-300 text-sm">
+                  Size By (Optional)
+                </Label>
+                <Select
+                  value={chartConfig.sizeBy || "none"}
+                  onValueChange={(value) =>
+                    setChartConfig({
+                      ...chartConfig,
+                      sizeBy: value === "none" ? undefined : value,
+                    })
+                  }
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-600">
+                    <SelectItem
+                      value="none"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      None
+                    </SelectItem>
+                    {numericColumns.map((col: string) => (
+                      <SelectItem
+                        key={col}
+                        value={col}
+                        className="text-white hover:bg-slate-700"
+                      >
+                        {col}
+                      </SelectItem>
                     ))}
-                  </div>
-                  <span className="capitalize">{name}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {chartConfig.type !== "table" &&
-        chartConfig.type !== "kpi" &&
-        chartConfig.type !== "map" && (
-          <>
-            <div className="flex items-center justify-between">
-              <Label className="text-slate-300 text-sm">Show Legend</Label>
-              <Switch
-                checked={chartConfig.showLegend}
-                onCheckedChange={(checked) =>
-                  setChartConfig({ ...chartConfig, showLegend: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label className="text-slate-300 text-sm">Show Grid</Label>
-              <Switch
-                checked={chartConfig.showGrid}
-                onCheckedChange={(checked) =>
-                  setChartConfig({ ...chartConfig, showGrid: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label className="text-slate-300 text-sm">Show Tooltip</Label>
-              <Switch
-                checked={chartConfig.showTooltip}
-                onCheckedChange={(checked) =>
-                  setChartConfig({ ...chartConfig, showTooltip: checked })
-                }
-              />
-            </div>
-          </>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         )}
 
-      {chartConfig.type === "map" && (
+        {chartConfig.type === "pie" && (
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Sub-Category</Label>
+            <Select
+              value={chartConfig.subCategory || "none"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  subCategory: value === "none" ? undefined : value,
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="none"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Select column
+                </SelectItem>
+                {columns.map((col) => (
+                  <SelectItem
+                    key={col}
+                    value={col}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {col}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (chartConfig.type === "kpi") {
+    return (
+      <div className="space-y-4">
+        {/* Basic Configuration */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Metric Column</Label>
+            <Select
+              value={chartConfig.column}
+              onValueChange={(value) =>
+                setChartConfig({ ...chartConfig, column: value })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                {columns.map((col) => (
+                  <SelectItem
+                    key={col}
+                    value={col}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {col}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Calculation Type</Label>
+            <Select
+              value={chartConfig.calculationType || "sum"}
+              onValueChange={(value) =>
+                setChartConfig({ ...chartConfig, calculationType: value })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                {[
+                  "sum",
+                  "avg",
+                  "count",
+                  "min",
+                  "max",
+                  "median",
+                  "mode",
+                  "distinct",
+                  "first",
+                  "last",
+                  "range",
+                  "std",
+                  "variance",
+                ].map((method) => (
+                  <SelectItem
+                    key={method}
+                    value={method}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {method.toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Format Type</Label>
+            <Select
+              value={chartConfig.formatType || "auto"}
+              onValueChange={(value) =>
+                setChartConfig({ ...chartConfig, formatType: value })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                {[
+                  "auto",
+                  "number",
+                  "currency",
+                  "percentage",
+                  "date",
+                  "time",
+                  "duration",
+                  "text",
+                ].map((format) => (
+                  <SelectItem
+                    key={format}
+                    value={format}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {format}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Second Row Configuration */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Target Value</Label>
+            <input
+              type="number"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded"
+              value={chartConfig.target ?? ""}
+              onChange={(e) =>
+                setChartConfig({
+                  ...chartConfig,
+                  target: Number(e.target.value),
+                })
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Group By</Label>
+            <Select
+              value={chartConfig.groupBy || "none"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  groupBy: value === "none" ? undefined : value,
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="none"
+                  className="text-white hover:bg-slate-700"
+                >
+                  None
+                </SelectItem>
+                {columns.map((col) => (
+                  <SelectItem
+                    key={col}
+                    value={col}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {col}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Filter By Column</Label>
+            <Select
+              value={chartConfig.filterBy?.column || "none"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  filterBy: {
+                    ...(chartConfig.filterBy || {}),
+                    column: value === "none" ? undefined : value,
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select filter column" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="none"
+                  className="text-white hover:bg-slate-700"
+                >
+                  None
+                </SelectItem>
+                {columns.map((col) => (
+                  <SelectItem
+                    key={col}
+                    value={col}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {col}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Currency Symbol (if currency selected) */}
+        {chartConfig.formatType === "currency" && (
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Currency Symbol</Label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded"
+              value={chartConfig.currencySymbol || ""}
+              onChange={(e) =>
+                setChartConfig({
+                  ...chartConfig,
+                  currencySymbol: e.target.value,
+                })
+              }
+            />
+          </div>
+        )}
+
+        {/* Filter Value (shown only if filter column is selected) */}
+        {chartConfig.filterBy?.column && (
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Filter Value</Label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded"
+              value={chartConfig.filterBy.value ?? ""}
+              onChange={(e) =>
+                setChartConfig({
+                  ...chartConfig,
+                  filterBy: {
+                    ...chartConfig.filterBy!,
+                    value: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+        )}
+
+        {/* Display Options - Toggle Switches */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
+          {[
+            { label: "Show Trend", key: "showTrend" },
+            { label: "Show Icon", key: "showIcon" },
+            { label: "Show Details", key: "showDetails" },
+          ].map(({ label, key }) => (
+            <div
+              key={key}
+              className="flex items-center justify-between px-4 py-2 border rounded-lg bg-slate-900"
+            >
+              <Label className="text-slate-300 text-sm">{label}</Label>
+              <Switch
+                checked={chartConfig[key]}
+                onCheckedChange={(checked) =>
+                  setChartConfig({ ...chartConfig, [key]: checked })
+                }
+              />
+            </div>
+          ))}
+        </div> */}
+      </div>
+    );
+  }
+};
+
+const ChartOptions = ({ chartConfig, setChartConfig }: any) => {
+  if (
+    chartConfig.type === "table" ||
+    chartConfig.type === "map" ||
+    chartConfig.type === "kpi"
+  )
+    return null;
+
+  return (
+    <Card className="bg-slate-800/50 border-slate-700">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-white flex items-center gap-2">
+          <Settings className="h-5 w-5" />
+          Chart Options
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        {/* Color Scheme Selector */}
+        <div className="space-y-2">
+          <Label className="text-slate-300 text-sm">Color Scheme</Label>
+          <Select
+            value={chartConfig.colorScheme}
+            onValueChange={(value) =>
+              setChartConfig({ ...chartConfig, colorScheme: value })
+            }
+          >
+            <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-800 border-slate-600">
+              {Object.entries(COLOR_SCHEMES).map(([name, colors]) => (
+                <SelectItem
+                  key={name}
+                  value={name}
+                  className="text-white hover:bg-slate-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      {colors.slice(0, 4).map((color, i) => (
+                        <div
+                          key={i}
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                    <span className="capitalize">{name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Show Legend Toggle */}
         <div className="flex items-center justify-between">
           <Label className="text-slate-300 text-sm">Show Legend</Label>
           <Switch
@@ -695,51 +1002,45 @@ const ChartOptions = ({ chartConfig, setChartConfig }: any) => (
             }
           />
         </div>
-      )}
 
-      {(chartConfig.type === "pie" ||
-        chartConfig.type === "treemap" ||
-        chartConfig.type === "kpi") && (
-        <div className="space-y-2">
-          <Label className="text-slate-300 text-sm">Aggregation</Label>
-          <Select
-            value={chartConfig.aggregation}
-            onValueChange={(value) =>
-              setChartConfig({
-                ...chartConfig,
-                aggregation: value as any,
-              })
+        {/* Show Grid Toggle */}
+        <div className="flex items-center justify-between">
+          <Label className="text-slate-300 text-sm">Show Grid</Label>
+          <Switch
+            checked={chartConfig.showGrid}
+            onCheckedChange={(checked) =>
+              setChartConfig({ ...chartConfig, showGrid: checked })
             }
-          >
-            <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-slate-800 border-slate-600">
-              <SelectItem value="sum" className="text-white hover:bg-slate-700">
-                Sum
-              </SelectItem>
-              <SelectItem value="avg" className="text-white hover:bg-slate-700">
-                Average
-              </SelectItem>
-              <SelectItem
-                value="count"
-                className="text-white hover:bg-slate-700"
-              >
-                Count
-              </SelectItem>
-              <SelectItem value="max" className="text-white hover:bg-slate-700">
-                Maximum
-              </SelectItem>
-              <SelectItem value="min" className="text-white hover:bg-slate-700">
-                Minimum
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          />
         </div>
-      )}
-    </CardContent>
-  </Card>
-);
+
+        {/* Show Tooltip Toggle */}
+        <div className="flex items-center justify-between">
+          <Label className="text-slate-300 text-sm">Show Tooltip</Label>
+          <Switch
+            checked={chartConfig.showTooltip}
+            onCheckedChange={(checked) =>
+              setChartConfig({ ...chartConfig, showTooltip: checked })
+            }
+          />
+        </div>
+
+        {/* Additional for Map Type */}
+        {chartConfig.type === "map" && (
+          <div className="flex items-center justify-between">
+            <Label className="text-slate-300 text-sm">Show Legend</Label>
+            <Switch
+              checked={chartConfig.showLegend}
+              onCheckedChange={(checked) =>
+                setChartConfig({ ...chartConfig, showLegend: checked })
+              }
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function ChartRenderer({
   data,
@@ -750,7 +1051,7 @@ export default function ChartRenderer({
   const [chartConfig, setChartConfig] = useState<ChartConfig>({
     type: "table",
     title: "Query Results",
-    showLegend: true,
+    showLegend: false,
     showGrid: true,
     showTooltip: true,
     colorScheme: "default",
@@ -762,8 +1063,6 @@ export default function ChartRenderer({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const itemsPerPage = 10;
-
-  console.log(data);
 
   // Convert array data to object format
   const processedData = useMemo(() => {
@@ -841,6 +1140,7 @@ export default function ChartRenderer({
       suggestions.push("kpi", "radialbar");
     }
     if (
+      true ||
       geographicColumns.length >= 2 ||
       numericColumns.some(
         (col) =>
@@ -868,12 +1168,13 @@ export default function ChartRenderer({
     ) {
       const latFields = columns.filter(
         (col) =>
-          col.toLowerCase().includes("lat") && fieldTypes[col] === "numeric"
+          // col.toLowerCase().includes("lat") &&
+          fieldTypes[col] === "numeric"
       );
       const longFields = columns.filter(
         (col) =>
-          (col.toLowerCase().includes("long") ||
-            col.toLowerCase().includes("long")) &&
+          // (col.toLowerCase().includes("long") ||
+          //   col.toLowerCase().includes("long")) &&
           fieldTypes[col] === "numeric"
       );
 
@@ -954,8 +1255,8 @@ export default function ChartRenderer({
     }
 
     if (
-      !chartConfig.xAxis ||
-      (!chartConfig.yAxis && chartConfig.type !== "kpi")
+      (chartConfig.type === "kpi" && !chartConfig.column) ||
+      (chartConfig.type !== "kpi" && (!chartConfig.xAxis || !chartConfig.yAxis))
     )
       return [];
 
@@ -963,63 +1264,7 @@ export default function ChartRenderer({
       COLOR_SCHEMES[chartConfig.colorScheme as keyof typeof COLOR_SCHEMES] ||
       COLOR_SCHEMES.default;
 
-    if (chartConfig.type === "kpi") {
-      // Calculate KPI metrics
-      const metrics = numericColumns.map((col, index) => {
-        const values = processedData.map((row) => Number(row[col]) || 0);
-        const sum = values.reduce((a, b) => a + b, 0);
-        const avg = sum / values.length;
-        const max = Math.max(...values);
-        const min = Math.min(...values);
-
-        return {
-          name: col,
-          value:
-            chartConfig.aggregation === "sum"
-              ? sum
-              : chartConfig.aggregation === "avg"
-              ? avg
-              : chartConfig.aggregation === "max"
-              ? max
-              : chartConfig.aggregation === "min"
-              ? min
-              : values.length,
-          color: colors[index % colors.length],
-          change: Math.random() * 20 - 10, // Mock change percentage
-          trend: Math.random() > 0.5 ? "up" : "down",
-        };
-      });
-      return metrics;
-    }
-
-    if (chartConfig.type === "pie" || chartConfig.type === "treemap") {
-      // Group by category and aggregate values
-      const grouped = processedData.reduce((acc, row) => {
-        const category = String(row[chartConfig.xAxis!]);
-        const value = Number(row[chartConfig.yAxis!]) || 0;
-
-        if (!acc[category]) {
-          acc[category] = { name: category, value: 0, count: 0 };
-        }
-
-        acc[category].value += value;
-        acc[category].count += 1;
-
-        return acc;
-      }, {} as Record<string, { name: string; value: number; count: number }>);
-
-      return Object.values(grouped).map((item, index) => ({
-        ...item,
-        value:
-          chartConfig.aggregation === "avg"
-            ? item.value / item.count
-            : item.value,
-        fill: colors[index % colors.length],
-      }));
-    }
-
     if (chartConfig.type === "heatmap") {
-      // Create heatmap data
       const xValues = [
         ...new Set(processedData.map((row) => row[chartConfig.xAxis!])),
       ];
@@ -1065,16 +1310,23 @@ export default function ChartRenderer({
       return heatmapData;
     }
 
-    // Standard chart data
-    return processedData.map((row, index) => ({
-      [chartConfig.xAxis!]: row[chartConfig.xAxis!],
-      [chartConfig.yAxis!]: Number(row[chartConfig.yAxis!]) || 0,
-      ...(chartConfig.colorBy && { colorBy: row[chartConfig.colorBy] }),
-      ...(chartConfig.sizeBy && {
-        sizeBy: Number(row[chartConfig.sizeBy]) || 0,
-      }),
-      fill: colors[index % colors.length],
-    }));
+    if (chartConfig.type === "kpi" && chartConfig.column) {
+      return processedData;
+    }
+
+    // Build color map based on colorBy field
+    const colorMap: Record<string, string> = {};
+    if (chartConfig.colorBy) {
+      const uniqueCategories = [
+        ...new Set(processedData.map((row) => row[chartConfig.colorBy!])),
+      ];
+      uniqueCategories.forEach((category, idx) => {
+        colorMap[String(category)] = colors[idx % colors.length];
+      });
+    }
+
+    // Final chart data mapping for bar/line/area/etc.
+    return processedData;
   }, [processedData, chartConfig, numericColumns]);
 
   const handleSort = (column: string) => {
@@ -1120,7 +1372,7 @@ export default function ChartRenderer({
         <div className="flex items-center justify-center h-64 text-slate-400">
           <div className="text-center">
             <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Configure chart axes to display visualization</p>
+            <p>Configure visualization properties to display</p>
           </div>
         </div>
       );
@@ -1144,7 +1396,7 @@ export default function ChartRenderer({
         }
         return (
           <div className="bg-red-600 h-[500px]">
-            <CanvasMap
+            <CustomizableMap
               element={{
                 id: "map-01",
                 type: "map",
@@ -1159,6 +1411,7 @@ export default function ChartRenderer({
                   showLegend: true,
                   center: { lat: 7, lng: 80 },
                   zoom: 6,
+                  categoryField: "type",
                 },
               }}
               dataSources={[
@@ -1199,218 +1452,81 @@ export default function ChartRenderer({
 
       case "bar":
         return (
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={chartData}>
-              {chartConfig.showGrid && (
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              )}
-              <XAxis dataKey={chartConfig.xAxis} stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
-              {chartConfig.showTooltip && (
-                <Tooltip content={<CustomTooltip />} />
-              )}
-              {chartConfig.showLegend && <Legend />}
-              <Bar
-                dataKey={chartConfig.yAxis}
-                fill={colors[0]}
-                radius={[2, 2, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarChartComponent
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+          />
         );
 
       case "line":
         return (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData}>
-              {chartConfig.showGrid && (
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              )}
-              <XAxis dataKey={chartConfig.xAxis} stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
-              {chartConfig.showTooltip && (
-                <Tooltip content={<CustomTooltip />} />
-              )}
-              {chartConfig.showLegend && <Legend />}
-              <Line
-                type="monotone"
-                dataKey={chartConfig.yAxis}
-                stroke={colors[0]}
-                strokeWidth={2}
-                dot={{ fill: colors[0], r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <LineChartComponent
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+            TooltipComponent={CustomTooltip}
+          />
         );
 
       case "area":
         return (
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={chartData}>
-              {chartConfig.showGrid && (
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              )}
-              <XAxis dataKey={chartConfig.xAxis} stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
-              {chartConfig.showTooltip && (
-                <Tooltip content={<CustomTooltip />} />
-              )}
-              {chartConfig.showLegend && <Legend />}
-              <Area
-                type="monotone"
-                dataKey={chartConfig.yAxis}
-                stroke={colors[0]}
-                fill={colors[0]}
-                fillOpacity={0.6}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <AreaChartComponent
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+            TooltipComponent={CustomTooltip}
+          />
         );
 
       case "scatter":
         return (
-          <ResponsiveContainer width="100%" height={400}>
-            <ScatterChart data={chartData}>
-              {chartConfig.showGrid && (
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              )}
-              <XAxis dataKey={chartConfig.xAxis} stroke="#9CA3AF" />
-              <YAxis dataKey={chartConfig.yAxis} stroke="#9CA3AF" />
-              {chartConfig.showTooltip && (
-                <Tooltip content={<CustomTooltip />} />
-              )}
-              {chartConfig.showLegend && <Legend />}
-              <Scatter dataKey={chartConfig.yAxis} fill={colors[0]} />
-            </ScatterChart>
-          </ResponsiveContainer>
+          <ScatterChartComponent
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+            TooltipComponent={CustomTooltip}
+          />
         );
 
       case "pie":
         return (
-          <ResponsiveContainer width="100%" height={400}>
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                // label={({ name, percent }) =>
-                //   `${name} ${(percent * 100).toFixed(0)}%`
-                // }
-                outerRadius={120}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={colors[index % colors.length]}
-                  />
-                ))}
-              </Pie>
-              {chartConfig.showTooltip && (
-                <Tooltip content={<CustomTooltip />} />
-              )}
-              {chartConfig.showLegend && <Legend />}
-            </PieChart>
-          </ResponsiveContainer>
+          <PieChartComponent
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+            TooltipComponent={CustomTooltip}
+          />
         );
 
       case "kpi":
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {chartData.map((kpi: any, index) => (
-              <Card key={index} className="bg-slate-800/50 border-slate-700">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-400">
-                        {kpi.name}
-                      </p>
-                      <p className="text-2xl font-bold text-white">
-                        {typeof kpi.value === "number"
-                          ? kpi.value.toLocaleString()
-                          : kpi.value}
-                      </p>
-                      <p
-                        className={`text-sm ${
-                          kpi.trend === "up" ? "text-green-400" : "text-red-400"
-                        }`}
-                      >
-                        {kpi.trend === "up" ? "↗" : "↘"}{" "}
-                        {Math.abs(kpi.change).toFixed(1)}%
-                      </p>
-                    </div>
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{
-                        backgroundColor: kpi.color + "20",
-                        color: kpi.color,
-                      }}
-                    >
-                      <TrendingUp className="h-6 w-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        );
+        return <KPIComponent chartData={chartData} chartConfig={chartConfig} />;
 
       case "treemap":
         return (
-          <ResponsiveContainer width="100%" height={400}>
-            <Treemap
-              data={chartData}
-              dataKey="value"
-              ratio={4 / 3}
-              stroke="#374151"
-              fill={colors[0]}
-            />
-          </ResponsiveContainer>
+          <TreemapChartComponent
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+          />
         );
 
       case "radialbar":
         return (
-          <ResponsiveContainer width="100%" height={400}>
-            <RadialBarChart
-              cx="50%"
-              cy="50%"
-              innerRadius="10%"
-              outerRadius="80%"
-              data={chartData}
-            >
-              <RadialBar dataKey="value" cornerRadius={10} fill={colors[0]} />
-              {chartConfig.showTooltip && (
-                <Tooltip content={<CustomTooltip />} />
-              )}
-              {chartConfig.showLegend && <Legend />}
-            </RadialBarChart>
-          </ResponsiveContainer>
+          <RadialBarChartComponent
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+          />
         );
 
       case "heatmap":
         return (
-          <div
-            className="grid gap-1 p-4"
-            style={{
-              gridTemplateColumns: `repeat(${Math.sqrt(
-                chartData.length
-              )}, 1fr)`,
-            }}
-          >
-            {chartData.map((cell: any, index) => (
-              <div
-                key={index}
-                className="aspect-square rounded flex items-center justify-center text-xs font-medium text-white"
-                style={{ backgroundColor: cell.color }}
-                title={`${cell.x}, ${cell.y}: ${cell.value}`}
-              >
-                {cell.value.toFixed(1)}
-              </div>
-            ))}
-          </div>
+          <Heatmap
+            chartData={chartData}
+            chartConfig={chartConfig}
+            colors={colors}
+          />
         );
 
       case "table":
@@ -1656,17 +1772,6 @@ export default function ChartRenderer({
                     } View`}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {/* <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-slate-400 hover:text-white"
-                  >
-                    {chartConfig.showLegend ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button> */}
                   <Button
                     variant="outline"
                     size="sm"

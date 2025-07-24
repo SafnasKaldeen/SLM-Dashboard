@@ -79,8 +79,11 @@ export const useSwaps = (filters?: ProfitFilters) => {
       setData(null);
       setError(null);
 
-      const fromDate = filters.dateRange.from.toISOString().split("T")[0];
-      const toDate = filters.dateRange.to.toISOString().split("T")[0];
+      // console.log("🔄 Fetching swap data with date", filters.dateRange)
+
+      const fromDate = filters.dateRange.from.toLocaleDateString('en-CA');
+      const toDate = filters.dateRange.to.toLocaleDateString('en-CA');
+
 
       // 🔧 Improved SQL construction with better null handling
       const areasParam = filters.selectedAreas.length > 0
@@ -105,7 +108,7 @@ export const useSwaps = (filters?: ProfitFilters) => {
         )
       `;
 
-      console.log("🔄 Executing SQL (swaps):", sql);
+      // console.log("🔄 Executing SQL (swaps):", sql);
 
       try {
         const response = await fetch("/api/query", {
@@ -122,7 +125,7 @@ export const useSwaps = (filters?: ProfitFilters) => {
         }
 
         const result = await response.json();
-        console.log("✅ Swap data result:", result[0]);
+        // console.log("✅ Swap data result:", result[0]);
 
         if (
           Array.isArray(result) &&

@@ -60,8 +60,10 @@ export const useProfit = (filters?: ProfitFilters) => {
       setData(null); // Clear previous data on new fetch
       setError(null); // Clear any previous errors
 
-      const fromDate = filters.dateRange.from.toISOString().split("T")[0];
-      const toDate = filters.dateRange.to.toISOString().split("T")[0];
+     
+      const fromDate = filters.dateRange.from.toLocaleDateString('en-CA');
+      const toDate = filters.dateRange.to.toLocaleDateString('en-CA');
+
 
       const sql = `
         CALL GET_PROFIT_METRICS_PROCEDURE(
@@ -81,7 +83,7 @@ export const useProfit = (filters?: ProfitFilters) => {
         )
       `;
 
-      console.log("🔍 Executing SQL:", sql);
+      // console.log("🔍 Executing SQL:", sql);
 
       try {
         const response = await fetch("/api/query", {

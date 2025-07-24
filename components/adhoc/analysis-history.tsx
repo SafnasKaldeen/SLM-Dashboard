@@ -353,8 +353,8 @@ export function AnalysisHistory({
       // Convert to the format expected by ChartRenderer
       const formattedData = convertToChartFormat(rows, columns);
 
-      console.log("Formatted data for ChartRenderer:", formattedData);
-      console.log("Columns:", columns);
+      // console.log("Formatted data for ChartRenderer:", formattedData);
+      // console.log("Columns:", columns);
 
       // Call the parent component's rerun handler with the formatted results
       const queryResult: QueryResult = {

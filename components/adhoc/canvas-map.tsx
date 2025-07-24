@@ -1,277 +1,59 @@
-"use client";
+import React, { useState, useRef, useEffect } from "react";
+import { assignIconsToCategories, getStatusIcon } from "@/utils/iconUtils";
+import { getSemanticColor, getColorsFromRecord } from "@/utils/colorUtils";
+import { MapPin, Menu, X, Loader2, Settings } from "lucide-react";
+import { da } from "date-fns/locale";
 
-import { useState, useRef, useEffect } from "react";
-import {
-  MapPin,
-  Navigation,
-  Clock,
-  Info,
-  AlertTriangle,
-  CheckCircle,
-  Menu,
-  X,
-  Loader2,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import dynamic from "next/dynamic";
-import type { CanvasElement, DataSource } from "../types/professional-types";
+// Map configuration interface
+interface MapConfig {
+  // Map provider settings
+  mapProvider?:
+    | "openstreetmap"
+    | "cartodb_dark"
+    | "cartodb_light"
+    | "satellite";
 
-interface CanvasMapProps {
-  element: CanvasElement;
-  dataSources?: DataSource[];
+  // Initial view settings
+  center?: { lat: number; lng: number };
+  zoom?: number;
+
+  // UI settings
+  showZoomControl?: boolean;
+  collapsibleUI?: boolean;
+
+  // Field mappings
+  latitudeField?: string;
+  longitudeField?: string;
+  sizeField?: string;
+  colorField?: string;
+  nameField?: string;
+  categoryField?: string;
+
+  // Pinging effect fields
+  pingSizeField?: string; // Field that determines ping size
+  pingSpeedField?: string; // Field that determines ping speed
+
+  // Styling
+  markerSize?: number;
+  colorScheme?: "default" | "traffic" | "battery" | "performance";
+
+  // Data filtering
+  timeFilter?: string;
+  statusFilter?: string[];
 }
 
-const mockMapData = [
-  {
-    id: "ST01",
-    name: "Miriswaththa",
-    latitude: 7.123456,
-    longitude: 80.123456,
-    type: "station",
-    area: "Gampaha",
-    revenue: 4120,
-    utilization_rate: 85,
-    battery_level: 85,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST02",
-    name: "Seeduwa",
-    latitude: 7.148497,
-    longitude: 79.873276,
-    type: "station",
-    area: "Gampaha",
-    revenue: 3980,
-    utilization_rate: 78,
-    battery_level: 78,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST03",
-    name: "Minuwangoda",
-    latitude: 7.182689,
-    longitude: 79.961171,
-    type: "station",
-    area: "Gampaha",
-    revenue: 4215,
-    utilization_rate: 81,
-    battery_level: 81,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST04",
-    name: "Divulapitiya",
-    latitude: 7.222404,
-    longitude: 80.017613,
-    type: "station",
-    area: "Gampaha",
-    revenue: 3900,
-    utilization_rate: 74,
-    battery_level: 74,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST05",
-    name: "Katunayake",
-    latitude: 7.222445,
-    longitude: 80.017625,
-    type: "station",
-    area: "Gampaha",
-    revenue: 4050,
-    utilization_rate: 86,
-    battery_level: 86,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST06",
-    name: "Udugampola",
-    latitude: 7.120498,
-    longitude: 79.983923,
-    type: "station",
-    area: "Gampaha",
-    revenue: 3775,
-    utilization_rate: 71,
-    battery_level: 71,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST07",
-    name: "Kadawatha",
-    latitude: 7.006685,
-    longitude: 79.958184,
-    type: "station",
-    area: "Gampaha",
-    revenue: 3890,
-    utilization_rate: 77,
-    battery_level: 77,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST08",
-    name: "Kochchikade",
-    latitude: 7.274298,
-    longitude: 79.862597,
-    type: "station",
-    area: "Gampaha",
-    revenue: 3625,
-    utilization_rate: 69,
-    battery_level: 69,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST09",
-    name: "Paliyagoda",
-    latitude: 6.960975,
-    longitude: 79.880949,
-    type: "station",
-    area: "Gampaha",
-    revenue: 4100,
-    utilization_rate: 84,
-    battery_level: 84,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST10",
-    name: "Boralesgamuwa",
-    latitude: 6.837024,
-    longitude: 79.903572,
-    type: "station",
-    area: "Colombo",
-    revenue: 4230,
-    utilization_rate: 90,
-    battery_level: 90,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST11",
-    name: "Thalawathugoda",
-    latitude: 6.877865,
-    longitude: 79.939505,
-    type: "station",
-    area: "Colombo",
-    revenue: 4065,
-    utilization_rate: 79,
-    battery_level: 79,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST12",
-    name: "Moratuwa",
-    latitude: 6.787022,
-    longitude: 79.884759,
-    type: "station",
-    area: "Colombo",
-    revenue: 4330,
-    utilization_rate: 88,
-    battery_level: 88,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST13",
-    name: "Borella",
-    latitude: 6.915059,
-    longitude: 79.881394,
-    type: "station",
-    area: "Colombo",
-    revenue: 4190,
-    utilization_rate: 83,
-    battery_level: 83,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST14",
-    name: "Padukka",
-    latitude: 6.847305,
-    longitude: 80.102153,
-    type: "station",
-    area: "Colombo",
-    revenue: 3745,
-    utilization_rate: 68,
-    battery_level: 68,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST15",
-    name: "Beruwala",
-    latitude: 7.222348,
-    longitude: 80.017553,
-    type: "station",
-    area: "Kalutara",
-    revenue: 3855,
-    utilization_rate: 76,
-    battery_level: 76,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST16",
-    name: "Bandaragama",
-    latitude: 6.714853,
-    longitude: 79.989208,
-    type: "station",
-    area: "Kalutara",
-    revenue: 3970,
-    utilization_rate: 72,
-    battery_level: 72,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST17",
-    name: "Maggona",
-    latitude: 7.222444,
-    longitude: 80.017606,
-    type: "station",
-    area: "Kalutara",
-    revenue: 3710,
-    utilization_rate: 66,
-    battery_level: 66,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "ST18",
-    name: "Panadura",
-    latitude: 6.713372,
-    longitude: 79.906452,
-    type: "station",
-    area: "Kalutara",
-    revenue: 4140,
-    utilization_rate: 80,
-    battery_level: 80,
-    status: "active",
-    timestamp: "2024-01-15T10:30:00Z",
-  },
-];
+// Data point interface
+interface DataPoint {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  type: "station" | "scooter" | "vehicle" | "point";
+  status: "active" | "inactive" | "safe" | "warning" | "danger";
+  [key: string]: any; // Allow additional properties
+}
 
-const computeAverageCenter = (points: typeof mockMapData) => {
-  const latitudes = points.map((p) => p.latitude || 0);
-  const longitudes = points.map((p) => p.longitude || 0);
-
-  const avgLat =
-    latitudes.reduce((sum, val) => sum + val, 0) / latitudes.length;
-  const avgLng =
-    longitudes.reduce((sum, val) => sum + val, 0) / longitudes.length;
-
-  return { lat: avgLat, lng: avgLng };
-};
-
+// Map providers configuration
 const mapProviders = {
   openstreetmap: {
     name: "OpenStreetMap",
@@ -299,56 +81,142 @@ const mapProviders = {
   },
 };
 
-// Leaflet Map Component
-function LeafletMapComponent({ element, dataSources = [] }: CanvasMapProps) {
+// Color schemes
+const colorSchemes = {
+  default: {
+    active: "#10B981",
+    warning: "#F59E0B",
+    danger: "#EF4444",
+    inactive: "#6B7280",
+    safe: "#10B981",
+  },
+  traffic: {
+    active: "#22C55E",
+    warning: "#EAB308",
+    danger: "#DC2626",
+    inactive: "#64748B",
+    safe: "#22C55E",
+  },
+  battery: {
+    active: "#06D6A0",
+    warning: "#FFD23F",
+    danger: "#EE6C4D",
+    inactive: "#8E8E93",
+    safe: "#06D6A0",
+  },
+  performance: {
+    active: "#3B82F6",
+    warning: "#F97316",
+    danger: "#E11D48",
+    inactive: "#71717A",
+    safe: "#3B82F6",
+  },
+};
+
+// Sample data - in real usage, this would be passed as props
+const sampleData: DataPoint[] = [
+  {
+    id: "ST01",
+    name: "Miriswaththa Station",
+    latitude: 7.123456,
+    longitude: 80.123456,
+    type: "station",
+    status: "active",
+    revenue: 4120,
+    utilization_rate: 85,
+    battery_level: 85,
+    area: "Gampaha",
+    ping_intensity: 0.8, // Higher values = larger ping
+    activity_level: 0.9, // Higher values = faster ping
+  },
+  {
+    id: "ST02",
+    name: "Seeduwa Hub",
+    latitude: 7.148497,
+    longitude: 79.873276,
+    type: "vehicle",
+    status: "pending",
+    revenue: 3980,
+    utilization_rate: 78,
+    battery_level: 78,
+    area: "Gampaha",
+    ping_intensity: 0.6,
+    activity_level: 0.5,
+  },
+  {
+    id: "SC01",
+    name: "Scooter Alpha",
+    latitude: 7.162689,
+    longitude: 79.971171,
+    type: "customer",
+    status: "safe",
+    battery_level: 92,
+    range: 45,
+    area: "Gampaha",
+    ping_intensity: 0.1,
+    activity_level: 0.8,
+  },
+  {
+    id: "SC02",
+    name: "Scooter Beta",
+    latitude: 7.182404,
+    longitude: 80.007613,
+    type: "scooter",
+    status: "warning",
+    battery_level: 35,
+    range: 15,
+    area: "Gampaha",
+    ping_intensity: 0.7,
+    activity_level: 0.7,
+  },
+  {
+    id: "SC03",
+    name: "Scooter Gamma",
+    latitude: 7.202445,
+    longitude: 80.027625,
+    type: "scooter",
+    status: "danger",
+    battery_level: 12,
+    range: 3,
+    area: "Gampaha",
+    ping_intensity: 1.0,
+    activity_level: 1.0,
+  },
+];
+
+interface CustomizableMapProps {
+  data?: DataPoint[];
+  config?: MapConfig;
+  onDataPointClick?: (point: DataPoint) => void;
+  onConfigChange?: (config: MapConfig) => void;
+  className?: string;
+}
+
+export default function CustomizableMap({
+  data,
+  config = {},
+  onDataPointClick,
+  onConfigChange,
+  className = "",
+}: CustomizableMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [leaflet, setLeaflet] = useState<any>(null);
   const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
-  const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
-  const [mapStats, setMapStats] = useState({
-    safe: 0,
-    warning: 0,
-    danger: 0,
-    stations: 0,
-  });
   const [uiCollapsed, setUiCollapsed] = useState(false);
-
-  /**
-   * Defensive configuration lookup.
-   * element.config can be undefined when the element has
-   * just been created or if its config hasn’t been saved yet.
-   */
-  const cfg = element.config ?? {};
-
-  // Get map-wide config values
-  const mapProvider = cfg.mapProvider ?? "openstreetmap";
-  const center = cfg.center ?? computeAverageCenter(mockMapData);
-  const zoom = cfg.zoom ?? 12;
-  const showLegend = cfg.showLegend !== false;
-  const timeFilter = cfg.timeFilter ?? "all";
-
-  // Get field mappings
-  const latitudeField = cfg.latitudeField;
-  const longitudeField = cfg.longitudeField;
-  const sizeField = cfg.sizeField;
-  const colorField = cfg.colorField;
-
-  // Calculate map statistics
-  useEffect(() => {
-    const stats = { safe: 0, warning: 0, danger: 0, stations: 0 };
-    mockMapData.forEach((point) => {
-      if (point.type === "station") {
-        stats.stations++;
-      } else if (point.type === "scooter") {
-        if (point.status === "safe") stats.safe++;
-        else if (point.status === "warning") stats.warning++;
-        else if (point.status === "danger") stats.danger++;
-      }
-    });
-    setMapStats(stats);
-  }, []);
+  const [currentConfig, setCurrentConfig] = useState<MapConfig>({
+    mapProvider: "cartodb_dark",
+    zoom: 11,
+    showZoomControl: true,
+    collapsibleUI: true,
+    markerSize: 32,
+    colorScheme: "default",
+    categoryField: "type",
+    pingSizeField: "ping_intensity", // Default field for ping size
+    pingSpeedField: "activity_level", // Fixed: was "Battery Level"
+    ...config,
+  });
 
   // Load Leaflet
   useEffect(() => {
@@ -362,229 +230,111 @@ function LeafletMapComponent({ element, dataSources = [] }: CanvasMapProps) {
         setIsLoading(false);
       }
     };
-
     loadLeaflet();
   }, []);
 
-  // Get data points based on field mappings
-  const getDataPoints = () => {
-    if (!latitudeField || !longitudeField) {
-      return mockMapData;
+  data = data || sampleData;
+
+  const getPointColor = (point: DataPoint) => {
+    const schemeName = currentConfig.colorScheme || "default";
+    const scheme = colorSchemes[schemeName];
+
+    const statusKey = point.status?.toLowerCase?.() || "unknown";
+
+    // First try to use color from the scheme
+    if (scheme && scheme[statusKey as keyof typeof scheme]) {
+      return scheme[statusKey as keyof typeof scheme];
     }
 
-    return mockMapData.map((point) => ({
-      ...point,
-      lat:
-        (point[latitudeField.id as keyof typeof point] as number) ||
-        point.latitude,
-      lng:
-        (point[longitudeField.id as keyof typeof point] as number) ||
-        point.longitude,
-      size: sizeField
-        ? (point[sizeField.id as keyof typeof point] as number)
-        : point.revenue,
-      color: colorField
-        ? (point[colorField.id as keyof typeof point] as number)
-        : point.utilization_rate,
-    }));
+    // Fallback to semantic color mapping
+    return getSemanticColor(statusKey);
   };
 
-  const dataPoints = getDataPoints();
+  const createPopupContent = (point: Record<string, any>) => {
+    const colorField = currentConfig.colorField || "status";
+    const statusValue = point[colorField] ?? "Unknown";
+    const statusColor = getPointColor(point);
 
-  // Get the color for a data point based on its value
-  const getPointColor = (point: any) => {
-    if (colorField) {
-      const value = point.color || 0;
-      if (value >= 80) return "#10B981";
-      if (value >= 60) return "#F59E0B";
-      if (value >= 40) return "#F97316";
-      return "#EF4444";
-    }
+    const rows: string[] = [];
 
-    if (point.type === "station") {
-      const utilizationRate = point.utilization_rate || 0;
-      if (utilizationRate >= 80) return "#10B981";
-      if (utilizationRate >= 60) return "#F59E0B";
-      return "#EF4444";
-    } else if (point.type === "scooter") {
-      switch (point.status) {
-        case "safe":
-          return "#10B981";
-        case "warning":
-          return "#F59E0B";
-        case "danger":
-          return "#EF4444";
-        default:
-          return "#6B7280";
+    for (const [key, value] of Object.entries(point)) {
+      if (key === "name" || key === colorField) continue;
+      if (value === null || value === undefined || value === "") continue;
+
+      const label = key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+      let displayValue: string;
+
+      // Handle various types
+      if (typeof value === "boolean") {
+        displayValue = value ? "Yes" : "No";
+      } else if (typeof value === "number") {
+        displayValue = value.toLocaleString();
+      } else if (Array.isArray(value)) {
+        displayValue = value.join(", ");
+      } else if (typeof value === "object") {
+        displayValue = JSON.stringify(value);
+      } else {
+        displayValue = value.toString();
       }
-    }
-    return "#6B7280";
-  };
 
-  // Get icon SVG for point type
-  const getPointIconSvg = (point: any) => {
-    if (point.type === "station") {
-      return '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle>';
-    } else if (point.type === "scooter") {
-      switch (point.status) {
-        case "safe":
-          return '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22,4 12,14.01 9,11.01"></polyline>';
-        case "warning":
-          return '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="m12 17 .01 0"></path>';
-        case "danger":
-          return '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="m12 17 .01 0"></path>';
-        default:
-          return '<path d="M6 3h12l4 6-10 13L2 9l4-6z"></path>';
-      }
+      rows.push(`
+      <div style="margin-bottom: 6px;">
+        <span style="color: #94a3b8;">${label}:</span>
+        <span style="font-weight: 500; margin-left: 8px;">${displayValue}</span>
+      </div>
+    `);
     }
-    return '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle>';
-  };
 
-  // Create popup content
-  const createPopupContent = (point: any) => {
+    // Optional: location field
+    const location =
+      point.latitude && point.longitude
+        ? `
+      <div style="margin-bottom: 6px;">
+        <span style="color: #94a3b8;">Location:</span>
+        <span style="font-weight: 500; margin-left: 8px;">${point.latitude.toFixed(
+          4
+        )}, ${point.longitude.toFixed(4)}</span>
+      </div>
+    `
+        : "";
+
     return `
-      <div style="color: white; font-family: system-ui, sans-serif;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-          <div style="font-weight: 600; font-size: 14px;">${point.name}</div>
-          <div style="background: ${getPointColor(
-            point
-          )}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 500;">
-            ${
-              point.type === "station" ? "STATION" : point.status?.toUpperCase()
-            }
-          </div>
-        </div>
-        
-        <div style="font-size: 12px; line-height: 1.4;">
-          <div style="margin-bottom: 4px;">
-            <span style="color: #94a3b8;">Coordinates:</span>
-            <span style="font-weight: 500; margin-left: 4px;">
-              ${(point.lat || point.latitude).toFixed(4)}, ${(
-      point.lng || point.longitude
-    ).toFixed(4)}
-            </span>
-          </div>
-          
-          ${
-            latitudeField
-              ? `
-            <div style="margin-bottom: 4px;">
-              <span style="color: #94a3b8;">${latitudeField.name}:</span>
-              <span style="font-weight: 500; margin-left: 4px;">${
-                point.lat || point.latitude
-              }</span>
-            </div>
-          `
-              : ""
-          }
-          
-          ${
-            longitudeField
-              ? `
-            <div style="margin-bottom: 4px;">
-              <span style="color: #94a3b8;">${longitudeField.name}:</span>
-              <span style="font-weight: 500; margin-left: 4px;">${
-                point.lng || point.longitude
-              }</span>
-            </div>
-          `
-              : ""
-          }
-          
-          ${
-            sizeField
-              ? `
-            <div style="margin-bottom: 4px;">
-              <span style="color: #94a3b8;">${sizeField.name}:</span>
-              <span style="font-weight: 500; margin-left: 4px;">${point.size}</span>
-            </div>
-          `
-              : ""
-          }
-          
-          ${
-            colorField
-              ? `
-            <div style="margin-bottom: 4px;">
-              <span style="color: #94a3b8;">${colorField.name}:</span>
-              <span style="font-weight: 500; margin-left: 4px;">${point.color}</span>
-            </div>
-          `
-              : ""
-          }
-          
-          ${
-            point.type === "station"
-              ? `
-            <div style="margin-bottom: 4px;">
-              <span style="color: #94a3b8;">Revenue:</span>
-              <span style="font-weight: 500; margin-left: 4px;">$${point.revenue?.toLocaleString()}</span>
-            </div>
-            <div style="margin-bottom: 4px;">
-              <span style="color: #94a3b8;">Utilization:</span>
-              <span style="font-weight: 500; margin-left: 4px;">${
-                point.utilization_rate
-              }%</span>
-            </div>
-          `
-              : `
-            <div style="margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-              <span style="color: #94a3b8;">Battery:</span>
-              <span style="font-weight: 500;">${point.battery_level}%</span>
-            </div>
-            ${
-              point.range
-                ? `
-              <div style="margin-bottom: 4px;">
-                <span style="color: #94a3b8;">Range:</span>
-                <span style="font-weight: 500; margin-left: 4px;">${point.range} km</span>
-              </div>
-            `
-                : ""
-            }
-          `
-          }
+    <div style="color: white; font-family: system-ui, sans-serif; min-width: 200px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+        <div style="font-weight: 600; font-size: 16px;">${
+          point.name || "Unknown"
+        }</div>
+        <div style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase;">
+          ${statusValue}
         </div>
       </div>
-    `;
+      <div style="font-size: 13px; line-height: 1.5;">
+        ${location}
+        ${rows.join("")}
+      </div>
+    </div>
+  `;
   };
 
-  // Initialize map
+  // Initialize and update map
   useEffect(() => {
     if (!leaflet || !mapRef.current) return;
 
     const L = leaflet.default || leaflet;
 
-    const initMap = () => {
-      try {
-        const L = leaflet.default || leaflet;
+    if (!mapInstance.current) {
+      mapInstance.current = L.map(mapRef.current, {
+        zoomControl: currentConfig.showZoomControl,
+        dragging: true,
+        scrollWheelZoom: true,
+      });
 
-        if (!mapInstance.current) {
-          mapInstance.current = L.map(mapRef.current, {
-            zoomControl: true,
-            dragging: true,
-            scrollWheelZoom: true,
-          });
-
-          const currentProvider =
-            mapProviders[mapProvider as keyof typeof mapProviders];
-
-          const tileOptions: any = {
-            attribution: currentProvider.attribution,
-            maxZoom: 19,
-          };
-
-          if (currentProvider.url.includes("{s}")) {
-            tileOptions.subdomains = "abcd";
-          }
-
-          L.tileLayer(currentProvider.url, tileOptions).addTo(
-            mapInstance.current
-          );
-
-          // ✅ Custom CSS styles
-          const style = document.createElement("style");
-          style.innerHTML = `
+      // Add custom styles once
+      const style = document.createElement("style");
+      style.innerHTML = `
         .custom-marker-icon {
           display: flex;
           align-items: center;
@@ -592,33 +342,58 @@ function LeafletMapComponent({ element, dataSources = [] }: CanvasMapProps) {
           color: white;
           font-weight: bold;
           border-radius: 50%;
-          border: 2px solid rgba(255, 255, 255, 0.5);
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+          border: 2px solid rgba(255, 255, 255, 0.8);
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+          transition: all 0.2s ease;
+          position: relative;
         }
-        .custom-marker-pulse {
-          animation: pulse 1.5s infinite;
+        .custom-marker-icon:hover {
+          transform: scale(1.1);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
-        @keyframes pulse {
-          0% { transform: scale(0.8); opacity: 1; }
-          70% { transform: scale(1.5); opacity: 0.3; }
-          100% { transform: scale(0.8); opacity: 1; }
+        
+        /* Pinging effect styles */
+        .ping-container {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          pointer-events: none;
         }
+        
+        .ping-ring {
+          position: absolute;
+          border-radius: 50%;
+          border: 2px solid;
+          opacity: 0;
+          transform: translate(-50%, -50%);
+          animation: ping-animation 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        
+        @keyframes ping-animation {
+          0% {
+            transform: translate(-50%, -50%) scale(0.8);
+            opacity: 1;
+          }
+          75%, 100% {
+            transform: translate(-50%, -50%) scale(2);
+            opacity: 0;
+          }
+        }
+        
         .custom-popup {
           background-color: rgba(15, 23, 42, 0.95);
           border: 1px solid rgba(100, 116, 139, 0.5);
-          border-radius: 8px;
+          border-radius: 12px;
           color: white;
           font-family: system-ui, sans-serif;
-          padding: 0;
-          font-size: 14px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-          backdrop-filter: blur(8px);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(12px);
         }
         .custom-popup .leaflet-popup-content-wrapper {
           background-color: transparent;
           border: none;
           box-shadow: none;
-          border-radius: 8px;
+          border-radius: 12px;
           padding: 16px;
         }
         .custom-popup .leaflet-popup-content {
@@ -633,364 +408,378 @@ function LeafletMapComponent({ element, dataSources = [] }: CanvasMapProps) {
           color: rgba(255, 255, 255, 0.7);
           font-size: 18px;
           padding: 4px 8px;
+          border-radius: 4px;
         }
         .custom-popup a.leaflet-popup-close-button:hover {
           color: white;
           background-color: rgba(255, 255, 255, 0.1);
-          border-radius: 4px;
         }
       `;
-          document.head.appendChild(style);
-        } else {
-          // update center without changing zoom manually
-          mapInstance.current.setView([center.lat, center.lng]);
-        }
+      document.head.appendChild(style);
+    }
 
-        // 🔄 Remove all previous markers
-        mapInstance.current.eachLayer((layer: any) => {
-          if (layer instanceof L.Marker) {
-            mapInstance.current.removeLayer(layer);
-          }
-        });
-
-        const markerLatLngs: any[] = [];
-
-        // 🧿 Add all points
-        dataPoints.forEach((point) => {
-          const color = getPointColor(point);
-          const iconSvg = getPointIconSvg(point);
-
-          const customIcon = L.divIcon({
-            className: "custom-marker-icon",
-            html: `
-          <div style="width: 32px; height: 32px; background-color: ${color}; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: 0 0 15px rgba(0, 0, 0, 0.6); border: 2px solid rgba(255, 255, 255, 0.8);">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              ${iconSvg}
-            </svg>
-          </div>
-          <div class="custom-marker-pulse" style="position: absolute; top: -8px; left: -8px; width: 48px; height: 48px; background-color: ${color}; opacity: 0.3; border-radius: 50%;"></div>
-        `,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-          });
-
-          const lat = point.lat || point.latitude;
-          const lng = point.lng || point.longitude;
-          const marker = L.marker([lat, lng], { icon: customIcon }).addTo(
-            mapInstance.current
-          );
-
-          markerLatLngs.push([lat, lng]);
-
-          const popupContent = createPopupContent(point);
-          marker.bindPopup(popupContent, {
-            className: "custom-popup",
-            maxWidth: 300,
-            closeButton: true,
-          });
-
-          marker.on("click", () => {
-            setSelectedPoint(point.id);
-          });
-        });
-
-        // 🗺️ Fit map bounds to all markers with padding
-        if (markerLatLngs.length > 0) {
-          const bounds = L.latLngBounds(markerLatLngs);
-          mapInstance.current.fitBounds(bounds.pad(0.1)); // ✅ 10% padding
-        }
-
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error initializing map:", error);
-        setIsLoading(false);
-      }
-    };
-
-    initMap();
-
-    return () => {
-      // Cleanup on component unmount
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-      }
-    };
-  }, [
-    leaflet,
-    mapProvider,
-    dataPoints,
-    latitudeField,
-    longitudeField,
-    sizeField,
-    colorField,
-  ]);
-
-  const renderCollapsibleUI = () => {
-    return (
-      <>
-        {/* Collapsible Toggle Button */}
-        <div className="absolute top-4 right-4 z-[1000]">
-          <Button
-            onClick={() => setUiCollapsed(!uiCollapsed)}
-            className="h-12 w-12 rounded-full bg-white/90 backdrop-blur-sm border shadow-lg hover:bg-white/95 transition-all duration-200"
-            variant="outline"
-          >
-            {uiCollapsed ? (
-              <Menu className="h-5 w-5 text-gray-700" />
-            ) : (
-              <X className="h-5 w-5 text-gray-700" />
-            )}
-          </Button>
-        </div>
-
-        {/* Collapsible UI Panel */}
-        {!uiCollapsed && (
-          <div className="absolute top-4 left-4 space-y-4 z-[999] transition-all duration-300">
-            {/* Zoom Level Display */}
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Navigation className="h-4 w-4 text-blue-500" />
-                  <div>
-                    <div className="text-xs text-gray-600">Zoom Level</div>
-                    <div className="text-lg font-bold text-blue-600">
-                      {zoom}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Stats Cards */}
-            <div className="space-y-2">
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <div>
-                      <div className="text-xs text-gray-600">Safe</div>
-                      <div className="text-lg font-bold text-green-600">
-                        {mapStats.safe}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                    <div>
-                      <div className="text-xs text-gray-600">Warning</div>
-                      <div className="text-lg font-bold text-yellow-600">
-                        {mapStats.warning}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    <div>
-                      <div className="text-xs text-gray-600">Danger</div>
-                      <div className="text-lg font-bold text-red-600">
-                        {mapStats.danger}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-blue-500" />
-                    <div>
-                      <div className="text-xs text-gray-600">Stations</div>
-                      <div className="text-lg font-bold text-blue-600">
-                        {mapStats.stations}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Legend */}
-            {showLegend && (
-              <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border p-4 max-w-xs">
-                <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Map Legend
-                </div>
-
-                <div className="space-y-3">
-                  {/* Field Mappings */}
-                  {(latitudeField || longitudeField) && (
-                    <div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">
-                        Field Mappings
-                      </div>
-                      <div className="space-y-1 text-xs">
-                        {latitudeField && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                            <span>Lat: {latitudeField.name}</span>
-                          </div>
-                        )}
-                        {longitudeField && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span>Lng: {longitudeField.name}</span>
-                          </div>
-                        )}
-                        {sizeField && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                            <span>Size: {sizeField.name}</span>
-                          </div>
-                        )}
-                        {colorField && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                            <span>Color: {colorField.name}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Point Types */}
-                  <div>
-                    <div className="text-xs font-medium text-gray-700 mb-2">
-                      Point Types
-                    </div>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500 flex items-center justify-center">
-                          <MapPin className="h-2 w-2 text-white" />
-                        </div>
-                        <span>Stations</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
-                          <CheckCircle className="h-2 w-2 text-white" />
-                        </div>
-                        <span>Safe Status</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-yellow-500 flex items-center justify-center">
-                          <AlertTriangle className="h-2 w-2 text-white" />
-                        </div>
-                        <span>Warning Status</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500 flex items-center justify-center">
-                          <AlertTriangle className="h-2 w-2 text-white" />
-                        </div>
-                        <span>Danger Status</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </>
+    // Set view on map center and zoom
+    mapInstance.current.setView(
+      [currentConfig.center?.lat || 7.15, currentConfig.center?.lng || 79.95],
+      currentConfig.zoom || 11
     );
+
+    // Remove existing tile layers
+    mapInstance.current.eachLayer((layer: any) => {
+      if (layer instanceof L.TileLayer) {
+        mapInstance.current.removeLayer(layer);
+      }
+    });
+
+    const provider = mapProviders[currentConfig.mapProvider || "openstreetmap"];
+    const tileOptions: any = {
+      attribution: provider.attribution,
+      maxZoom: 19,
+    };
+
+    if (provider.url.includes("{s}")) {
+      tileOptions.subdomains = "abcd";
+    }
+
+    L.tileLayer(provider.url, tileOptions).addTo(mapInstance.current);
+
+    // Remove existing markers
+    mapInstance.current.eachLayer((layer: any) => {
+      if (layer instanceof L.Marker) {
+        mapInstance.current.removeLayer(layer);
+      }
+    });
+
+    // Get unique categories and assign icons using improved algorithm
+    const categoryField = currentConfig.categoryField;
+    const uniqueCategories = Array.from(
+      new Set(data.map((p) => p[categoryField] || "marker"))
+    );
+
+    // Available Lucide icons that work with the CDN
+    const availableIcons = [
+      "map-pin",
+      "car",
+      "bike",
+      "truck",
+      "bus",
+      "battery",
+      "battery-low",
+      "battery-full",
+      "zap",
+      "plug",
+      "check-circle",
+      "alert-triangle",
+      "alert-circle",
+      "x-circle",
+      "alert-octagon",
+      "navigation",
+      "home",
+      "building",
+      "radio",
+      "wrench",
+      "settings",
+      "wifi",
+      "wifi-off",
+      "info",
+      "globe",
+      "clock",
+    ];
+
+    const categoryToIconMap = assignIconsToCategories(
+      uniqueCategories,
+      availableIcons
+    );
+
+    // EFFICIENT NORMALIZATION: Calculate max values once for the entire dataset
+    const pingSizeField = currentConfig.pingSizeField;
+    const pingSpeedField = currentConfig.pingSpeedField;
+
+    const pingSizeValues = data
+      .map((p) => p[pingSizeField])
+      .filter((v) => typeof v === "number") as number[];
+
+    const pingSpeedValues = data
+      .map((p) => p[pingSpeedField])
+      .filter((v) => typeof v === "number") as number[];
+
+    const maxPingSize = Math.max(...pingSizeValues, 1); // Use 1 as fallback to avoid division by 0
+    const maxPingSpeed = Math.max(...pingSpeedValues, 1);
+
+    // Efficient function that uses pre-calculated max values
+    const getPingValues = (point: DataPoint) => {
+      const pointPingSize =
+        typeof point[pingSizeField] === "number" ? point[pingSizeField] : 0;
+      const pointPingSpeed =
+        typeof point[pingSpeedField] === "number" ? point[pingSpeedField] : 0;
+
+      // Normalize by dividing by the maximum (0-1 range)
+      const normalizedPingSize = Math.max(
+        0,
+        Math.min(1, pointPingSize / maxPingSize)
+      );
+      const normalizedPingSpeed = Math.max(
+        0,
+        Math.min(1, pointPingSpeed / maxPingSpeed)
+      );
+
+      return {
+        size: normalizedPingSize,
+        speed: normalizedPingSpeed,
+        actualSize: pointPingSize,
+        actualSpeed: pointPingSpeed,
+      };
+    };
+
+    data.forEach((point) => {
+      const color = getPointColor(point);
+      const category = point[categoryField] || "unknown";
+      const iconKey = categoryToIconMap[category] || "map-pin";
+      const pingValues = getPingValues(point);
+
+      // console.log("Ping values for", point.name, pingValues);
+
+      // Smart rotation based on category type
+      let rotation = 0;
+      if (category === "scooter" || iconKey === "bike") rotation = 25;
+      else if (category === "vehicle" || iconKey === "car") rotation = 90;
+      else if (category === "truck") rotation = 90;
+
+      // Base marker size (can be dynamic or default)
+      const baseSize = currentConfig.markerSize || 32;
+
+      // 🔧 Size control
+      // Adjust min/max multiplier to scale down pings visually
+      const minPingMultiplier = 0.4; // Previously 1.5
+      const maxPingMultiplier = 2.0; // Previously 4.0
+
+      // Clamp and ease the size value
+      const rawSize = Math.max(0, Math.min(1, pingValues.size));
+      const pingMultiplier =
+        minPingMultiplier + rawSize * (maxPingMultiplier - minPingMultiplier);
+      const calculatedPingSize = baseSize * pingMultiplier;
+
+      // 🔧 Speed control
+      // Clamp and ease the speed to avoid too-fast animations
+      const rawSpeed = Math.max(0, Math.min(1, pingValues.speed));
+      const adjustedSpeed = Math.pow(rawSpeed, 2); // Slower on high values
+
+      // Animation duration range (tweaked to be visually better)
+      const minDuration = 1.5; // Slower max speed
+      const maxDuration = 5.0; // Slower min speed
+
+      const animationDuration =
+        maxDuration - adjustedSpeed * (maxDuration - minDuration);
+
+      // 🔁 Build ping rings
+      const pingRings = `
+  <div class="ping-container">
+    <div class="ping-ring" style="
+      width: ${calculatedPingSize}px;
+      height: ${calculatedPingSize}px;
+      border-color: ${color};
+      animation-duration: ${animationDuration}s;
+    "></div>
+    <div class="ping-ring" style="
+      width: ${calculatedPingSize}px;
+      height: ${calculatedPingSize}px;
+      border-color: ${color};
+      animation-duration: ${animationDuration}s;
+      animation-delay: ${animationDuration * 0.33}s;
+    "></div>
+    <div class="ping-ring" style="
+      width: ${calculatedPingSize}px;
+      height: ${calculatedPingSize}px;
+      border-color: ${color};
+      animation-duration: ${animationDuration}s;
+      animation-delay: ${animationDuration * 0.66}s;
+    "></div>
+  </div>
+`;
+
+      const iconHtml = `
+        <div
+          class="custom-marker-icon"
+          style="
+            width: ${baseSize}px;
+            height: ${baseSize}px;
+            background-color: ${color};
+            transform: rotate(${rotation}deg);
+            position: relative;
+            z-index: 1000;
+          "
+        >
+          <div style="
+            width: 60%;
+            height: 60%;
+            background-image: url('https://cdn.jsdelivr.net/npm/lucide-static@0.408.0/icons/${iconKey}.svg');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            filter: invert(1);
+            transform: rotate(${-rotation}deg);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -${baseSize * 0.3}px;
+            margin-left: -${baseSize * 0.3}px;
+          "></div>
+        </div>
+        ${pingRings}
+      `;
+
+      const icon = L.divIcon({
+        html: iconHtml,
+        className: "",
+        iconSize: [baseSize, baseSize],
+        iconAnchor: [baseSize / 2, baseSize / 2],
+      });
+
+      const marker = L.marker([point.latitude, point.longitude], { icon })
+        .addTo(mapInstance.current)
+        .on("click", () => {
+          setSelectedPoint(point.id);
+          if (onDataPointClick) onDataPointClick(point);
+        });
+
+      marker.bindPopup(createPopupContent(point), {
+        className: "custom-popup",
+        closeButton: true,
+      });
+    });
+
+    setIsLoading(false);
+  }, [leaflet, data, currentConfig, onDataPointClick]);
+
+  // Update configuration
+  const updateConfig = (newConfig: Partial<MapConfig>) => {
+    const updatedConfig = { ...currentConfig, ...newConfig };
+    setCurrentConfig(updatedConfig);
+    onConfigChange?.(updatedConfig);
   };
 
   return (
-    <div className="h-full w-full relative bg-gray-100 rounded-lg overflow-hidden">
-      {/* Map Provider Info */}
+    <div
+      className={`h-full w-full relative bg-slate-900/50 rounded-lg overflow-hidden ${className}`}
+    >
+      {/* Map Provider Badge */}
       <div className="absolute top-2 left-2 z-[999]">
-        <Badge variant="outline" className="bg-black/90 backdrop-blur-sm">
-          {mapProviders[mapProvider as keyof typeof mapProviders]?.name ||
-            "OpenStreetMap"}{" "}
-          (Z: {zoom})
-        </Badge>
+        <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 px-3 py-2 rounded-md text-xs font-medium">
+          {mapProviders[currentConfig.mapProvider]?.name} (Z:{" "}
+          {currentConfig.zoom})
+        </div>
       </div>
 
-      {/* Leaflet Map Container */}
-      <Card className="h-full bg-slate-900/50 border-slate-700/50 backdrop-blur-sm overflow-hidden">
-        <CardContent className="p-0 h-full">
-          <div className="h-full relative">
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-[1001]">
-                <div className="flex flex-col items-center">
-                  <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-                  <p className="mt-2 text-sm text-slate-300">Loading map...</p>
-                </div>
-              </div>
-            )}
-            <div ref={mapRef} className="h-full w-full" />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Settings Toggle Button */}
+      <div className="absolute top-2 right-2 z-[999]">
+        <button
+          onClick={() => setUiCollapsed(!uiCollapsed)}
+          className="bg-slate-800/90 hover:bg-slate-800/95 backdrop-blur-sm border border-slate-700 text-slate-300 hover:text-white rounded-lg p-2 transition-all duration-200"
+        >
+          {uiCollapsed ? (
+            <Menu className="h-4 w-4" />
+          ) : (
+            <X className="h-4 w-4" />
+          )}
+        </button>
+      </div>
 
-      {/* No Data State */}
-      {(!latitudeField || !longitudeField) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-[1002]">
-          <div className="text-center text-gray-500 p-6">
-            <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <div className="text-lg font-medium mb-2">Configure Map Fields</div>
-            <div className="text-sm mb-4">
-              Drag and drop latitude and longitude fields from the data panel to
-              configure the map
+      {/* Collapsible UI Panel */}
+      {!uiCollapsed && currentConfig.collapsibleUI && (
+        <div className="absolute top-12 right-2 space-y-3 z-[998] max-w-xs">
+          {/* Quick Config Panel */}
+          <div className="bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-700 p-4">
+            <div className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Quick Settings
             </div>
-            <div className="space-y-2 text-xs text-left bg-gray-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>Required: Latitude field</span>
+
+            <div className="space-y-3">
+              {/* Map Provider */}
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Map Style
+                </label>
+                <select
+                  value={currentConfig.mapProvider}
+                  onChange={(e) =>
+                    updateConfig({ mapProvider: e.target.value })
+                  }
+                  className="w-full text-xs bg-slate-800 border border-slate-600 text-white rounded px-2 py-1 focus:border-cyan-400 focus:outline-none"
+                >
+                  <option value="openstreetmap">OpenStreetMap</option>
+                  <option value="cartodb_light">Light</option>
+                  <option value="cartodb_dark">Dark</option>
+                  <option value="satellite">Satellite</option>
+                </select>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>Required: Longitude field</span>
+
+              {/* Color Scheme */}
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Color Scheme
+                </label>
+                <select
+                  value={currentConfig.colorScheme}
+                  onChange={(e) =>
+                    updateConfig({ colorScheme: e.target.value })
+                  }
+                  className="w-full text-xs bg-slate-800 border border-slate-600 text-white rounded px-2 py-1 focus:border-cyan-400 focus:outline-none"
+                >
+                  <option value="default">Default</option>
+                  <option value="traffic">Traffic</option>
+                  <option value="battery">Battery</option>
+                  <option value="performance">Performance</option>
+                </select>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                <span>Optional: Size field</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                <span>Optional: Color field</span>
+
+              {/* Marker Size */}
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Marker Size
+                </label>
+                <input
+                  type="range"
+                  min="20"
+                  max="50"
+                  value={currentConfig.markerSize}
+                  onChange={(e) =>
+                    updateConfig({ markerSize: parseInt(e.target.value) })
+                  }
+                  className="w-full accent-cyan-400"
+                />
+                <div className="text-xs text-slate-400 text-center mt-1">
+                  {currentConfig.markerSize}px
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-// Dynamically import the map component with SSR disabled
-const DynamicLeafletMap = dynamic(() => Promise.resolve(LeafletMapComponent), {
-  ssr: false,
-  loading: () => (
-    <div className="h-full w-full relative bg-gray-100 rounded-lg overflow-hidden">
-      <Card className="h-full bg-slate-900/50 border-slate-700/50 backdrop-blur-sm overflow-hidden">
-        <CardContent className="p-0 h-full">
-          <div className="h-full relative">
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10">
-              <div className="flex flex-col items-center">
-                <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-                <p className="mt-2 text-sm text-slate-300">Loading map...</p>
-              </div>
+      {/* Map Container */}
+      <div className="h-full w-full relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-[1001]">
+            <div className="flex flex-col items-center text-white">
+              <Loader2 className="h-8 w-8 animate-spin mb-2" />
+              <p className="text-sm">Loading map...</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  ),
-});
+        )}
+        <div ref={mapRef} className="h-full w-full" />
+      </div>
 
-// Export the dynamic component as default
-export function CanvasMap({ element, dataSources = [] }: CanvasMapProps) {
-  return <DynamicLeafletMap element={element} dataSources={dataSources} />;
+      {/* No Data State */}
+      {data.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-[1002]">
+          <div className="text-center text-gray-500 p-6">
+            <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <div className="text-lg font-medium mb-2">No Data Available</div>
+            <div className="text-sm">Add data points to display on the map</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

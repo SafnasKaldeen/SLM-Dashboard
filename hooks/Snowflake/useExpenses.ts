@@ -62,8 +62,9 @@ export const useExpenses = (filters?: ExpensesFilters) => {
     const fetchExpensesData = async () => {
       setLoading(true);
 
-      const fromDate = filters.dateRange.from.toISOString().split("T")[0];
-      const toDate = filters.dateRange.to.toISOString().split("T")[0];
+
+      const fromDate = filters.dateRange.from.toLocaleDateString('en-CA');
+      const toDate = filters.dateRange.to.toLocaleDateString('en-CA');
 
       const sql = `
         CALL GET_EXPENSE_METRICS_PROCEDURE(
@@ -83,7 +84,7 @@ export const useExpenses = (filters?: ExpensesFilters) => {
         )
       `;
 
-      console.log("🔍 Executing SQL:", sql);
+      // console.log("🔍 Executing SQL:", sql);
 
       try {
         const response = await fetch("/api/query", {
