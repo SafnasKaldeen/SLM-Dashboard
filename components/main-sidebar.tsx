@@ -1,5 +1,3 @@
-"use client";
-
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -120,8 +118,9 @@ export function MainSidebar() {
     },
     {
       id: "gps",
-      label: "GPS Services",
+      label: "GPS Analytics",
       icon: categoryIcons.gps,
+      show: true,
       items: [
         {
           path: "/gps",
@@ -147,7 +146,7 @@ export function MainSidebar() {
     },
     {
       id: "battery",
-      label: "Battery Services",
+      label: "Battery Analytics",
       icon: categoryIcons.battery,
       items: [
         {
@@ -174,7 +173,7 @@ export function MainSidebar() {
     },
     {
       id: "motor",
-      label: "Motor Services",
+      label: "Motor Analytics",
       icon: categoryIcons.motor,
       items: [
         {
@@ -229,6 +228,7 @@ export function MainSidebar() {
     {
       id: "revenue",
       label: "Revenue Management",
+      show: true,
       icon: {
         icon: <DollarSign className="h-4 w-4" />,
         color: "text-emerald-500",
@@ -240,17 +240,13 @@ export function MainSidebar() {
           icon: <Activity className="h-4 w-4" />,
         },
         {
-          path: "/revenue/analytics",
+          path: "/analytics",
           label: "Analytics",
           icon: <TrendingUp className="h-4 w-4" />,
         },
+
         {
-          path: "/revenue/adhoc",
-          label: "Adhoc",
-          icon: <BrainCog className="h-4 w-4" />,
-        },
-        {
-          path: "/revenue/forecasting",
+          path: "/forecasting",
           label: "Forecasting",
           icon: <Target className="h-4 w-4" />,
         },
@@ -285,14 +281,27 @@ export function MainSidebar() {
     },
   ];
 
+  // Filter categories to show only those with show: true
+  const visibleCategories = menuCategories.filter(
+    (category) => category.show === true
+  );
+
   return (
-    <Sidebar className="border-r border-slate-800 bg-slate-900 w-64">
-      <SidebarHeader className="p-4 border-b border-slate-800">
-        <div className="flex items-center space-x-2">
-          <Hexagon className="h-8 w-8 text-cyan-500" />
-          <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-            SL-MOBILITY
-          </span>
+    <Sidebar className="border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 w-64 shadow-2xl">
+      <SidebarHeader className="h-16 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <Hexagon className="h-9 w-9 text-cyan-400 drop-shadow-lg" />
+            <div className="absolute inset-0 h-9 w-9 bg-cyan-400/20 rounded-full blur-md"></div>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-500 bg-clip-text text-transparent tracking-wide">
+              SL-MOBILITY
+            </span>
+            <span className="text-xs text-slate-400 font-medium tracking-wider">
+              ANALYTICS PLATFORM
+            </span>
+          </div>
         </div>
       </SidebarHeader>
 
@@ -303,22 +312,99 @@ export function MainSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                isActive={isActive("/")}
-                className="w-full px-3 py-2 rounded-md transition-colors hover:bg-slate-800"
+                isActive={isActive("/predictive")}
+                className={`w-full px-3 py-2 rounded-md transition-colors ${
+                  isActive("/predictive")
+                    ? "bg-gradient-to-r from-blue-500/15 to-blue-600/10 border border-blue-500/20"
+                    : "hover:bg-slate-800"
+                }`}
               >
-                <Link href="/" className="flex items-center space-x-3">
-                  <div className="flex items-center justify-center h-6 w-6 rounded-md bg-blue-500/10 text-blue-500">
+                <Link
+                  href="/predictive"
+                  className="flex items-center space-x-3"
+                >
+                  <div
+                    className={`flex items-center justify-center h-6 w-6 rounded-md transition-colors ${
+                      isActive("/")
+                        ? "bg-blue-500/15 text-blue-400"
+                        : "bg-blue-500/10 text-blue-500"
+                    }`}
+                  >
                     <Home className="h-4 w-4" />
                   </div>
-                  <span>Dashboard</span>
+                  <span>Predictive Analytics</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
-        <SidebarSeparator className="my-2 bg-slate-800" />
-        {/* Menu Categories */}
-        {menuCategories.map((category) => (
+
+        {/* Adhoc Section */}
+        <SidebarGroup className="px-2 py-1">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/adhoc")}
+                className={`w-full px-3 py-2 rounded-md transition-colors ${
+                  isActive("/adhoc")
+                    ? "bg-gradient-to-r from-emerald-500/15 to-emerald-600/10 border border-emerald-500/20"
+                    : "hover:bg-slate-800"
+                }`}
+              >
+                <Link href="/adhoc" className="flex items-center space-x-3">
+                  <div
+                    className={`flex items-center justify-center h-6 w-6 rounded-md ${
+                      isActive("/adhoc")
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : "bg-emerald-500/10 text-emerald-500"
+                    }`}
+                  >
+                    <BrainCog className="h-4 w-4" />
+                  </div>
+                  <span>Adhoc Analytics</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Real-Time Analytics Section */}
+        <SidebarGroup className="px-2 py-1">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/realtime")}
+                className={`w-full px-3 py-2 rounded-md transition-colors ${
+                  isActive("/realtime")
+                    ? "bg-gradient-to-r from-pink-500/15 to-pink-600/10 border border-pink-500/20"
+                    : "hover:bg-slate-800"
+                }`}
+              >
+                <Link href="/realtime" className="flex items-center space-x-3">
+                  <div
+                    className={`flex items-center justify-center h-6 w-6 rounded-md ${
+                      isActive("/realtime")
+                        ? "bg-pink-500/15 text-pink-400"
+                        : "bg-pink-500/10 text-pink-500"
+                    }`}
+                  >
+                    <LineChart className="h-4 w-4" />
+                  </div>
+                  <span>Real-Time Analytics</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {visibleCategories.length > 0 && (
+          <SidebarSeparator className="my-1 bg-slate-800" />
+        )}
+
+        {/* Menu Categories - Only show categories with show: true */}
+        {visibleCategories.map((category) => (
           <Collapsible
             key={category.id}
             open={openGroups[category.id]}
@@ -359,9 +445,13 @@ export function MainSidebar() {
                           isActive={isActive(item.path)}
                           className={`w-full px-3 py-2 rounded-md transition-colors ${
                             isActive(item.path)
-                              ? `bg-${
-                                  category.icon.color.split("-")[1]
-                                }-500/10 ${category.icon.color}`
+                              ? `bg-gradient-to-r ${
+                                  category.icon.color.includes("cyan")
+                                    ? "from-cyan-500/15 to-cyan-600/10 border border-cyan-500/20"
+                                    : category.icon.color.includes("emerald")
+                                    ? "from-emerald-500/15 to-emerald-600/10 border border-emerald-500/20"
+                                    : "from-blue-500/15 to-blue-600/10 border border-blue-500/20"
+                                } ${category.icon.color}`
                               : "hover:bg-slate-800 text-slate-300"
                           }`}
                         >
@@ -381,7 +471,9 @@ export function MainSidebar() {
             </SidebarGroup>
           </Collapsible>
         ))}
+
         <SidebarSeparator className="my-2 bg-slate-800" />
+
         {/* Settings */}
         <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
@@ -389,7 +481,11 @@ export function MainSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={isActive("/settings")}
-                className="w-full px-3 py-2 rounded-md transition-colors hover:bg-slate-800"
+                className={`w-full px-3 py-2 rounded-md transition-colors ${
+                  isActive("/settings")
+                    ? "bg-gradient-to-r from-slate-500/15 to-slate-600/10 border border-slate-500/20"
+                    : "hover:bg-slate-800"
+                }`}
               >
                 <Link href="/settings" className="flex items-center space-x-3">
                   <div className="flex items-center justify-center h-6 w-6 rounded-md bg-slate-500/10 text-slate-500">
@@ -426,26 +522,48 @@ export function MainSidebar() {
 @keyframes slideDown {
   from {
     height: 0;
+    opacity: 0;
   }
   to {
     height: var(--radix-collapsible-content-height);
+    opacity: 1;
   }
 }
 
 @keyframes slideUp {
   from {
     height: var(--radix-collapsible-content-height);
+    opacity: 1;
   }
   to {
     height: 0;
+    opacity: 0;
   }
 }
 
 .animate-slideDown {
-  animation: slideDown 300ms ease-out;
+  animation: slideDown 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .animate-slideUp {
-  animation: slideUp 300ms ease-out;
+  animation: slideUp 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-*/
+
+/* Custom scrollbar styles */
+// .scrollbar-thin {
+//   scrollbar-width: thin;
+// }
+
+// .scrollbar-thumb-slate-700\/50::-webkit-scrollbar-thumb {
+//   background-color: rgba(51, 65, 85, 0.5);
+//   border-radius: 0.375rem;
+// }
+
+// .scrollbar-track-transparent::-webkit-scrollbar-track {
+//   background-color: transparent;
+// }
+
+// .scrollbar-thin::-webkit-scrollbar {
+//   width: 6px;
+// }
+// */
