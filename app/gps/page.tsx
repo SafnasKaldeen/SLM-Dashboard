@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -7,260 +8,234 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Route, Layers, Navigation } from "lucide-react";
-import Link from "next/link";
-import CartoMap from "@/components/maps/carto-map";
+import { GPSFilters } from "@/components/gps/gps-filters";
+import { GPSMetrics } from "@/components/gps/gps-metrics";
+import { GPSChart } from "@/components/gps/gps-chart";
+import { TopPerformingScooters } from "@/components/gps/top";
+import { DistanceByBatteryType } from "@/components/gps/DistanceByBatteryType";
+import GPSMap from "@/components/gps/GPSMap";
+import CustomizableMap from "@/components/gps/canvas-map";
 
-export default function GPSServicesPage() {
-  // Sample data for the map
-  const mapMarkers = [
+export default function GPSPage() {
+  const [filters, setFilters] = useState<GPSFilters>({
+    quickTime: "last_year",
+    dateRange: undefined,
+    aggregation: "monthly",
+    selectedTboxes: [],
+    selectedBmses: [],
+    selectedBatteryTypes: [],
+  });
+
+  const GPSData = [
+    { date: "2024-01", GPS: 10000 },
+    { date: "2024-02", GPS: 12000 },
+    { date: "2024-03", GPS: 9000 },
+    { date: "2024-04", GPS: 14000 },
+    { date: "2024-05", GPS: 16000 },
+    { date: "2024-06", GPS: 13000 },
+  ];
+
+  const topScootersData = [
     {
-      position: [6.696449, 79.985743] as [number, number],
-      popup: "<strong>Current Location</strong>",
-      color: "#3b82f6", // blue
+      scooterId: "A001",
+      model: "Scooter A",
+      totalDistance: 8000,
+      averageDailyDistance: 42.1,
+      lastUsed: "2024-07-26",
+      status: "active",
+      area: "Colombo",
     },
     {
-      position: [6.698123, 79.986789] as [number, number],
-      popup: "<strong>Central Hub</strong><br>Available: 8/15",
-      color: "#10b981", // green
-      icon: "charging",
+      scooterId: "B002",
+      model: "Scooter B",
+      totalDistance: 7000,
+      averageDailyDistance: 38.7,
+      lastUsed: "2024-07-25",
+      status: "maintenance",
+      area: "Kandy",
     },
     {
-      position: [6.699234, 79.987123] as [number, number],
-      popup: "<strong>Main Street</strong><br>Available: 5/8",
-      color: "#f59e0b", // amber
-      icon: "charging",
+      scooterId: "C003",
+      model: "Scooter C",
+      totalDistance: 6000,
+      averageDailyDistance: 35.5,
+      lastUsed: "2024-07-24",
+      status: "inactive",
+      area: "Galle",
     },
     {
-      position: [6.697456, 79.985678] as [number, number],
-      popup: "<strong>City Center</strong><br>Available: 3/10",
-      color: "#ef4444", // red
-      icon: "charging",
+      scooterId: "D004",
+      model: "Scooter D",
+      totalDistance: 5000,
+      averageDailyDistance: 30.2,
+      lastUsed: "2024-07-23",
+      status: "active",
+      area: "Jaffna",
+    },
+    {
+      scooterId: "E005",
+      model: "Scooter E",
+      totalDistance: 4000,
+      averageDailyDistance: 28.9,
+      lastUsed: "2024-07-22",
+      status: "inactive",
+      area: "Negombo",
+    },
+    {
+      scooterId: "F006",
+      model: "Scooter F",
+      totalDistance: 3000,
+      averageDailyDistance: 25.4,
+      lastUsed: "2024-07-21",
+      status: "maintenance",
+      area: "Kandy",
+    },
+    {
+      scooterId: "G007",
+      model: "Scooter G",
+      totalDistance: 2000,
+      averageDailyDistance: 20.1,
+      lastUsed: "2024-07-20",
+      status: "active",
+      area: "Colombo",
     },
   ];
 
-  const mapRoutes = [
-    {
-      path: [
-        [6.696449, 79.985743],
-        [6.697123, 79.986567],
-        [6.698234, 79.987123],
-        [6.699345, 79.988456],
-        [6.700123, 79.989567],
-        [6.701234, 79.990123],
-      ] as [number, number][],
-      color: "#3b82f6", // blue
-      dashArray: "5, 10",
-    },
+  // ✅ NEW GPS-by-Area-based distance data (by battery type)
+  const batteryTypeAreaData = [
+    { BATTERY_TYPE: "Li-ion", AREA: "Colombo", TOTAL_DISTANCE: 15000 },
+    { BATTERY_TYPE: "Li-ion", AREA: "Kandy", TOTAL_DISTANCE: 10000 },
+    { BATTERY_TYPE: "Lead Acid", AREA: "Galle", TOTAL_DISTANCE: 7000 },
+    { BATTERY_TYPE: "NiMH", AREA: "Jaffna", TOTAL_DISTANCE: 5000 },
+    { BATTERY_TYPE: "Li-ion", AREA: "Negombo", TOTAL_DISTANCE: 4000 },
+    { BATTERY_TYPE: "Lead Acid", AREA: "Kandy", TOTAL_DISTANCE: 3000 },
   ];
 
-  const mapClusters = [
-    {
-      center: [6.698123, 79.986789] as [number, number],
-      radius: 500, // Radius in meters
-      color: "#06b6d4", // cyan
-      fillColor: "#06b6d4",
-      fillOpacity: 0.1,
-    },
-  ];
+  // ✅ Transform for pie chart: Group total distance by BATTERY_TYPE
+  const batteryTypeDistanceData = useMemo(() => {
+    const map = new Map<string, number>();
+
+    batteryTypeAreaData.forEach((entry) => {
+      const { BATTERY_TYPE, TOTAL_DISTANCE } = entry;
+      if (map.has(BATTERY_TYPE)) {
+        map.set(BATTERY_TYPE, map.get(BATTERY_TYPE)! + TOTAL_DISTANCE);
+      } else {
+        map.set(BATTERY_TYPE, TOTAL_DISTANCE);
+      }
+    });
+
+    return Array.from(map.entries()).map(([BATTERY_TYPE, TOTAL_DISTANCE]) => ({
+      BATTERY_TYPE,
+      TOTAL_DISTANCE,
+    }));
+  }, [batteryTypeAreaData]);
+
+  const isDateRangeSet =
+    filters.dateRange &&
+    filters.dateRange.from instanceof Date &&
+    filters.dateRange.to instanceof Date;
+
+  const handleFiltersChange = (newFilters: GPSFilters) => {
+    setFilters(newFilters);
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">GPS Services</h1>
-          <p className="text-slate-400">
-            Location-based services for EV fleet management
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">GPS Overview</h2>
+      </div>
+
+      <GPSFilters onFiltersChange={handleFiltersChange} />
+
+      {isDateRangeSet ? (
+        <>
+          <GPSMetrics GPSData={GPSData} filters={filters} />
+
+          {/* <div className="bg-red-600 h-[500px]">
+            <CustomizableMap
+              element={{
+                id: "map-01",
+                type: "map",
+                position: { x: 0, y: 0 },
+                size: { width: 600, height: 400 },
+                config: {
+                  latitudeField: { id: "latitude", name: "Latitude" },
+                  longitudeField: { id: "longitude", name: "Longitude" },
+                  sizeField: "utilization_rate",
+                  colorField: "area",
+                  pingSpeedField: { id: "ping_speed", name: "Ping Speed" },
+                  showLegend: true,
+                  center: { lat: 7, lng: 80 },
+                  zoom: 6,
+                  categoryField: "type",
+                },
+              }}
+              dataSources={[
+                {
+                  id: "mapData",
+                  name: "Station Points",
+                  data: [
+                    {
+                      id: "1",
+                      name: "Station Alpha",
+                      latitude: 7.123456,
+                      longitude: 80.123456,
+                      type: "Battery Swap",
+                      area: "Ampara",
+                      utilization_rate: 75,
+                      ping_speed: 100,
+                      timestamp: "2024-07-01T08:00:00Z",
+                      status: "active",
+                    },
+                    {
+                      id: "2",
+                      name: "Station Beta",
+                      latitude: 6.987654,
+                      longitude: 79.876543,
+                      type: "Battery Swap",
+                      area: "Colombo",
+                      utilization_rate: 90,
+                      ping_speed: 85,
+                      timestamp: "2024-07-01T08:05:00Z",
+                      status: "warning",
+                    },
+                  ],
+                },
+              ]}
+            />
+          </div> */}
+          <div className="grid gap-4">
+            <GPSChart filters={filters} data={GPSData} loading={false} />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <TopPerformingScooters filters={filters} data={topScootersData} />
+
+            {/* 🥧 Replaced GPS by Area with Pie Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Distance by Battery Type</CardTitle>
+                <CardDescription>
+                  Proportion of total distance travelled by battery types across
+                  all areas.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-[600px]">
+                <DistanceByBatteryType
+                  filters={filters}
+                  data={batteryTypeDistanceData}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <div className="text-center p-8">
+          <p className="text-lg text-muted-foreground">
+            Please select a valid date range to view GPS data.
           </p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm col-span-full">
-          <CardContent className="p-0">
-            <CartoMap
-              center={[6.696449, 79.985743]}
-              zoom={14}
-              markers={mapMarkers}
-              routes={mapRoutes}
-              clusters={mapClusters}
-              height="400px"
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/50 transition-colors">
-          <CardHeader>
-            <CardTitle className="text-slate-100 flex items-center">
-              <Route className="mr-2 h-5 w-5 text-cyan-500" />
-              EV Route Planning
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Plan optimal routes for electric vehicles with charging stops
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-300 mb-4">
-              Calculate the most efficient route between two points, taking into
-              account battery level, vehicle efficiency, and available charging
-              stations.
-            </p>
-            <Link href="/gps/route-planning" passHref>
-              <Button className="w-full bg-cyan-600 hover:bg-cyan-700 text-white">
-                <Route className="mr-2 h-4 w-4" />
-                Plan Route
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/50 transition-colors">
-          <CardHeader>
-            <CardTitle className="text-slate-100 flex items-center">
-              <Layers className="mr-2 h-5 w-5 text-cyan-500" />
-              Station Allocation
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Optimize charging station placement using clustering algorithms
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-300 mb-4">
-              Use density-based or geospatial clustering to determine optimal
-              locations for new charging stations based on usage patterns and
-              demand.
-            </p>
-            <Link href="/gps/station-allocation" passHref>
-              <Button className="w-full bg-cyan-600 hover:bg-cyan-700 text-white">
-                <Layers className="mr-2 h-4 w-4" />
-                Allocate Stations
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/50 transition-colors">
-          <CardHeader>
-            <CardTitle className="text-slate-100 flex items-center">
-              <Navigation className="mr-2 h-5 w-5 text-cyan-500" />
-              Closest Stations
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Find nearby charging stations based on location or route
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-300 mb-4">
-              Locate the nearest available charging stations based on your
-              current location or along your planned route to a destination.
-            </p>
-            <Link href="/gps/closest-stations" passHref>
-              <Button className="w-full bg-cyan-600 hover:bg-cyan-700 text-white">
-                <Navigation className="mr-2 h-4 w-4" />
-                Find Stations
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-slate-100">API Documentation</CardTitle>
-          <CardDescription className="text-slate-400">
-            Available GPS service endpoints for developers
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-md font-medium text-cyan-400 mb-2">
-                POST /ev-route-plan
-              </h3>
-              <p className="text-sm text-slate-300 mb-2">
-                Plan an EV route based on source, destination, battery, and
-                efficiency.
-              </p>
-              <div className="bg-slate-900/50 p-3 rounded-md text-xs font-mono text-slate-300 overflow-x-auto">
-                {`{
-  "source": "6.696449,79.985743",
-  "destination": "6.701234,79.990123",
-  "battery": 80,
-  "efficiency": 70
-}`}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-md font-medium text-cyan-400 mb-2">
-                POST /DensityBased-station-allocation
-              </h3>
-              <p className="text-sm text-slate-300 mb-2">
-                Cluster stations using density-based clustering (e.g., DBSCAN).
-              </p>
-              <div className="bg-slate-900/50 p-3 rounded-md text-xs font-mono text-slate-300 overflow-x-auto">
-                {`{
-  "eps": 0.5,
-  "min_samples": 5,
-  "top_n": 10,
-  "zoom_level": 14,
-  "stage_name": "production"
-}`}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-md font-medium text-cyan-400 mb-2">
-                POST /GeoBased-station-allocation
-              </h3>
-              <p className="text-sm text-slate-300 mb-2">
-                Allocate stations using geospatial filtering and radius-based
-                logic.
-              </p>
-              <div className="bg-slate-900/50 p-3 rounded-md text-xs font-mono text-slate-300 overflow-x-auto">
-                {`{
-  "max_radius_km": 2.0,
-  "outlier_threshold_km": 5.0,
-  "top_n": 10,
-  "zoom_level": 14,
-  "stage_name": "production"
-}`}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-md font-medium text-cyan-400 mb-2">
-                POST /closest-station
-              </h3>
-              <p className="text-sm text-slate-300 mb-2">
-                Return the closest station based on current coordinates or
-                context.
-              </p>
-              <div className="bg-slate-900/50 p-3 rounded-md text-xs font-mono text-slate-300 overflow-x-auto">
-                {`{
-  "stage_name": "production"
-}`}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-md font-medium text-cyan-400 mb-2">
-                POST /closest-station-with-direction
-              </h3>
-              <p className="text-sm text-slate-300 mb-2">
-                Return closest station along with directional context (e.g.,
-                towards destination).
-              </p>
-              <div className="bg-slate-900/50 p-3 rounded-md text-xs font-mono text-slate-300 overflow-x-auto">
-                {`{
-  "stage_name": "production"
-}`}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }

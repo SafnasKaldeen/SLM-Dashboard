@@ -27,6 +27,7 @@ import {
   BarChart3,
   AlertTriangle,
   Route,
+  FileBarChart,
   Layers,
   Navigation,
   Gauge,
@@ -46,7 +47,8 @@ import {
   Target,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useState } from "react";
+import { act, useState } from "react";
+import path from "path";
 
 export function MainSidebar() {
   const pathname = usePathname();
@@ -127,20 +129,41 @@ export function MainSidebar() {
           label: "Overview",
           icon: <Layers className="h-4 w-4" />,
         },
+        // {
+        //   path: "/gps/route-planning",
+        //   label: "Route Planning",
+        //   icon: <Route className="h-4 w-4" />,
+        // },
+        // {
+        //   path: "/gps/station-allocation",
+        //   label: "Station Allocation",
+        //   icon: <Layers className="h-4 w-4" />,
+        // },
+        // {
+        //   path: "/gps/closest-stations",
+        //   label: "Closest Stations",
+        //   icon: <BarChart3 className="h-4 w-4" />,
+        // },
+
         {
-          path: "/gps/route-planning",
-          label: "Route Planning",
-          icon: <Route className="h-4 w-4" />,
-        },
-        {
-          path: "/gps/station-allocation",
-          label: "Station Allocation",
-          icon: <Layers className="h-4 w-4" />,
-        },
-        {
-          path: "/gps/closest-stations",
-          label: "Closest Stations",
+          path: "/gps/usage-patterns",
+          label: "Usage Patterns",
           icon: <Navigation className="h-4 w-4" />,
+        },
+        // {
+        //   path: "/gps/trip-analytics",
+        //   label: "Trip Analytics",
+        //   icon: <BarChart3 className="h-4 w-4" />,
+        // },
+        {
+          path: "/gps/density-analysis",
+          label: "Density Patterns",
+          icon: <Hexagon className="h-4 w-4" />,
+        },
+        {
+          path: "/gps/Reports",
+          label: "Reports",
+          icon: <FileBarChart className="h-4 w-4" />,
         },
       ],
     },
@@ -202,6 +225,7 @@ export function MainSidebar() {
       id: "charging",
       label: "Charging Stations",
       icon: categoryIcons.charging,
+      show: true,
       items: [
         {
           path: "/charging",
@@ -228,7 +252,7 @@ export function MainSidebar() {
     {
       id: "revenue",
       label: "Revenue Management",
-      show: true,
+      // show: true,
       icon: {
         icon: <DollarSign className="h-4 w-4" />,
         color: "text-emerald-500",
@@ -240,16 +264,16 @@ export function MainSidebar() {
           icon: <Activity className="h-4 w-4" />,
         },
         {
-          path: "/analytics",
+          path: "/revenue/analytics",
           label: "Analytics",
           icon: <TrendingUp className="h-4 w-4" />,
         },
 
-        {
-          path: "/forecasting",
-          label: "Forecasting",
-          icon: <Target className="h-4 w-4" />,
-        },
+        // {
+        //   path: "/revenue/forecasting",
+        //   label: "Forecasting",
+        //   icon: <Target className="h-4 w-4" />,
+        // },
       ],
     },
     {
@@ -288,17 +312,20 @@ export function MainSidebar() {
 
   return (
     <Sidebar className="border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 w-64 shadow-2xl">
-      <SidebarHeader className="h-16 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
-        <div className="flex items-center space-x-3">
-          <div className="relative">
+      <SidebarHeader className="h-20 border-b flex items-center justify-between border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
+        <div className="flex items-center gap-x-3 mt-2">
+          {/* Icon with glow */}
+          <div className="relative flex items-center justify-center h-9 w-9">
             <Hexagon className="h-9 w-9 text-cyan-400 drop-shadow-lg" />
-            <div className="absolute inset-0 h-9 w-9 bg-cyan-400/20 rounded-full blur-md"></div>
+            <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-md"></div>
           </div>
-          <div className="flex flex-col">
+
+          {/* Text block */}
+          <div className="flex flex-col self-center leading-none">
             <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-500 bg-clip-text text-transparent tracking-wide">
               SL-MOBILITY
             </span>
-            <span className="text-xs text-slate-400 font-medium tracking-wider">
+            <span className="text-xs text-slate-400 font-medium tracking-wider mt-0.5">
               ANALYTICS PLATFORM
             </span>
           </div>
@@ -307,32 +334,31 @@ export function MainSidebar() {
 
       <SidebarContent className="py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
         {/* Dashboard */}
+
+        {/* Real-Time Analytics Section */}
         <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                isActive={isActive("/predictive")}
+                isActive={isActive("/realtime")}
                 className={`w-full px-3 py-2 rounded-md transition-colors ${
-                  isActive("/predictive")
-                    ? "bg-gradient-to-r from-blue-500/15 to-blue-600/10 border border-blue-500/20"
+                  isActive("/realtime")
+                    ? "bg-gradient-to-r from-pink-500/15 to-pink-600/10 border border-pink-500/20"
                     : "hover:bg-slate-800"
                 }`}
               >
-                <Link
-                  href="/predictive"
-                  className="flex items-center space-x-3"
-                >
+                <Link href="/realtime" className="flex items-center space-x-3">
                   <div
-                    className={`flex items-center justify-center h-6 w-6 rounded-md transition-colors ${
-                      isActive("/")
-                        ? "bg-blue-500/15 text-blue-400"
-                        : "bg-blue-500/10 text-blue-500"
+                    className={`flex items-center justify-center h-6 w-6 rounded-md ${
+                      isActive("/realtime")
+                        ? "bg-pink-500/15 text-pink-400"
+                        : "bg-pink-500/10 text-pink-500"
                     }`}
                   >
-                    <Home className="h-4 w-4" />
+                    <LineChart className="h-4 w-4" />
                   </div>
-                  <span>Predictive Analytics</span>
+                  <span>Real-Time Analytics</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -369,30 +395,32 @@ export function MainSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Real-Time Analytics Section */}
         <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                isActive={isActive("/realtime")}
+                isActive={isActive("/predictive")}
                 className={`w-full px-3 py-2 rounded-md transition-colors ${
-                  isActive("/realtime")
-                    ? "bg-gradient-to-r from-pink-500/15 to-pink-600/10 border border-pink-500/20"
+                  isActive("/predictive")
+                    ? "bg-gradient-to-r from-blue-500/15 to-blue-600/10 border border-blue-500/20"
                     : "hover:bg-slate-800"
                 }`}
               >
-                <Link href="/realtime" className="flex items-center space-x-3">
+                <Link
+                  href="/predictive"
+                  className="flex items-center space-x-3"
+                >
                   <div
-                    className={`flex items-center justify-center h-6 w-6 rounded-md ${
-                      isActive("/realtime")
-                        ? "bg-pink-500/15 text-pink-400"
-                        : "bg-pink-500/10 text-pink-500"
+                    className={`flex items-center justify-center h-6 w-6 rounded-md transition-colors ${
+                      isActive("/")
+                        ? "bg-blue-500/15 text-blue-400"
+                        : "bg-blue-500/10 text-blue-500"
                     }`}
                   >
-                    <LineChart className="h-4 w-4" />
+                    <Home className="h-4 w-4" />
                   </div>
-                  <span>Real-Time Analytics</span>
+                  <span>Predictive Analytics</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

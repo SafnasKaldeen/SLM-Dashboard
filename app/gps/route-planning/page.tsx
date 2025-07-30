@@ -19,6 +19,7 @@ import CartoMap from "@/components/maps/carto-map";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
+import DashboardLayout from "@/components/dashboard-layout";
 import { se } from "date-fns/locale";
 
 interface RouteSummary {

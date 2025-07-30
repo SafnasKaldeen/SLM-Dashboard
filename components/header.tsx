@@ -63,7 +63,7 @@ export function Header() {
   };
 
   return (
-    <header className="h-16 border-b border-slate-800 bg-black/20 backdrop-blur-sm flex items-center justify-between px-6">
+    <header className="h-20 border-b border-slate-800 bg-black/20 backdrop-blur-sm flex items-center justify-between px-6">
       <div className="flex items-center space-x-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

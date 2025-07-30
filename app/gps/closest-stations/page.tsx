@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 
+import DashboardLayout from "@/components/dashboard-layout";
+
 interface ClosestStationData {
   id: string;
   name: string;

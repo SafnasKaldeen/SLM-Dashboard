@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/revenue/test/HigherOrderChart.jsx", "components/main-sidebar.tsx", "lib/anomaly-detector.ts", "components/adhoc/BarChartComponent.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/revenue/test/HigherOrderChart.jsx", "components/main-sidebar.tsx", "lib/anomaly-detector.ts", "components/adhoc/BarChartComponent.jsx", "components/gps/GEOMaker.js"],
   "exclude": ["node_modules"]
 }

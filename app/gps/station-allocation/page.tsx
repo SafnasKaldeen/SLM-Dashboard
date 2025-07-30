@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import DashboardLayout from "@/components/dashboard-layout";
+
 interface StationAllocationData {
   clusters: Array<{
     id: number;

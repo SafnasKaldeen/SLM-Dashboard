@@ -1,20 +1,28 @@
-"use client"
-import { CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
-import type { DateRange } from "react-day-picker"
+"use client";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface DateRangePickerProps {
-  className?: string
-  dateRange: DateRange
-  onDateRangeChange: (range: DateRange) => void
+  className?: string;
+  dateRange: DateRange;
+  onDateRangeChange: (range: DateRange) => void;
 }
 
-export function DateRangePicker({ className, dateRange, onDateRangeChange }: DateRangePickerProps) {
+export function DateRangePicker({
+  className,
+  dateRange,
+  onDateRangeChange,
+}: DateRangePickerProps) {
   return (
     <div className={cn("grid gap-2", className)}>
       <Popover>
@@ -24,14 +32,15 @@ export function DateRangePicker({ className, dateRange, onDateRangeChange }: Dat
             variant={"outline"}
             className={cn(
               "w-[300px] justify-start text-left font-normal border-slate-700 bg-slate-900/50",
-              !dateRange && "text-muted-foreground",
+              !dateRange && "text-muted-foreground"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {dateRange?.from ? (
               dateRange.to ? (
                 <>
-                  {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
+                  {format(dateRange.from, "LLL dd, y")} -{" "}
+                  {format(dateRange.to, "LLL dd, y")}
                 </>
               ) : (
                 format(dateRange.from, "LLL dd, y")
@@ -53,5 +62,7 @@ export function DateRangePicker({ className, dateRange, onDateRangeChange }: Dat
         </PopoverContent>
       </Popover>
     </div>
-  )
+  );
 }
+
+export default DateRangePicker;
