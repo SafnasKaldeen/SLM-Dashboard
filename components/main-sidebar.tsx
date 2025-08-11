@@ -150,19 +150,19 @@ export function MainSidebar() {
           label: "Usage Patterns",
           icon: <Navigation className="h-4 w-4" />,
         },
-        // {
-        //   path: "/gps/trip-analytics",
-        //   label: "Trip Analytics",
-        //   icon: <BarChart3 className="h-4 w-4" />,
-        // },
+        {
+          path: "/gps/area-analysis",
+          label: "Area Analysis",
+          icon: <BarChart3 className="h-4 w-4" />,
+        },
         {
           path: "/gps/density-analysis",
-          label: "Density Patterns",
+          label: "Density Analysis",
           icon: <Hexagon className="h-4 w-4" />,
         },
         {
-          path: "/gps/Reports",
-          label: "Reports",
+          path: "/gps/batch-analysis",
+          label: "GPS Batch Analysis",
           icon: <FileBarChart className="h-4 w-4" />,
         },
       ],
@@ -243,8 +243,8 @@ export function MainSidebar() {
           icon: <BarChart3 className="h-4 w-4" />,
         },
         {
-          path: "/charging/scheduling",
-          label: "Scheduling",
+          path: "/charging/Cabinets",
+          label: "Cabinet",
           icon: <Calendar className="h-4 w-4" />,
         },
       ],
@@ -252,7 +252,7 @@ export function MainSidebar() {
     {
       id: "revenue",
       label: "Revenue Management",
-      // show: true,
+      show: true,
       icon: {
         icon: <DollarSign className="h-4 w-4" />,
         color: "text-emerald-500",
@@ -312,23 +312,27 @@ export function MainSidebar() {
 
   return (
     <Sidebar className="border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 w-64 shadow-2xl">
-      <SidebarHeader className="h-20 border-b flex items-center justify-between border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
+      <SidebarHeader className="h-20 border-b flex px-5 justify-between border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
         <div className="flex items-center gap-x-3 mt-2">
           {/* Icon with glow */}
-          <div className="relative flex items-center justify-center h-9 w-9">
-            <Hexagon className="h-9 w-9 text-cyan-400 drop-shadow-lg" />
+          <div className="relative flex items-center justify-center h-10 w-10">
+            <div className="w-10 h-10 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
+              <Zap className="w-7 h-7 text-white" />
+            </div>
             <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-md"></div>
           </div>
 
           {/* Text block */}
-          <div className="flex flex-col self-center leading-none">
-            <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-500 bg-clip-text text-transparent tracking-wide">
-              SL-MOBILITY
-            </span>
-            <span className="text-xs text-slate-400 font-medium tracking-wider mt-0.5">
-              ANALYTICS PLATFORM
-            </span>
-          </div>
+          <a href="/" className="inline-block">
+            <div className="flex flex-col self-center leading-none cursor-pointer">
+              <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-500 bg-clip-text text-transparent tracking-wide">
+                SL-MOBILITY
+              </span>
+              <span className="text-xs text-slate-400 font-medium tracking-wider mt-0.5">
+                ANALYTICS PLATFORM
+              </span>
+            </div>
+          </a>
         </div>
       </SidebarHeader>
 

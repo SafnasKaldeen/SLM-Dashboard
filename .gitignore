@@ -11,6 +11,8 @@
 # production
 /build
 
+/components/gps/geojson
+
 # debug
 npm-debug.log*
 yarn-debug.log*

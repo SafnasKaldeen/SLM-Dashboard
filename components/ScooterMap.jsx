@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Circle, Popup } from "react-leaflet";
@@ -22,7 +22,18 @@ import {
   Navigation,
   Shield,
   AlertCircle,
+  Layers,
+  Menu,
+  X,
+  Settings,
+  Activity,
+  BarChart3,
+  TrendingUp,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 // Modern color palette with consistent gradients
 const colors = {
@@ -51,6 +62,131 @@ const colors = {
     secondary: "rgba(30, 41, 59, 0.6)",
     accent: "rgba(51, 65, 85, 0.4)",
   },
+};
+
+// Map providers
+const mapProviders = {
+  openstreetmap: {
+    name: "OpenStreetMap",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "© OpenStreetMap contributors",
+    borderColor: "#1f2937",
+    regionBaseColor: "#ffffff",
+  },
+  cartodb_dark: {
+    name: "Carto Dark",
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    attribution: "© OpenStreetMap contributors © CARTO",
+    borderColor: "#facc15",
+    regionBaseColor: "#1e293b",
+  },
+  cartodb_light: {
+    name: "Carto Light",
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    attribution: "© OpenStreetMap contributors © CARTO",
+    borderColor: "#111827",
+    regionBaseColor: "#f8fafc",
+  },
+  satellite: {
+    name: "Satellite",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "© Esri",
+    borderColor: "#00E5FF",
+    regionBaseColor: "#000000",
+  },
+};
+
+// Enhanced Loading Component
+const EnhancedLoader = ({ phase = "initializing", progress }) => {
+  const [dots, setDots] = useState("");
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const phaseMessages = {
+    initializing: "Initializing smart monitoring system",
+    loading: "Loading fleet data",
+    rendering: "Rendering scooter positions",
+    calculating: "Calculating danger zones",
+    ready: "System ready",
+  };
+
+  const phaseIcons = {
+    initializing: <Activity className="h-6 w-6" />,
+    loading: <Zap className="h-6 w-6" />,
+    rendering: <MapPin className="h-6 w-6" />,
+    calculating: <BarChart3 className="h-6 w-6" />,
+    ready: <Shield className="h-6 w-6" />,
+  };
+
+  return (
+    <div className="text-center text-muted-foreground p-8">
+      <div className="relative mb-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-purple-500/20 rounded-full blur-xl animate-pulse" />
+        <div className="relative bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-full p-4 inline-flex items-center justify-center">
+          <div className="text-cyan-400 animate-spin">
+            <Loader2 className="h-8 w-8" />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-center gap-3 text-lg font-medium">
+          <div className="text-cyan-400">{phaseIcons[phase]}</div>
+          <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+            {phaseMessages[phase]}
+            {dots}
+          </span>
+        </div>
+
+        {progress !== undefined && (
+          <div className="w-64 mx-auto">
+            <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="text-xs text-slate-400 mt-2">
+              {Math.round(progress)}% complete
+            </div>
+          </div>
+        )}
+
+        <div className="text-sm text-slate-400 max-w-md mx-auto">
+          Real-time fleet monitoring with intelligent danger zone detection
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Toggle Switch Component
+const ToggleSwitch = ({ checked, onChange, label, icon }) => {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {icon && <div className="text-slate-400">{icon}</div>}
+        <span className="text-sm text-slate-300">{label}</span>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-800 ${
+          checked ? "bg-cyan-500" : "bg-slate-600"
+        }`}
+      >
+        <span
+          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+            checked ? "translate-x-5" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
 };
 
 // Enhanced custom icon creation with consistent styling
@@ -395,26 +531,49 @@ const getStatusIcon = (status) => {
 
 const ScooterMap = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingPhase, setLoadingPhase] = useState("initializing");
   const [mapStats, setMapStats] = useState({ safe: 0, warning: 0, danger: 0 });
+
+  // UI States
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statsVisible, setStatsVisible] = useState(true);
+  const [mapProvider, setMapProvider] = useState("cartodb_dark");
+  const [showStations, setShowStations] = useState(true);
+  const [showRangeCircles, setShowRangeCircles] = useState(false);
+  const [batteryThreshold, setBatteryThreshold] = useState(25);
 
   useEffect(() => {
     addLeafletCustomStyles();
 
-    // Calculate stats
-    const stats = { safe: 0, warning: 0, danger: 0 };
-    scooters.forEach((scooter) => {
-      const distanceToNearestStation = getNearestStationDistance(scooter);
-      const scooterRange = getScooterRangeMeters(scooter.battery);
-      const status = getScooterStatus(
-        scooter,
-        distanceToNearestStation,
-        scooterRange
-      );
-      stats[status]++;
-    });
-    setMapStats(stats);
+    // Simulate loading phases
+    const loadingSequence = async () => {
+      setLoadingPhase("loading");
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
-    setTimeout(() => setIsLoading(false), 1000);
+      setLoadingPhase("calculating");
+      // Calculate stats
+      const stats = { safe: 0, warning: 0, danger: 0 };
+      scooters.forEach((scooter) => {
+        const distanceToNearestStation = getNearestStationDistance(scooter);
+        const scooterRange = getScooterRangeMeters(scooter.battery);
+        const status = getScooterStatus(
+          scooter,
+          distanceToNearestStation,
+          scooterRange
+        );
+        stats[status]++;
+      });
+      setMapStats(stats);
+
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setLoadingPhase("rendering");
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      setLoadingPhase("ready");
+      setIsLoading(false);
+    };
+
+    loadingSequence();
   }, []);
 
   const getNearestStationDistance = (scooter) => {
@@ -424,240 +583,374 @@ const ScooterMap = () => {
     return Math.min(...distances);
   };
 
+  // Calculate additional metrics
+  const additionalStats = useMemo(() => {
+    const averageBattery =
+      scooters.reduce((sum, s) => sum + s.battery, 0) / scooters.length;
+    const lowBatteryCount = scooters.filter(
+      (s) => s.battery <= batteryThreshold
+    ).length;
+    const activeScooters = scooters.filter((s) => s.battery > 5).length;
+
+    return {
+      averageBattery: Math.round(averageBattery),
+      lowBatteryCount,
+      activeScooters,
+      totalStations: stations.length,
+    };
+  }, [scooters, batteryThreshold]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-900 relative">
+      {/* Map Container with Overlays */}
+      <div className="relative w-full h-screen">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            Smart Fleet Monitor
-          </h1>
-          <p className="text-slate-400 text-lg">
-            Intelligent monitoring with real-time danger zone detection and
-            battery analytics{" "}
-          </p>
-        </div>
-
-        {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-500/30 backdrop-blur-sm hover:scale-105 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+        <div className="absolute top-3 left-12 z-[1000]">
+          <Card className="bg-slate-800/95 backdrop-blur-md border border-slate-700 text-slate-300 shadow-2xl">
+            <CardContent className="p-2">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <Zap className="h-6 w-6 text-blue-400" />
+                </div>
                 <div>
-                  <p className="text-sm font-semibold text-green-300 mb-1">
-                    Safe Scooters
-                  </p>
-                  <p className="text-3xl font-bold text-green-400">
-                    {mapStats.safe}
-                  </p>
-                  <p className="text-xs text-green-300/60 mt-1">
-                    Optimal battery & range
-                  </p>
-                </div>
-                <div className="p-3 bg-green-500/20 rounded-full">
-                  <Shield className="w-8 h-8 text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-yellow-500/20 to-orange-600/20 border-yellow-500/30 backdrop-blur-sm hover:scale-105 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-yellow-300 mb-1">
-                    Warning Zone
-                  </p>
-                  <p className="text-3xl font-bold text-yellow-400">
-                    {mapStats.warning}
-                  </p>
-                  <p className="text-xs text-yellow-300/60 mt-1">
-                    Low battery or far from station
-                  </p>
-                </div>
-                <div className="p-3 bg-yellow-500/20 rounded-full">
-                  <AlertTriangle className="w-8 h-8 text-yellow-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-red-500/20 to-pink-600/20 border-red-500/30 backdrop-blur-sm hover:scale-105 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-red-300 mb-1">
-                    Critical Alert
-                  </p>
-                  <p className="text-3xl font-bold text-red-400">
-                    {mapStats.danger}
-                  </p>
-                  <p className="text-xs text-red-300/60 mt-1">
-                    Cannot reach station
-                  </p>
-                </div>
-                <div className="p-3 bg-red-500/20 rounded-full">
-                  <AlertCircle className="w-8 h-8 text-red-400" />
+                  <div className="text-lg font-bold text-white">
+                    Smart Fleet Monitor
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Real-time tracking • {scooters.length} vehicles •{" "}
+                    {stations.length} stations
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Map Card */}
-        <Card className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-2xl">
-          {/* <CardHeader className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 text-white rounded-t-lg border-b border-slate-700/50">
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Navigation className="w-8 h-8 text-blue-400" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl font-bold">
-                  Fleet Overview Dashboard
-                </CardTitle>
-                <CardDescription className="text-slate-300 mt-2">
-                  Intelligent monitoring with real-time danger zone detection
-                  and battery analytics
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader> */}
-          <CardContent className="h-[700px] relative z-0 p-0">
-            {isLoading ? (
-              <div className="flex flex-col justify-center items-center h-full bg-slate-900 rounded-b-lg">
-                <div className="relative">
-                  <Loader2 className="w-16 h-16 animate-spin text-blue-400 mb-6" />
-                  <div className="absolute inset-0 w-16 h-16 rounded-full bg-blue-400/20 animate-ping"></div>
-                </div>
-                <p className="text-slate-300 text-lg animate-pulse">
-                  Initializing smart monitoring system...
-                </p>
-                <div className="flex gap-2 mt-4">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                  <div
-                    className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.1s" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  ></div>
-                </div>
-              </div>
+        {/* Top Controls */}
+        <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+          {/* Stats Toggle */}
+          <button
+            onClick={() => setStatsVisible(!statsVisible)}
+            className={`p-2 rounded-lg transition-all duration-200 shadow-lg backdrop-blur-md border ${
+              statsVisible
+                ? "bg-cyan-500/20 border-cyan-400/30 text-cyan-400"
+                : "bg-slate-800/90 border-slate-700 text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            {statsVisible ? (
+              <Eye className="h-4 w-4" />
             ) : (
-              <div className="h-full rounded-b-lg overflow-hidden">
-                <MapContainer
-                  center={[6.9278, 79.8612]}
-                  zoom={8}
-                  style={{ height: "100%", width: "100%", zIndex: 0 }}
-                >
-                  <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                  />
+              <EyeOff className="h-4 w-4" />
+            )}
+          </button>
 
-                  {/* Stations */}
-                  {stations.map((station) => (
+          {/* Settings Toggle */}
+          <button
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className={`p-2 rounded-lg transition-all duration-200 shadow-lg backdrop-blur-md border ${
+              settingsOpen
+                ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
+                : "bg-slate-800/90 border-slate-700 text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Settings Panel */}
+        {settingsOpen && (
+          <div className="absolute top-20 right-4 z-[998] w-80">
+            <Card className="bg-slate-800/95 backdrop-blur-md border border-slate-700 shadow-2xl">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-cyan-400" />
+                  <CardTitle className="text-white text-lg">
+                    Fleet Controls
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Map Style */}
+                <div>
+                  <Label className="text-slate-300 text-sm font-medium mb-3 block">
+                    Map Style
+                  </Label>
+                  <select
+                    value={mapProvider}
+                    onChange={(e) => setMapProvider(e.target.value)}
+                    className="w-full text-sm bg-slate-700/50 border border-slate-600 text-white rounded-lg px-3 py-2.5 focus:border-cyan-400 focus:outline-none transition-colors backdrop-blur-sm"
+                  >
+                    {Object.entries(mapProviders).map(([key, provider]) => (
+                      <option key={key} value={key}>
+                        {provider.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Battery Threshold */}
+                <div className="space-y-3">
+                  <Label className="text-slate-300 flex items-center justify-between text-sm font-medium">
+                    <span>Battery Alert Threshold</span>
+                    <span className="text-cyan-400 font-mono bg-slate-700/50 px-2 py-1 rounded text-xs">
+                      {batteryThreshold}%
+                    </span>
+                  </Label>
+                  <div className="px-2">
+                    <Slider
+                      min={10}
+                      max={50}
+                      step={5}
+                      value={[batteryThreshold]}
+                      onValueChange={(values) => setBatteryThreshold(values[0])}
+                      className="py-2"
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 px-2">
+                    <span>10%</span>
+                    <span>50%</span>
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-700/50" />
+
+                {/* Display Options */}
+                <div className="space-y-4">
+                  <Label className="text-slate-300 text-sm font-medium block">
+                    Display Options
+                  </Label>
+                  <div className="space-y-3">
+                    <ToggleSwitch
+                      checked={showStations}
+                      onChange={setShowStations}
+                      label="Charging Stations"
+                      icon={<MapPin className="w-4 h-4" />}
+                    />
+                    <ToggleSwitch
+                      checked={showRangeCircles}
+                      onChange={setShowRangeCircles}
+                      label="Range Circles"
+                      icon={<Navigation className="w-4 h-4" />}
+                    />
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-700/50" />
+
+                {/* Quick Stats */}
+                <div className="bg-slate-700/30 rounded-lg p-3 space-y-2">
+                  <Label className="text-slate-300 text-sm font-medium block mb-2">
+                    Quick Stats
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Active:</span>
+                      <span className="text-cyan-400 font-medium">
+                        {additionalStats.activeScooters}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Avg Battery:</span>
+                      <span className="text-cyan-400 font-medium">
+                        {additionalStats.averageBattery}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Low Battery:</span>
+                      <span className="text-yellow-400 font-medium">
+                        {additionalStats.lowBatteryCount}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Stations:</span>
+                      <span className="text-green-400 font-medium">
+                        {additionalStats.totalStations}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Bottom Status Bar */}
+        <div className="absolute bottom-4 left-4 right-4 z-[999] pointer-events-none">
+          <div className="flex justify-between items-center">
+            {/* Left Side - Map Attribution */}
+            <Card className="bg-slate-800/90 backdrop-blur-md border border-slate-700 text-slate-300 px-3 py-2 rounded-lg text-xs pointer-events-auto">
+              <div className="flex items-center gap-2">
+                <Layers className="w-3 h-3" />
+                <span>{mapProviders[mapProvider].name}</span>
+              </div>
+            </Card>
+
+            {/* Right Side - Fleet Summary */}
+            <div className="flex gap-2 pointer-events-auto">
+              <Card className="bg-slate-800/90 backdrop-blur-md border border-slate-700 text-slate-300 px-3 py-2 rounded-lg text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <span>Active: {additionalStats.activeScooters}</span>
+                </div>
+              </Card>
+
+              <Card className="bg-slate-800/90 backdrop-blur-md border border-slate-700 text-slate-300 px-3 py-2 rounded-lg text-xs">
+                <div className="flex items-center gap-2">
+                  <Battery className="w-3 h-3" />
+                  <span>Avg: {additionalStats.averageBattery}%</span>
+                </div>
+              </Card>
+
+              <Card className="bg-slate-800/90 backdrop-blur-md border border-slate-700 text-slate-300 px-3 py-2 rounded-lg text-xs">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-3 h-3 text-yellow-400" />
+                  <span>Low: {additionalStats.lowBatteryCount}</span>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Map */}
+        {isLoading ? (
+          <div className="flex flex-col justify-center items-center h-full bg-slate-900">
+            <EnhancedLoader phase={loadingPhase} />
+          </div>
+        ) : (
+          <div className="h-full w-full">
+            <MapContainer
+              center={[6.9278, 79.8612]}
+              zoom={8}
+              style={{ height: "100%", width: "100%", zIndex: 0 }}
+            >
+              <TileLayer
+                url={mapProviders[mapProvider].url}
+                attribution={mapProviders[mapProvider].attribution}
+              />
+
+              {/* Stations */}
+              {showStations &&
+                stations.map((station) => (
+                  <Marker
+                    key={station.id}
+                    position={[station.lat, station.lng]}
+                    icon={stationIcon}
+                  >
+                    <Popup className="custom-popup">
+                      <div>
+                        <div className="popup-header">
+                          <MapPin className="w-5 h-5 text-blue-400" />
+                          <span className="popup-title">{station.name}</span>
+                        </div>
+                        <div className="info-grid">
+                          <div className="info-item">
+                            <span className="info-label">Station ID:</span>
+                            <span className="info-value">{station.id}</span>
+                          </div>
+                          <div className="info-item">
+                            <span className="info-label">Type:</span>
+                            <span className="info-value">Charging Hub</span>
+                          </div>
+                          <div className="info-item">
+                            <span className="info-label">Status:</span>
+                            <span className="info-value text-green-400">
+                              Active
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+
+              {/* Scooters */}
+              {scooters.map((scooter) => {
+                const scooterRange = getScooterRangeMeters(scooter.battery);
+                const distanceToNearestStation =
+                  getNearestStationDistance(scooter);
+                const status = getScooterStatus(
+                  scooter,
+                  distanceToNearestStation,
+                  scooterRange
+                );
+
+                return (
+                  <React.Fragment key={scooter.id}>
                     <Marker
-                      key={station.id}
-                      position={[station.lat, station.lng]}
-                      icon={stationIcon}
+                      position={[scooter.lat, scooter.lng]}
+                      icon={getScooterIcon(status)}
                     >
                       <Popup className="custom-popup">
                         <div>
                           <div className="popup-header">
-                            <MapPin className="w-5 h-5 text-blue-400" />
-                            <span className="popup-title">{station.name}</span>
+                            <Zap className="w-5 h-5 text-blue-400" />
+                            <span className="popup-title">
+                              Scooter {scooter.id}
+                            </span>
                           </div>
+
+                          <div className="battery-indicator">
+                            {getBatteryIcon(scooter.battery)}
+                            <span className="font-semibold">
+                              Battery: {scooter.battery}%
+                            </span>
+                          </div>
+
                           <div className="info-grid">
                             <div className="info-item">
-                              <span className="info-label">Station ID:</span>
-                              <span className="info-value">{station.id}</span>
-                            </div>
-                            <div className="info-item">
-                              <span className="info-label">Type:</span>
-                              <span className="info-value">Charging Hub</span>
-                            </div>
-                            <div className="info-item">
-                              <span className="info-label">Status:</span>
-                              <span className="info-value text-green-400">
-                                Active
+                              <Navigation className="w-4 h-4 text-blue-400" />
+                              <span className="info-label">Range:</span>
+                              <span className="info-value">
+                                {(scooterRange / 1000).toFixed(1)} km
                               </span>
                             </div>
+                            <div className="info-item">
+                              <MapPin className="w-4 h-4 text-blue-400" />
+                              <span className="info-label">Nearest:</span>
+                              <span className="info-value">
+                                {(distanceToNearestStation / 1000).toFixed(1)}{" "}
+                                km
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className={`status-badge status-${status}`}>
+                            {getStatusIcon(status)}
+                            {status.toUpperCase()}
                           </div>
                         </div>
                       </Popup>
                     </Marker>
-                  ))}
 
-                  {/* Scooters */}
-                  {scooters.map((scooter) => {
-                    const scooterRange = getScooterRangeMeters(scooter.battery);
-                    const distanceToNearestStation =
-                      getNearestStationDistance(scooter);
-                    const status = getScooterStatus(
-                      scooter,
-                      distanceToNearestStation,
-                      scooterRange
-                    );
-
-                    return (
-                      <React.Fragment key={scooter.id}>
-                        <Marker
-                          position={[scooter.lat, scooter.lng]}
-                          icon={getScooterIcon(status)}
-                        >
-                          <Popup className="custom-popup">
-                            <div>
-                              <div className="popup-header">
-                                <Zap className="w-5 h-5 text-blue-400" />
-                                <span className="popup-title">
-                                  Scooter {scooter.id}
-                                </span>
-                              </div>
-
-                              <div className="battery-indicator">
-                                {getBatteryIcon(scooter.battery)}
-                                <span className="font-semibold">
-                                  Battery: {scooter.battery}%
-                                </span>
-                              </div>
-
-                              <div className="info-grid">
-                                <div className="info-item">
-                                  <Navigation className="w-4 h-4 text-blue-400" />
-                                  <span className="info-label">Range:</span>
-                                  <span className="info-value">
-                                    {(scooterRange / 1000).toFixed(1)} km
-                                  </span>
-                                </div>
-                                <div className="info-item">
-                                  <MapPin className="w-4 h-4 text-blue-400" />
-                                  <span className="info-label">Nearest:</span>
-                                  <span className="info-value">
-                                    {(distanceToNearestStation / 1000).toFixed(
-                                      1
-                                    )}{" "}
-                                    km
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className={`status-badge status-${status}`}>
-                                {getStatusIcon(status)}
-                                {status.toUpperCase()}
-                              </div>
-                            </div>
-                          </Popup>
-                        </Marker>
-                      </React.Fragment>
-                    );
-                  })}
-                </MapContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    {/* Range Circles */}
+                    {showRangeCircles && (
+                      <Circle
+                        center={[scooter.lat, scooter.lng]}
+                        radius={scooterRange}
+                        pathOptions={{
+                          color:
+                            status === "danger"
+                              ? colors.danger.solid
+                              : status === "warning"
+                              ? colors.warning.solid
+                              : colors.success.solid,
+                          fillColor:
+                            status === "danger"
+                              ? colors.danger.solid
+                              : status === "warning"
+                              ? colors.warning.solid
+                              : colors.success.solid,
+                          fillOpacity: 0.1,
+                          weight: 1,
+                        }}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </MapContainer>
+          </div>
+        )}
       </div>
     </div>
   );

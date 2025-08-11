@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MapPin, Menu, X, Loader2, Settings } from "lucide-react";
+import { MapPin, Menu, X, Loader2 } from "lucide-react";
 
 // Utility functions (inline for this example)
 const assignIconsToCategories = (
@@ -13,22 +13,99 @@ const assignIconsToCategories = (
   return iconMap;
 };
 
-const getSemanticColor = (status: string) => {
-  const statusColors: Record<string, string> = {
-    active: "#10B981",
-    inactive: "#6B7280",
-    warning: "#F59E0B",
-    danger: "#EF4444",
-    safe: "#10B981",
-    error: "#EF4444",
-    success: "#10B981",
-    info: "#3B82F6",
-    unknown: "#6B7280",
-  };
-  return statusColors[status] || "#6B7280";
+// Color palettes for distinct value assignment
+const colorPalettes = {
+  default: [
+    "#3B82F6",
+    "#EF4444",
+    "#10B981",
+    "#F59E0B",
+    "#8B5CF6",
+    "#06B6D4",
+    "#EC4899",
+    "#84CC16",
+    "#F97316",
+    "#6366F1",
+    "#14B8A6",
+    "#F43F5E",
+    "#22C55E",
+    "#A855F7",
+    "#0EA5E9",
+    "#EAB308",
+    "#DC2626",
+    "#059669",
+    "#7C3AED",
+    "#0891B2",
+  ],
+  traffic: [
+    "#22C55E",
+    "#EAB308",
+    "#DC2626",
+    "#64748B",
+    "#06B6D4",
+    "#8B5CF6",
+    "#EC4899",
+    "#F97316",
+    "#6366F1",
+    "#14B8A6",
+    "#F43F5E",
+    "#84CC16",
+    "#A855F7",
+    "#0EA5E9",
+    "#F59E0B",
+    "#10B981",
+    "#EF4444",
+    "#3B82F6",
+    "#7C3AED",
+    "#0891B2",
+  ],
+  battery: [
+    "#06D6A0",
+    "#FFD23F",
+    "#EE6C4D",
+    "#8E8E93",
+    "#3B82F6",
+    "#8B5CF6",
+    "#EC4899",
+    "#84CC16",
+    "#F97316",
+    "#6366F1",
+    "#14B8A6",
+    "#F43F5E",
+    "#22C55E",
+    "#A855F7",
+    "#0EA5E9",
+    "#EAB308",
+    "#DC2626",
+    "#059669",
+    "#7C3AED",
+    "#0891B2",
+  ],
+  performance: [
+    "#3B82F6",
+    "#F97316",
+    "#E11D48",
+    "#71717A",
+    "#10B981",
+    "#8B5CF6",
+    "#06B6D4",
+    "#EC4899",
+    "#84CC16",
+    "#6366F1",
+    "#14B8A6",
+    "#F43F5E",
+    "#22C55E",
+    "#A855F7",
+    "#0EA5E9",
+    "#EAB308",
+    "#DC2626",
+    "#059669",
+    "#7C3AED",
+    "#0891B2",
+  ],
 };
 
-// Map configuration interface
+// Simplified map configuration interface
 interface MapConfig {
   // Map provider settings
   mapProvider?:
@@ -41,33 +118,14 @@ interface MapConfig {
   center?: { lat: number; lng: number };
   zoom?: number;
 
-  // UI settings
-  showZoomControl?: boolean;
-  collapsibleUI?: boolean;
-
   // Field mappings
   latitudeField?: string;
   longitudeField?: string;
-  sizeField?: string;
-  colorField?: string;
   nameField?: string;
-  categoryField?: string;
-  markerOpacity?: number;
 
-  // Pinging effect fields
-  pingSizeField?: string;
-  pingSpeedField?: string;
-
-  // Styling
-  markerSize?: number;
+  // Color configuration - passed from parent
+  colorField?: string;
   colorScheme?: "default" | "traffic" | "battery" | "performance";
-
-  // Legend settings
-  showLegend?: boolean;
-
-  // Data filtering
-  timeFilter?: string;
-  statusFilter?: string[];
 }
 
 // Data point interface
@@ -76,8 +134,6 @@ interface DataPoint {
   name: string;
   latitude: number;
   longitude: number;
-  type?: "station" | "scooter" | "vehicle" | "point";
-  status?: "active" | "inactive" | "safe" | "warning" | "danger";
   [key: string]: any;
 }
 
@@ -109,43 +165,10 @@ const mapProviders = {
   },
 };
 
-// Color schemes
-const colorSchemes = {
-  default: {
-    active: "#10B981",
-    warning: "#F59E0B",
-    danger: "#EF4444",
-    inactive: "#6B7280",
-    safe: "#10B981",
-  },
-  traffic: {
-    active: "#22C55E",
-    warning: "#EAB308",
-    danger: "#DC2626",
-    inactive: "#64748B",
-    safe: "#22C55E",
-  },
-  battery: {
-    active: "#06D6A0",
-    warning: "#FFD23F",
-    danger: "#EE6C4D",
-    inactive: "#8E8E93",
-    safe: "#06D6A0",
-  },
-  performance: {
-    active: "#3B82F6",
-    warning: "#F97316",
-    danger: "#E11D48",
-    inactive: "#71717A",
-    safe: "#3B82F6",
-  },
-};
-
 interface CustomizableMapProps {
   data?: DataPoint[];
   config?: MapConfig;
   onDataPointClick?: (point: DataPoint) => void;
-  onConfigChange?: (config: MapConfig) => void;
   className?: string;
 }
 
@@ -153,56 +176,26 @@ export default function CustomizableMap({
   data = [],
   config = {},
   onDataPointClick,
-  onConfigChange,
   className = "",
 }: CustomizableMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [leaflet, setLeaflet] = useState<any>(null);
-  const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
-  const [uiCollapsed, setUiCollapsed] = useState(false);
+  const [colorMapping, setColorMapping] = useState<Record<string, string>>({});
 
   // Define default config
   const defaultConfig = {
     mapProvider: "cartodb_dark" as const,
-    zoom: 11,
-    showZoomControl: true,
-    collapsibleUI: true,
-    markerSize: 32, // This is for large markers only
-    colorScheme: "default" as const,
+    zoom: 8,
     latitudeField: "latitude",
     longitudeField: "longitude",
-    markerOpacity: 1,
-    showLegend: false,
+    colorScheme: "default" as const,
+    colorField: "none",
   };
 
-  // Internal state for configuration to ensure quick settings work
-  const [internalConfig, setInternalConfig] = useState<MapConfig>({
-    ...defaultConfig,
-    ...config,
-  });
-
-  // Update internal config when parent config changes
-  useEffect(() => {
-    setInternalConfig({ ...defaultConfig, ...config });
-  }, [config]);
-
-  // Determine if we should use larger markers (when pinging or icons are enabled)
-  const shouldUseLargeMarkers = !!(
-    (internalConfig.pingSizeField && internalConfig.pingSizeField !== "none") ||
-    (internalConfig.pingSpeedField &&
-      internalConfig.pingSpeedField !== "none") ||
-    (internalConfig.categoryField && internalConfig.categoryField !== "none")
-  );
-
-  // Get effective marker size - FIXED: Always return small size for simple markers
-  const getEffectiveMarkerSize = () => {
-    if (shouldUseLargeMarkers) {
-      return internalConfig.markerSize || 32;
-    }
-    return 8; // Small dot for simple markers - reduced from 10 to 8
-  };
+  // Merge with provided config
+  const finalConfig = { ...defaultConfig, ...config };
 
   // Load Leaflet
   useEffect(() => {
@@ -219,33 +212,64 @@ export default function CustomizableMap({
     loadLeaflet();
   }, []);
 
-  const getPointColor = (point: DataPoint) => {
-    const schemeName = internalConfig.colorScheme || "default";
-    const scheme = colorSchemes[schemeName];
-
-    if (internalConfig.colorField && point[internalConfig.colorField]) {
-      if (internalConfig.colorField === "none") {
-        return scheme.active || "#10B981"; // Default color if no field specified
-      }
-      const colorValue = point[internalConfig.colorField];
-      const statusKey = colorValue?.toString().toLowerCase() || "unknown";
-
-      if (scheme && scheme[statusKey as keyof typeof scheme]) {
-        return scheme[statusKey as keyof typeof scheme];
-      }
-
-      return getSemanticColor(statusKey);
+  // Create color mapping for distinct values
+  useEffect(() => {
+    if (
+      !data.length ||
+      !finalConfig.colorField ||
+      finalConfig.colorField === "none"
+    ) {
+      setColorMapping({});
+      return;
     }
 
-    return scheme.active || "#10B981";
+    // Get all unique values from the color field
+    const uniqueValues = Array.from(
+      new Set(
+        data
+          .map((point) => point[finalConfig.colorField!])
+          .filter(
+            (value) => value !== null && value !== undefined && value !== ""
+          )
+      )
+    ).sort(); // Sort for consistent ordering
+
+    // Get the color palette for the selected scheme
+    const palette = colorPalettes[finalConfig.colorScheme || "default"];
+
+    // Create mapping of unique values to colors
+    const newColorMapping: Record<string, string> = {};
+    uniqueValues.forEach((value, index) => {
+      newColorMapping[String(value)] = palette[index % palette.length];
+    });
+
+    setColorMapping(newColorMapping);
+  }, [data, finalConfig.colorField, finalConfig.colorScheme]);
+
+  const getPointColor = (point: DataPoint) => {
+    // If no color field is selected, use default color
+    if (!finalConfig.colorField || finalConfig.colorField === "none") {
+      return colorPalettes[finalConfig.colorScheme || "default"][0];
+    }
+
+    const colorValue = point[finalConfig.colorField];
+
+    // Handle null/undefined/empty values
+    if (colorValue === null || colorValue === undefined || colorValue === "") {
+      return "#6B7280"; // Gray for missing values
+    }
+
+    // Return the mapped color for this value
+    return colorMapping[String(colorValue)] || "#6B7280";
   };
 
   const createPopupContent = (point: Record<string, any>) => {
-    const colorField = internalConfig.colorField;
+    const colorField = finalConfig.colorField;
     const statusValue =
-      colorField && point[colorField] ? point[colorField] : "Active";
+      colorField && colorField !== "none" && point[colorField]
+        ? point[colorField]
+        : null;
     const statusColor = getPointColor(point);
-    const opacityValue = internalConfig.markerOpacity || 1;
 
     const rows: string[] = [];
 
@@ -302,7 +326,7 @@ export default function CustomizableMap({
           point.name || "Data Point"
         }</div>
         ${
-          colorField
+          statusValue
             ? `<div style="
     background: ${statusColor}; 
     color: white; 
@@ -311,7 +335,6 @@ export default function CustomizableMap({
     font-size: 10px; 
     font-weight: 600; 
     text-transform: uppercase;
-    opacity: ${opacityValue};
   ">
     ${statusValue}
   </div>`
@@ -334,7 +357,7 @@ export default function CustomizableMap({
 
     if (!mapInstance.current) {
       mapInstance.current = L.map(mapRef.current, {
-        zoomControl: internalConfig.showZoomControl,
+        zoomControl: true,
         dragging: true,
         scrollWheelZoom: true,
       });
@@ -342,23 +365,6 @@ export default function CustomizableMap({
       // Add custom styles once
       const style = document.createElement("style");
       style.innerHTML = `
-        .custom-marker-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: bold;
-          border-radius: 50%;
-          border: 2px solid rgba(255, 255, 255, 0.8);
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-          transition: all 0.2s ease;
-          position: relative;
-        }
-        .custom-marker-icon:hover {
-          transform: scale(1.1);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        }
-        
         .simple-marker {
           border-radius: 50%;
           border: 1px solid rgba(255, 255, 255, 0.6);
@@ -370,33 +376,6 @@ export default function CustomizableMap({
           transform: scale(1.3);
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
           border-color: rgba(255, 255, 255, 0.9);
-        }
-        
-        .ping-container {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          pointer-events: none;
-        }
-        
-        .ping-ring {
-          position: absolute;
-          border-radius: 50%;
-          border: 2px solid;
-          opacity: 0;
-          transform: translate(-50%, -50%);
-          animation: ping-animation 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-        
-        @keyframes ping-animation {
-          0% {
-            transform: translate(-50%, -50%) scale(0.8);
-            opacity: 1;
-          }
-          75%, 100% {
-            transform: translate(-50%, -50%) scale(2);
-            opacity: 0;
-          }
         }
         
         .custom-popup {
@@ -439,8 +418,8 @@ export default function CustomizableMap({
 
     // Set view on map center and zoom
     mapInstance.current.setView(
-      [internalConfig.center?.lat || 7.15, internalConfig.center?.lng || 79.95],
-      internalConfig.zoom || 11
+      [finalConfig.center?.lat || 7.8731, finalConfig.center?.lng || 80.7718],
+      finalConfig.zoom || 8
     );
 
     // Remove existing tile layers
@@ -450,8 +429,7 @@ export default function CustomizableMap({
       }
     });
 
-    const provider =
-      mapProviders[internalConfig.mapProvider || "openstreetmap"];
+    const provider = mapProviders[finalConfig.mapProvider || "cartodb_dark"];
     const tileOptions: any = {
       attribution: provider.attribution,
       maxZoom: 19,
@@ -475,266 +453,34 @@ export default function CustomizableMap({
       return;
     }
 
-    // Get unique categories for icons
-    const categoryField = internalConfig.categoryField;
-    let categoryToIconMap: Record<string, string> = {};
-
-    if (
-      categoryField &&
-      categoryField !== "none" &&
-      categoryField.trim() !== ""
-    ) {
-      const uniqueCategories = Array.from(
-        new Set(data.map((p) => p[categoryField] || "default"))
-      );
-
-      const availableIcons = [
-        "map-pin",
-        "car",
-        "bike",
-        "truck",
-        "bus",
-        "battery",
-        "battery-low",
-        "battery-full",
-        "zap",
-        "plug",
-        "check-circle",
-        "alert-triangle",
-        "alert-circle",
-        "x-circle",
-        "alert-octagon",
-        "navigation",
-        "home",
-        "building",
-        "radio",
-        "wrench",
-        "settings",
-        "wifi",
-        "wifi-off",
-        "info",
-        "globe",
-        "clock",
-      ];
-
-      categoryToIconMap = assignIconsToCategories(
-        uniqueCategories,
-        availableIcons
-      );
-    }
-
-    // Calculate ping normalization values
-    let maxPingSize = 1;
-    let maxPingSpeed = 1;
-
-    if (
-      internalConfig.pingSizeField &&
-      internalConfig.pingSizeField !== "none"
-    ) {
-      const pingSizeValues = data
-        .map((p) => p[internalConfig.pingSizeField!])
-        .filter((v) => typeof v === "number") as number[];
-      if (pingSizeValues.length > 0) {
-        maxPingSize = Math.max(...pingSizeValues, 1);
-      }
-    }
-
-    if (
-      internalConfig.pingSpeedField &&
-      internalConfig.pingSpeedField !== "none"
-    ) {
-      const pingSpeedValues = data
-        .map((p) => p[internalConfig.pingSpeedField!])
-        .filter((v) => typeof v === "number") as number[];
-      if (pingSpeedValues.length > 0) {
-        maxPingSpeed = Math.max(...pingSpeedValues, 1);
-      }
-    }
-
-    const getPingValues = (point: DataPoint) => {
-      let normalizedPingSize = 0;
-      let normalizedPingSpeed = 0;
-
-      const hasPingSize =
-        internalConfig.pingSizeField &&
-        internalConfig.pingSizeField !== "none" &&
-        typeof point[internalConfig.pingSizeField] === "number";
-      const hasPingSpeed =
-        internalConfig.pingSpeedField &&
-        internalConfig.pingSpeedField !== "none" &&
-        typeof point[internalConfig.pingSpeedField] === "number";
-
-      if (hasPingSize) {
-        normalizedPingSize = Math.max(
-          0,
-          Math.min(1, point[internalConfig.pingSizeField!] / maxPingSize)
-        );
-      } else if (hasPingSpeed) {
-        // Default size if ping speed is present but size is not
-        normalizedPingSize = 0.6;
-      } else {
-        normalizedPingSize = 0; // No pinging
-      }
-
-      if (hasPingSpeed) {
-        normalizedPingSpeed = Math.max(
-          0,
-          Math.min(1, point[internalConfig.pingSpeedField!] / maxPingSpeed)
-        );
-      }
-
-      return {
-        size: normalizedPingSize,
-        speed: normalizedPingSpeed,
-      };
+    // Create markers - using simple 8px dots for all markers
+    // Helper: Convert HEX to RGBA with given alpha
+    const hexToRgba = (hex, alpha) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     };
 
     data.forEach((point) => {
       const color = getPointColor(point);
-      const category =
-        categoryField && categoryField !== "none"
-          ? point[categoryField]
-          : "default";
-      const iconKey = categoryToIconMap[category] || "map-pin";
-      const pingValues = getPingValues(point);
 
-      let rotation = 0;
-      if (category === "scooter" || iconKey === "bike") rotation = 25;
-      else if (category === "vehicle" || iconKey === "car") rotation = 90;
-      else if (category === "truck") rotation = 90;
+      // Transparent color for overlapping visibility
+      const transparentColor = hexToRgba(color, 0.1); // 10% opacity
 
-      const baseSize = getEffectiveMarkerSize();
-      const opacity = internalConfig.markerOpacity || 1;
-
-      // For simple markers (no pinging/icons), use a simple dot
-      if (!shouldUseLargeMarkers) {
-        console.log("Creating simple marker with size:", baseSize);
-
-        const iconHtml = `
-          <div
-            class="simple-marker"
-            style="
-              width: ${baseSize}px;
-              height: ${baseSize}px;
-              background-color: ${color};
-              opacity: ${opacity};
-            "
-          ></div>
-        `;
-
-        const icon = L.divIcon({
-          html: iconHtml,
-          className: "",
-          iconSize: [baseSize, baseSize],
-          iconAnchor: [baseSize / 2, baseSize / 2],
-        });
-
-        const marker = L.marker([point.latitude, point.longitude], { icon })
-          .addTo(mapInstance.current)
-          .on("click", () => {
-            setSelectedPoint(point.id);
-            if (onDataPointClick) onDataPointClick(point);
-          });
-
-        marker.bindPopup(createPopupContent(point), {
-          className: "custom-popup",
-          closeButton: true,
-        });
-        return;
-      }
-
-      // Complex markers with pinging and icons
-      console.log("Creating complex marker with size:", baseSize);
-
-      let calculatedPingSize = baseSize;
-      let animationDuration = 3;
-
-      if (
-        (internalConfig.pingSizeField &&
-          internalConfig.pingSizeField !== "none") ||
-        (internalConfig.pingSpeedField &&
-          internalConfig.pingSpeedField !== "none")
-      ) {
-        const minPingMultiplier = 0.4;
-        const maxPingMultiplier = 2.0;
-        const pingMultiplier =
-          minPingMultiplier +
-          pingValues.size * (maxPingMultiplier - minPingMultiplier);
-        calculatedPingSize = baseSize * pingMultiplier;
-
-        const rawSpeed = Math.max(0, Math.min(1, pingValues.speed));
-        const adjustedSpeed = Math.pow(rawSpeed, 2);
-        const minDuration = 1.5;
-        const maxDuration = 5.0;
-        animationDuration =
-          maxDuration - adjustedSpeed * (maxDuration - minDuration);
-      }
-
-      const pingRings =
-        (internalConfig.pingSizeField &&
-          internalConfig.pingSizeField !== "none") ||
-        (internalConfig.pingSpeedField &&
-          internalConfig.pingSpeedField !== "none")
-          ? `
-        <div class="ping-container">
-          <div class="ping-ring" style="
-            width: ${calculatedPingSize}px;
-            height: ${calculatedPingSize}px;
-            border-color: ${color};
-            animation-duration: ${animationDuration}s;
-            opacity: ${opacity * 0.8};
-          "></div>
-          <div class="ping-ring" style="
-            width: ${calculatedPingSize}px;
-            height: ${calculatedPingSize}px;
-            border-color: ${color};
-            animation-duration: ${animationDuration}s;
-            animation-delay: ${animationDuration * 0.33}s;
-            opacity: ${opacity * 0.8};
-          "></div>
-          <div class="ping-ring" style="
-            width: ${calculatedPingSize}px;
-            height: ${calculatedPingSize}px;
-            border-color: ${color};
-            animation-duration: ${animationDuration}s;
-            animation-delay: ${animationDuration * 0.66}s;
-            opacity: ${opacity * 0.8};
-          "></div>
-        </div>
-      `
-          : "";
+      const baseSize = 8;
 
       const iconHtml = `
-        <div
-          class="custom-marker-icon"
-          style="
-            width: ${baseSize}px;
-            height: ${baseSize}px;
-            background-color: ${color};
-            transform: rotate(${rotation}deg);
-            position: relative;
-            z-index: 1000;
-            opacity: ${opacity};
-          "
-        >
-          <div style="
-            width: 60%;
-            height: 60%;
-            background-image: url('https://cdn.jsdelivr.net/npm/lucide-static@0.408.0/icons/${iconKey}.svg');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            filter: invert(1);
-            transform: rotate(${-rotation}deg);
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            margin-top: -${baseSize * 0.3}px;
-            margin-left: -${baseSize * 0.3}px;
-          "></div>
-        </div>
-        ${pingRings}
-      `;
+    <div
+      class="simple-marker"
+      style="
+        width: ${baseSize}px;
+        height: ${baseSize}px;
+        background-color: ${transparentColor};
+        border: 1px solid ${color}; /* Outline to keep it visible */
+      "
+    ></div>
+  `;
 
       const icon = L.divIcon({
         html: iconHtml,
@@ -743,10 +489,12 @@ export default function CustomizableMap({
         iconAnchor: [baseSize / 2, baseSize / 2],
       });
 
-      const marker = L.marker([point.latitude, point.longitude], { icon })
+      const marker = L.marker([point.latitude, point.longitude], {
+        icon,
+        zIndexOffset: point.density ? point.density : 0, // Optional: higher density on top
+      })
         .addTo(mapInstance.current)
         .on("click", () => {
-          setSelectedPoint(point.id);
           if (onDataPointClick) onDataPointClick(point);
         });
 
@@ -757,13 +505,16 @@ export default function CustomizableMap({
     });
 
     setIsLoading(false);
-  }, [leaflet, data, internalConfig, onDataPointClick, shouldUseLargeMarkers]);
+  }, [leaflet, data, finalConfig, onDataPointClick, colorMapping]);
 
-  // Update configuration
-  const updateConfig = (newConfig: Partial<MapConfig>) => {
-    const updatedConfig = { ...internalConfig, ...newConfig };
-    setInternalConfig(updatedConfig);
-    onConfigChange?.(updatedConfig);
+  // Get unique values count for display
+  const getUniqueValuesInfo = () => {
+    if (!finalConfig.colorField || finalConfig.colorField === "none") {
+      return "Default";
+    }
+
+    const uniqueCount = Object.keys(colorMapping).length;
+    return `${finalConfig.colorField} (${uniqueCount} values)`;
   };
 
   return (
@@ -771,110 +522,38 @@ export default function CustomizableMap({
       className={`h-full w-full relative bg-slate-900/50 rounded-lg overflow-hidden ${className}`}
     >
       {/* Map Provider Badge */}
-      <div className="absolute top-2 left-2 z-[999]">
+      <div className="absolute top-3 left-3 z-[999]">
         <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 px-3 py-2 rounded-md text-xs font-medium">
-          {mapProviders[internalConfig.mapProvider || "openstreetmap"]?.name}{" "}
-          (Z: {internalConfig.zoom}) |
-          {shouldUseLargeMarkers
-            ? ` Large (${getEffectiveMarkerSize()}px)`
-            : ` Small (${getEffectiveMarkerSize()}px)`}
+          {mapProviders[finalConfig.mapProvider || "cartodb_dark"]?.name} |
+          {data.length} points | Color: {getUniqueValuesInfo()}
         </div>
       </div>
 
-      {/* Settings Toggle Button */}
-      <div className="absolute top-2 right-2 z-[999]">
-        <button
-          onClick={() => setUiCollapsed(!uiCollapsed)}
-          className="bg-slate-800/90 hover:bg-slate-800/95 backdrop-blur-sm border border-slate-700 text-slate-300 hover:text-white rounded-lg p-2 transition-all duration-200"
-        >
-          {uiCollapsed ? (
-            <Menu className="h-4 w-4" />
-          ) : (
-            <X className="h-4 w-4" />
-          )}
-        </button>
-      </div>
-
-      {/* Collapsible UI Panel */}
-      {!uiCollapsed && internalConfig.collapsibleUI && (
-        <div className="absolute top-12 right-2 space-y-3 z-[998] max-w-xs">
-          <div className="bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-700 p-4">
-            <div className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Quick Settings
-            </div>
-
-            <div className="space-y-3">
-              {/* Map Provider */}
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
-                  Map Style
-                </label>
-                <select
-                  value={internalConfig.mapProvider}
-                  onChange={(e) =>
-                    updateConfig({ mapProvider: e.target.value as any })
-                  }
-                  className="w-full text-xs bg-slate-800 border border-slate-600 text-white rounded px-2 py-1 focus:border-cyan-400 focus:outline-none"
-                >
-                  <option value="openstreetmap">OpenStreetMap</option>
-                  <option value="cartodb_light">Light</option>
-                  <option value="cartodb_dark">Dark</option>
-                  <option value="satellite">Satellite</option>
-                </select>
+      {/* Color Legend - Show when color field is selected */}
+      {finalConfig.colorField &&
+        finalConfig.colorField !== "none" &&
+        Object.keys(colorMapping).length > 0 && (
+          <div className="absolute top-3 right-3 z-[999] max-w-xs">
+            <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 p-3 rounded-md text-xs">
+              <div className="font-medium mb-2 text-cyan-400">
+                {finalConfig.colorField
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())}
               </div>
-
-              {/* Color Scheme */}
-              <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
-                  Color Scheme
-                </label>
-                <select
-                  value={internalConfig.colorScheme}
-                  onChange={(e) =>
-                    updateConfig({ colorScheme: e.target.value as any })
-                  }
-                  className="w-full text-xs bg-slate-800 border border-slate-600 text-white rounded px-2 py-1 focus:border-cyan-400 focus:outline-none"
-                >
-                  <option value="default">Default</option>
-                  <option value="traffic">Traffic</option>
-                  <option value="battery">Battery</option>
-                  <option value="performance">Performance</option>
-                </select>
-              </div>
-
-              {/* Marker Size - only show if using large markers */}
-              {shouldUseLargeMarkers && (
-                <div>
-                  <label className="text-xs font-medium text-slate-300 block mb-1">
-                    Marker Size
-                  </label>
-                  <input
-                    type="range"
-                    min="20"
-                    max="50"
-                    value={internalConfig.markerSize || 32}
-                    onChange={(e) =>
-                      updateConfig({ markerSize: parseInt(e.target.value) })
-                    }
-                    className="w-full accent-cyan-400"
-                  />
-                  <div className="text-xs text-slate-400 text-center mt-1">
-                    {internalConfig.markerSize || 32}px
+              <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
+                {Object.entries(colorMapping).map(([value, color]) => (
+                  <div key={value} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full border border-white/20"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="truncate">{value}</span>
                   </div>
-                </div>
-              )}
-
-              {/* Info about marker size */}
-              <div className="text-xs text-slate-400 bg-slate-700/50 rounded p-2">
-                {shouldUseLargeMarkers
-                  ? "Large markers with icons/pinging active"
-                  : "Small dot markers (8px)"}
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Map Container */}
       <div className="h-full w-full relative">

@@ -46,22 +46,28 @@ export function RevenueAnalyticsChart({
     const processedData = data.map((item, index) => {
       // Adapt based on your actual data structure
       // This assumes your data has properties like: date, revenue, swaps, etc.
+      const revenue =
+        item.revenue || item.totalRevenue || item.total_revenue || 0;
+      const swaps = item.swaps || item.totalSwaps || item.total_swaps || 0;
+      const efficiency =
+        item.averageEfficiency ||
+        item.swapEfficiency ||
+        item.swap_efficiency ||
+        Math.min(100);
+      const avgPerSwap =
+        item.avgPerSwap ||
+        item.revenuePerSwap ||
+        item.revenue_per_swap ||
+        (revenue && swaps ? revenue / swaps : 0);
+
       return {
         // For daily view - adapt field names based on your actual data
         date: item.date || item.period || item.month || `Day ${index + 1}`,
-        revenue: item.revenue || item.totalRevenue || item.total_revenue || 0,
-        swaps: item.swaps || item.totalSwaps || item.total_swaps || 0,
-        avgPerSwap:
-          item.avgPerSwap ||
-          item.revenuePerSwap ||
-          item.revenue_per_swap ||
-          (item.revenue && item.swaps ? item.revenue / item.swaps : 0),
-        efficiency:
-          item.efficiency ||
-          item.swapEfficiency ||
-          item.swap_efficiency ||
-          Math.min(100, Math.max(70, 85 + Math.random() * 15)), // Fallback calculation
-
+        revenue,
+        swaps,
+        avgPerSwap,
+        efficiency,
+        optimalRevenue: revenue / (efficiency / 100), // Calculate optimal revenue
         // For hourly view (if you have hourly data)
         hour:
           item.hour || item.time || `${String(index % 24).padStart(2, "0")}:00`,
@@ -86,12 +92,17 @@ export function RevenueAnalyticsChart({
           ? 0.3
           : 1;
 
+      const revenue = Math.round((dailyAvg * peakMultiplier) / 24);
+      const swaps = Math.round((swapAvg * peakMultiplier) / 24);
+      const efficiency = Math.min(100, Math.max(70, 85 + Math.random() * 15));
+
       return {
         hour: hourStr,
-        revenue: Math.round((dailyAvg * peakMultiplier) / 24),
-        swaps: Math.round((swapAvg * peakMultiplier) / 24),
+        revenue,
+        swaps,
         avgPerSwap: dailyAvg / swapAvg || 8.0,
-        efficiency: Math.min(100, Math.max(70, 85 + Math.random() * 15)),
+        efficiency,
+        optimalRevenue: revenue / (efficiency / 100),
       };
     });
 
@@ -354,6 +365,13 @@ export function RevenueAnalyticsChart({
                 tick={{ fontSize: 12 }}
                 domain={[70, 100]}
               />
+              <YAxis
+                yAxisId="optimal"
+                orientation="right"
+                className="text-xs fill-muted-foreground"
+                tick={{ fontSize: 12 }}
+                hide // Hide this axis as we're using it just for the optimal revenue line
+              />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
@@ -379,6 +397,25 @@ export function RevenueAnalyticsChart({
                                 {data.efficiency}%
                               </div>
                             </div>
+                            <div>
+                              <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                Revenue
+                              </span>
+                              <div className="font-bold">
+                                ${data.revenue?.toLocaleString()}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                Optimal Revenue
+                              </span>
+                              <div className="font-bold">
+                                $
+                                {data.optimalRevenue
+                                  ?.toFixed(0)
+                                  ?.toLocaleString()}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -401,6 +438,16 @@ export function RevenueAnalyticsChart({
                 stroke="hsl(var(--chart-1))"
                 strokeWidth={3}
                 dot={{ fill: "hsl(var(--chart-1))", strokeWidth: 2, r: 5 }}
+              />
+              <Line
+                yAxisId="optimal"
+                type="monotone"
+                dataKey="optimalRevenue"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                // strokeDasharray="5 5"
+                dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
+                name="Optimal Revenue"
               />
             </ComposedChart>
           </ResponsiveContainer>

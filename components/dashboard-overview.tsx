@@ -60,50 +60,7 @@ export default function DashboardOverview() {
     <div className="space-y-6">
       <FleetStatusCard data={fleetData} isLoading={isLoading} />
 
-      {/* <Tabs defaultValue="scooters" className="w-full">
-        <TabsList className="grid grid-cols-4 mb-4 bg-slate-800/50 p-1">
-          <TabsTrigger
-            value="scooters"
-            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-          >
-            Scooter Status
-          </TabsTrigger>
-          <TabsTrigger
-            value="battery"
-            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-          >
-            Battery Analytics
-          </TabsTrigger>
-          <TabsTrigger
-            value="motor"
-            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-          >
-            Motor Performance
-          </TabsTrigger>
-          <TabsTrigger
-            value="alerts"
-            className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-          >
-            System Alerts
-          </TabsTrigger>
-        </TabsList> */}
-
-      {/* <TabsContent value="scooters" className="space-y-6"> */}
       <ScooterMap />
-      {/* </TabsContent> */}
-
-      {/* <TabsContent value="battery" className="space-y-6">
-          <BatteryAnalyticsChart />
-        </TabsContent>
-
-        <TabsContent value="motor" className="space-y-6">
-          <MotorOverview />
-        </TabsContent> */}
-
-      {/* <TabsContent value="alerts" className="space-y-6">
-          <AlertsOverview />
-        </TabsContent> */}
-      {/* </Tabs> */}
     </div>
   );
 }

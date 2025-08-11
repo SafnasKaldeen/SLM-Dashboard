@@ -61,7 +61,7 @@ export const useTopStations = (filters?: RevenueFilters) => {
           ${filters.aggregation.length > 0 ? `'${filters.aggregation}'` : "NULL"}
         )
       `;
-
+      console.log("🔍 Executing SQL:", sql);
       try {
         const response = await fetch("/api/query", {
           method: "POST",

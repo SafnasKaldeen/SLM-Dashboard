@@ -114,12 +114,6 @@ export default function RevenuePage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <CardHeader>
-                <CardTitle>Top Performing BSS Stations</CardTitle>
-                <CardDescription>
-                  Stations generating the highest revenue
-                </CardDescription>
-              </CardHeader>
               <CardContent>
                 <TopPerformingStations
                   filters={filters}

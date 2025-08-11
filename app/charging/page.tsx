@@ -25,6 +25,10 @@ import {
   CheckCircle,
   Clock,
   Users,
+  Zap,
+  Shield,
+  Globe,
+  Award,
 } from "lucide-react";
 
 // Station data with comprehensive metrics
@@ -116,6 +120,24 @@ const stationData = {
   },
 };
 
+// Custom Badge Component
+const Badge = ({ children, className }) => (
+  <span
+    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}
+  >
+    {children}
+  </span>
+);
+
+// Custom Card Components
+const Card = ({ children, className }) => (
+  <div className={`rounded-lg ${className}`}>{children}</div>
+);
+
+const CardContent = ({ children, className }) => (
+  <div className={className}>{children}</div>
+);
+
 const BatteryStationsOverview = () => {
   const [selectedMetric, setSelectedMetric] = useState("dailySwaps");
 
@@ -191,11 +213,11 @@ const BatteryStationsOverview = () => {
       case "optimal":
         return "text-green-400";
       case "good":
-        return "text-yellow-400";
+        return "text-cyan-400";
       case "maintenance":
         return "text-red-400";
       default:
-        return "text-slate-400";
+        return "text-gray-400";
     }
   };
 
@@ -212,13 +234,13 @@ const BatteryStationsOverview = () => {
     }
   };
 
-  const COLORS = ["#22C55E", "#EAB308", "#EF4444", "#6B7280"];
+  const COLORS = ["#22C55E", "#06B6D4", "#EF4444", "#6B7280"];
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
-          <p className="text-slate-200 font-medium">{label}</p>
+        <div className="bg-gray-900/90 border border-white/20 rounded-lg p-3 shadow-lg backdrop-blur-sm">
+          <p className="text-white font-medium">{label}</p>
           {payload.map((entry, index) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
               {entry.name}: {entry.value}
@@ -234,347 +256,419 @@ const BatteryStationsOverview = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">
-            Battery Swap Network Overview
-          </h1>
-          <p className="text-slate-400">
-            Real-time monitoring and analytics across all stations
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-slate-300">
-          <Battery className="w-5 h-5" />
-          <span className="font-medium">
-            {networkStats.operationalStations}/{networkStats.totalStations}{" "}
-            Operational
-          </span>
-        </div>
+    <div className="min-h-screen text-white">
+      {/* Background Effects */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-black to-cyan-900/20" />
+        <div className="absolute top-20 left-20 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
       </div>
 
-      {/* Network Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin className="w-4 h-4 text-cyan-400" />
-            <span className="text-xs text-slate-400">Total Stations</span>
-          </div>
-          <div className="text-xl font-bold text-slate-100">
-            {networkStats.totalStations}
-          </div>
-        </div>
-
-        <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Battery className="w-4 h-4 text-green-400" />
-            <span className="text-xs text-slate-400">Total Swaps</span>
-          </div>
-          <div className="text-xl font-bold text-slate-100">
-            {networkStats.totalDailySwaps}
-          </div>
-          <div className="text-xs text-slate-500">today</div>
-        </div>
-
-        <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-purple-400" />
-            <span className="text-xs text-slate-400">Revenue</span>
-          </div>
-          <div className="text-xl font-bold text-slate-100">
-            ${networkStats.totalRevenue.toLocaleString()}
-          </div>
-          <div className="text-xs text-slate-500">today</div>
-        </div>
-
-        <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="w-4 h-4 text-yellow-400" />
-            <span className="text-xs text-slate-400">Efficiency</span>
-          </div>
-          <div className="text-xl font-bold text-slate-100">
-            {networkStats.avgEfficiency.toFixed(1)}%
-          </div>
-          <div className="text-xs text-slate-500">network avg</div>
-        </div>
-
-        <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Battery className="w-4 h-4 text-orange-400" />
-            <span className="text-xs text-slate-400">Battery Use</span>
-          </div>
-          <div className="text-xl font-bold text-slate-100">
-            {networkStats.batteryUtilization.toFixed(1)}%
-          </div>
-          <div className="text-xs text-slate-500">utilization</div>
-        </div>
-
-        <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-4 h-4 text-pink-400" />
-            <span className="text-xs text-slate-400">Satisfaction</span>
-          </div>
-          <div className="text-xl font-bold text-slate-100">
-            {networkStats.avgSatisfaction.toFixed(1)}/5
-          </div>
-          <div className="text-xs text-slate-500">avg rating</div>
-        </div>
+      {/* Animated Grid Background */}
+      <div className="absolute inset-0 opacity-5">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
+                           linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px)`,
+            backgroundSize: "50px 50px",
+          }}
+        />
       </div>
 
-      {/* Station Status and Performance Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Station Status Distribution */}
-        <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg">
-          <div className="p-6 pb-2">
-            <h3 className="text-slate-100 font-semibold">Station Status</h3>
-            <p className="text-slate-400 text-sm">
-              Current operational status distribution
-            </p>
-          </div>
-          <div className="p-6 pt-2">
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value, name) => [`${value} stations`, name]}
-                    contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #475569",
-                      borderRadius: "8px",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+      <div className="relative z-10 p-6 space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            <Badge className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/30 px-4 py-2">
+              <Award className="w-4 h-4 mr-2" />
+              Battery Swap Network
+            </Badge>
+            <div>
+              <h1 className="text-4xl lg:text-5xl font-bold mb-4">
+                <span className="bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent">
+                  Network
+                </span>
+                <br />
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  Overview
+                </span>
+              </h1>
+              <p className="text-xl text-gray-300 leading-relaxed max-w-2xl">
+                Real-time monitoring and analytics across all battery swap
+                stations
+              </p>
             </div>
-            <div className="mt-4 space-y-2">
-              {statusData.map((status, index) => (
-                <div
-                  key={status.name}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
+          </div>
+          <div className="flex items-center gap-3 bg-gradient-to-r from-gray-900/50 to-black/50 border border-white/10 backdrop-blur-sm rounded-2xl px-6 py-4">
+            <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center">
+              <Battery className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-white font-bold text-lg">
+                {networkStats.operationalStations}/{networkStats.totalStations}
+              </div>
+              <div className="text-gray-400 text-sm">Operational</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Network Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+          {[
+            {
+              icon: MapPin,
+              label: "Total Stations",
+              value: networkStats.totalStations,
+              color: "cyan",
+              subtitle: "network wide",
+            },
+            {
+              icon: Battery,
+              label: "Total Swaps",
+              value: networkStats.totalDailySwaps,
+              color: "green",
+              subtitle: "today",
+            },
+            {
+              icon: TrendingUp,
+              label: "Revenue",
+              value: `${networkStats.totalRevenue.toLocaleString()}`,
+              color: "purple",
+              subtitle: "today",
+            },
+            {
+              icon: CheckCircle,
+              label: "Efficiency",
+              value: `${networkStats.avgEfficiency.toFixed(1)}%`,
+              color: "yellow",
+              subtitle: "network avg",
+            },
+            {
+              icon: Users,
+              label: "Satisfaction",
+              value: `${networkStats.avgSatisfaction.toFixed(1)}/5`,
+              color: "pink",
+              subtitle: "avg rating",
+            },
+          ].map((stat, index) => (
+            <div
+              key={index}
+              className="group hover:-translate-y-1 transition-all duration-300"
+            >
+              <Card className="bg-gradient-to-br from-gray-900/50 to-black/50 border border-white/10 backdrop-blur-sm hover:border-cyan-500/30 transition-all duration-300">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-4">
                     <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: COLORS[index] }}
-                    />
-                    <span className="text-slate-300 text-sm">
-                      {status.name}
-                    </span>
+                      className={`w-10 h-10 bg-gradient-to-r from-${stat.color}-500/20 to-${stat.color}-500/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}
+                    >
+                      <stat.icon className={`w-5 h-5 text-${stat.color}-400`} />
+                    </div>
+                    <span className="text-sm text-gray-400">{stat.label}</span>
                   </div>
-                  <span className="text-slate-400 text-sm">
-                    {status.percentage}%
-                  </span>
+                  <div className="space-y-1">
+                    <div
+                      className={`text-2xl font-bold text-${stat.color}-400`}
+                    >
+                      {stat.value}
+                    </div>
+                    <div className="text-xs text-gray-500">{stat.subtitle}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ))}
+        </div>
+
+        {/* Station Status and Performance Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Station Status Distribution */}
+          <Card className="bg-gradient-to-br from-gray-900/50 to-black/50 border border-white/10 backdrop-blur-sm">
+            <CardContent className="p-0">
+              <div className="p-6 pb-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+                    <Shield className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-white font-semibold text-lg mb-1">
+                      Station Status
+                    </h3>
+                    <p className="text-gray-400 text-sm leading-relaxed">
+                      Current operational status distribution
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Performance Comparison */}
-        <div className="lg:col-span-2 bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg">
-          <div className="p-6 pb-2">
-            <h3 className="text-slate-100 font-semibold">
-              Station Performance
-            </h3>
-            <p className="text-slate-400 text-sm">
-              Daily swaps and efficiency comparison
-            </p>
-          </div>
-          <div className="p-6 pt-2">
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis
-                    dataKey="name"
-                    stroke="#9CA3AF"
-                    tick={{ fill: "#9CA3AF", fontSize: 12 }}
-                  />
-                  <YAxis
-                    stroke="#9CA3AF"
-                    tick={{ fill: "#9CA3AF", fontSize: 12 }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ color: "#9CA3AF" }} />
-                  <Bar dataKey="dailySwaps" fill="#3B82F6" name="Daily Swaps" />
-                  <Bar
-                    dataKey="efficiency"
-                    fill="#22C55E"
-                    name="Efficiency %"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Detailed Station List */}
-      <div className="bg-slate-900/50 border border-slate-700/50 backdrop-blur-sm rounded-lg">
-        <div className="p-6 pb-2">
-          <h3 className="text-slate-100 font-semibold">Station Details</h3>
-          <p className="text-slate-400 text-sm">
-            Comprehensive view of all battery swap stations
-          </p>
-        </div>
-        <div className="p-6 pt-2">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Station
-                  </th>
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Status
-                  </th>
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Batteries
-                  </th>
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Daily Swaps
-                  </th>
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Efficiency
-                  </th>
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Revenue
-                  </th>
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Trend
-                  </th>
-                  <th className="text-left text-slate-300 font-medium p-3">
-                    Rating
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(stationData).map(([id, station]) => (
-                  <tr
-                    key={id}
-                    className="border-b border-slate-800 hover:bg-slate-800/30"
-                  >
-                    <td className="p-3">
-                      <div>
-                        <div className="text-slate-100 font-medium">
-                          {station.name}
-                        </div>
-                        <div className="text-slate-400 text-sm">
-                          {station.location}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div
-                        className={`flex items-center gap-2 ${getStatusColor(
-                          station.status
-                        )}`}
+              </div>
+              <div className="px-6 pb-6">
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={statusData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
                       >
-                        {getStatusIcon(station.status)}
-                        <span className="capitalize text-sm">
-                          {station.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="text-slate-100">
-                        {station.availableBatteries}/{station.totalBatteries}
-                      </div>
-                      <div className="text-slate-400 text-sm">
-                        {Math.round(
-                          (station.availableBatteries /
-                            station.totalBatteries) *
-                            100
-                        )}
-                        % available
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="text-slate-100 font-medium">
-                        {station.dailySwaps}
-                      </div>
-                      <div className="text-slate-400 text-sm">swaps today</div>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="text-slate-100">
-                          {station.efficiency}%
-                        </div>
-                        <div className="w-12 bg-slate-700 rounded-full h-2">
-                          <div
-                            className="h-2 rounded-full bg-cyan-400"
-                            style={{ width: `${station.efficiency}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="text-slate-100 font-medium">
-                        ${station.revenue}
-                      </div>
-                      <div className="text-slate-400 text-sm">today</div>
-                    </td>
-                    <td className="p-3">
-                      <div
-                        className={`flex items-center gap-1 ${
-                          station.weeklyTrend >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {station.weeklyTrend >= 0 ? (
-                          <TrendingUp className="w-4 h-4" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4" />
-                        )}
-                        <span className="text-sm">
-                          {Math.abs(station.weeklyTrend)}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="text-slate-100">
-                        {station.customerSatisfaction}/5
-                      </div>
-                      <div className="flex gap-1 mt-1">
-                        {[...Array(5)].map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-2 h-2 rounded-full ${
-                              i < Math.floor(station.customerSatisfaction)
-                                ? "bg-yellow-400"
-                                : "bg-slate-600"
-                            }`}
+                        {statusData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
                           />
                         ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {statusData.map((status, index) => (
+                    <div
+                      key={status.name}
+                      className="flex items-center justify-between group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-4 h-4 rounded-full group-hover:scale-110 transition-transform duration-300"
+                          style={{ backgroundColor: COLORS[index] }}
+                        />
+                        <span className="text-gray-300 text-sm group-hover:text-white transition-colors">
+                          {status.name}
+                        </span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <Badge className="bg-gray-800/50 text-gray-300 border border-gray-700/50">
+                        {status.percentage}%
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Performance Comparison */}
+          <Card className="lg:col-span-2 bg-gradient-to-br from-gray-900/50 to-black/50 border border-white/10 backdrop-blur-sm">
+            <CardContent className="p-0">
+              <div className="p-6 pb-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+                    <TrendingUp className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-white font-semibold text-lg mb-1">
+                      Station Performance
+                    </h3>
+                    <p className="text-gray-400 text-sm leading-relaxed">
+                      Daily swaps and efficiency comparison
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 pb-6">
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis
+                        dataKey="name"
+                        stroke="#9CA3AF"
+                        tick={{ fill: "#9CA3AF", fontSize: 12 }}
+                      />
+                      <YAxis
+                        stroke="#9CA3AF"
+                        tick={{ fill: "#9CA3AF", fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend wrapperStyle={{ color: "#9CA3AF" }} />
+                      <Bar
+                        dataKey="dailySwaps"
+                        fill="#3B82F6"
+                        name="Daily Swaps"
+                      />
+                      <Bar
+                        dataKey="efficiency"
+                        fill="#22C55E"
+                        name="Efficiency %"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Detailed Station List */}
+        <Card className="bg-gradient-to-br from-gray-900/50 to-black/50 border border-white/10 backdrop-blur-sm">
+          <CardContent className="p-0">
+            <div className="p-6 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+                  <Globe className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold text-lg mb-1">
+                    Station Details
+                  </h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    Comprehensive view of all battery swap stations
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pb-6">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Station
+                      </th>
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Status
+                      </th>
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Batteries
+                      </th>
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Daily Swaps
+                      </th>
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Efficiency
+                      </th>
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Revenue
+                      </th>
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Trend
+                      </th>
+                      <th className="text-left text-gray-300 font-medium p-4 text-sm">
+                        Rating
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(stationData).map(([id, station]) => (
+                      <tr
+                        key={id}
+                        className="border-b border-white/5 hover:bg-gray-800/30 transition-colors group"
+                      >
+                        <td className="p-4">
+                          <div>
+                            <div className="text-white font-medium group-hover:text-cyan-400 transition-colors">
+                              {station.name}
+                            </div>
+                            <div className="text-gray-400 text-sm">
+                              {station.location}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Badge
+                            className={`flex items-center gap-2 w-fit ${
+                              station.status === "optimal"
+                                ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                : station.status === "good"
+                                ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/30"
+                                : "bg-red-500/20 text-red-400 border-red-500/30"
+                            }`}
+                          >
+                            {getStatusIcon(station.status)}
+                            <span className="capitalize text-xs">
+                              {station.status}
+                            </span>
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-white font-medium">
+                            {station.availableBatteries}/
+                            {station.totalBatteries}
+                          </div>
+                          <div className="text-gray-400 text-sm">
+                            {Math.round(
+                              (station.availableBatteries /
+                                station.totalBatteries) *
+                                100
+                            )}
+                            % available
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-white font-medium">
+                            {station.dailySwaps}
+                          </div>
+                          <div className="text-gray-400 text-sm">
+                            swaps today
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="text-white font-medium">
+                              {station.efficiency}%
+                            </div>
+                            <div className="w-16 bg-gray-800 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-1000 ease-out"
+                                style={{ width: `${station.efficiency}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-white font-medium">
+                            ${station.revenue}
+                          </div>
+                          <div className="text-gray-400 text-sm">today</div>
+                        </td>
+                        <td className="p-4">
+                          <div
+                            className={`flex items-center gap-2 ${
+                              station.weeklyTrend >= 0
+                                ? "text-green-400"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {station.weeklyTrend >= 0 ? (
+                              <TrendingUp className="w-4 h-4" />
+                            ) : (
+                              <TrendingDown className="w-4 h-4" />
+                            )}
+                            <span className="text-sm font-medium">
+                              {Math.abs(station.weeklyTrend)}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-white font-medium">
+                            {station.customerSatisfaction}/5
+                          </div>
+                          <div className="flex gap-1 mt-1">
+                            {[...Array(5)].map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-2 h-2 rounded-full transition-colors ${
+                                  i < Math.floor(station.customerSatisfaction)
+                                    ? "bg-yellow-400"
+                                    : "bg-gray-600"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

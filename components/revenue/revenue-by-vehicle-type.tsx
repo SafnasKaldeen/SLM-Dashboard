@@ -162,15 +162,15 @@ export function RevenueByArea({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={600}>
+    <ResponsiveContainer width="100%" height={550}>
       <PieChart>
         <Pie
           data={chartData}
           cx="50%"
           cy="50%"
           innerRadius={60}
-          outerRadius={200}
-          paddingAngle={3}
+          outerRadius={180}
+          paddingAngle={2}
           dataKey="value"
         >
           {chartData.map((entry, index) => (
@@ -220,18 +220,20 @@ export function RevenueByArea({
         />
         <Legend
           content={({ payload }) => (
-            <div className="flex flex-wrap justify-center gap-4 mt-4">
-              {payload?.map((entry, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: entry.color }}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {entry.value}
-                  </span>
-                </div>
-              ))}
+            <div className="max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/50 scrollbar-track-transparent pr-2 mt-4 flex justify-center">
+              <div className="flex flex-wrap gap-4 justify-center">
+                {payload?.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {entry.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         />

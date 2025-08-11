@@ -1,17 +1,17 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
-  MapPin,
   Layers,
-  Settings,
   Menu,
   X,
+  MapPin,
   Loader2,
-  Eye,
-  EyeOff,
+  Settings,
+  Activity,
+  BarChart3,
+  Users,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 // d3 color scale imports
 import { scaleSequential } from "d3-scale";
@@ -31,6 +32,14 @@ import {
   interpolateCividis,
 } from "d3-scale-chromatic";
 
+// Import your aggregation library
+import {
+  aggregateByRegion,
+  makeLegendLabel,
+  AggregationKey,
+  getRegionNameFromFeature,
+} from "@/lib/geo-aggregation";
+
 /* =========================
    Types
 ========================= */
@@ -41,21 +50,30 @@ interface DataPoint {
   longitude: number;
   type?: string;
   area?: string;
-  // explicit admin fields
   district?: string;
   province?: string;
-  // kept for backward compatibility (province equivalent)
   region?: string;
-
+  // Individual station fields
   utilization_rate?: number;
   ping_speed?: number;
   status?: string;
   battery_count?: number;
   daily_swaps?: number;
   revenue?: number;
+  // Aggregated data fields
+  point_count?: number;
+  avg_utilization?: number;
+  total_revenue?: number;
+  max_utilization?: number;
+  min_utilization?: number;
+  unique_stations?: number;
+  // Metric for choropleth coloring
+  metric_value?: number;
+  [key: string]: any;
 }
 
 type SelectByKey = "area" | "district" | "province";
+type PaletteKey = "YlOrRd" | "Viridis" | "Plasma" | "Turbo" | "Cividis";
 
 interface ChoroplethProps {
   data?: DataPoint[];
@@ -64,32 +82,30 @@ interface ChoroplethProps {
     opacity?: number;
     showPoints?: boolean;
     showBorders?: boolean;
+    Aggregation?: AggregationKey;
+    AggregationField?: string;
+    selectBy?: SelectByKey;
+    regionProperty?: string;
     mapProvider?:
       | "openstreetmap"
       | "cartodb_dark"
       | "cartodb_light"
       | "satellite";
-    regionProperty?: string; // If you want to override the detected property
     palette?: PaletteKey;
-    selectBy?: SelectByKey; // default grouping
+    // New config for data mode
+    dataMode?: "aggregated" | "individual" | "auto";
   };
   className?: string;
   onRegionClick?: (region: any, data: DataPoint[]) => void;
   onDataPointClick?: (point: DataPoint) => void;
 }
 
-type PaletteKey = "YlOrRd" | "Viridis" | "Plasma" | "Turbo" | "Cividis";
-
 /* =========================
-   Palette Config
+   Palettes
 ========================= */
 const PALETTES: Record<
   PaletteKey,
-  {
-    label: string;
-    interpolator: (t: number) => string;
-    stops?: number[];
-  }
+  { label: string; interpolator: (t: number) => string; stops?: number[] }
 > = {
   YlOrRd: { label: "YlOrRd (Heatmap)", interpolator: interpolateYlOrRd },
   Viridis: { label: "Viridis", interpolator: interpolateViridis },
@@ -109,482 +125,88 @@ function cssGradientFromInterpolator(
 }
 
 /* =========================
-   Hardcoded Data (added district & province)
+   Enhanced Loading Component
 ========================= */
-const hardcodedStations: DataPoint[] = [
-  // Western Province
-  {
-    id: "LK001",
-    name: "Station Colombo Fort",
-    latitude: 6.9271,
-    longitude: 79.8612,
-    area: "Colombo",
-    district: "Colombo",
-    province: "Western Province",
-  },
-  {
-    id: "LK002",
-    name: "Station Negombo",
-    latitude: 7.2083,
-    longitude: 79.8358,
-    area: "Negombo",
-    district: "Gampaha",
-    province: "Western Province",
-  },
-  {
-    id: "LK003",
-    name: "Station Kelaniya",
-    latitude: 6.9553,
-    longitude: 79.9219,
-    area: "Kelaniya",
-    district: "Gampaha",
-    province: "Western Province",
-  },
-  {
-    id: "LK004",
-    name: "Station Kalutara",
-    latitude: 6.5831,
-    longitude: 79.9608,
-    area: "Kalutara",
-    district: "Kalutara",
-    province: "Western Province",
-  },
-  {
-    id: "LK021",
-    name: "Station Dehiwala",
-    latitude: 6.8528,
-    longitude: 79.8651,
-    area: "Dehiwala",
-    district: "Colombo",
-    province: "Western Province",
-  },
-  {
-    id: "LK022",
-    name: "Station Wattala",
-    latitude: 6.9735,
-    longitude: 79.8897,
-    area: "Wattala",
-    district: "Gampaha",
-    province: "Western Province",
-  },
-  {
-    id: "LK023",
-    name: "Station Moratuwa",
-    latitude: 6.7733,
-    longitude: 79.8836,
-    area: "Moratuwa",
-    district: "Colombo",
-    province: "Western Province",
-  },
-  {
-    id: "LK024",
-    name: "Station Ragama",
-    latitude: 7.0273,
-    longitude: 79.9183,
-    area: "Ragama",
-    district: "Gampaha",
-    province: "Western Province",
-  },
+const EnhancedLoader: React.FC<{
+  phase: "leaflet" | "geojson" | "rendering" | "parent" | "transitioning";
+  progress?: number;
+}> = ({ phase, progress }) => {
+  const [dots, setDots] = useState("");
 
-  // Central Province
-  {
-    id: "LK005",
-    name: "Station Kandy City",
-    latitude: 7.2906,
-    longitude: 80.6337,
-    area: "Gangawata Korale",
-    district: "Kandy",
-    province: "Central Province",
-  },
-  {
-    id: "LK006",
-    name: "Station Matale",
-    latitude: 7.4675,
-    longitude: 80.6234,
-    area: "Matale",
-    district: "Matale",
-    province: "Central Province",
-  },
-  {
-    id: "LK007",
-    name: "Nuwara Eliya",
-    latitude: 6.9497,
-    longitude: 80.7891,
-    area: "Nuwara Eliya",
-    district: "Nuwara Eliya",
-    province: "Central Province",
-  },
-  {
-    id: "LK025",
-    name: "Station Peradeniya",
-    latitude: 7.2624,
-    longitude: 80.5982,
-    area: "Peradeniya",
-    district: "Kandy",
-    province: "Central Province",
-  },
-  {
-    id: "LK026",
-    name: "Station Dambulla",
-    latitude: 7.8554,
-    longitude: 80.6512,
-    area: "Dambulla",
-    district: "Matale",
-    province: "Central Province",
-  },
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
 
-  // Southern Province
-  {
-    id: "LK008",
-    name: "Station Galle Fort",
-    latitude: 6.0346,
-    longitude: 80.217,
-    area: "Galle",
-    district: "Galle",
-    province: "Southern Province",
-  },
-  {
-    id: "LK009",
-    name: "Station Matara",
-    latitude: 5.9485,
-    longitude: 80.5353,
-    area: "Matara",
-    district: "Matara",
-    province: "Southern Province",
-  },
-  {
-    id: "LK027",
-    name: "Station Weligama",
-    latitude: 5.9668,
-    longitude: 80.4292,
-    area: "Weligama",
-    district: "Matara",
-    province: "Southern Province",
-  },
-  {
-    id: "LK028",
-    name: "Station Tangalle",
-    latitude: 6.0244,
-    longitude: 80.7916,
-    area: "Tangalle",
-    district: "Hambantota",
-    province: "Southern Province",
-  },
-  {
-    id: "LK029",
-    name: "Station Hambantota Town",
-    latitude: 6.1241,
-    longitude: 81.1185,
-    area: "Hambantota Town",
-    district: "Hambantota",
-    province: "Southern Province",
-  },
+  const phaseMessages = {
+    leaflet: "Initializing map engine",
+    geojson: "Loading geographic boundaries",
+    rendering: "Rendering choropleth layers",
+    parent: "Processing data updates",
+    transitioning: "Applying configuration changes",
+  };
 
-  // Northern Province
-  {
-    id: "LK010",
-    name: "Station Jaffna",
-    latitude: 9.6615,
-    longitude: 80.0255,
-    area: "Jaffna",
-    district: "Jaffna",
-    province: "Northern Province",
-  },
-  {
-    id: "LK030",
-    name: "Station Chavakachcheri",
-    latitude: 9.658,
-    longitude: 80.159,
-    area: "Chavakachcheri",
-    district: "Jaffna",
-    province: "Northern Province",
-  },
-  {
-    id: "LK031",
-    name: "Station Kilinochchi",
-    latitude: 9.395,
-    longitude: 80.398,
-    area: "Kilinochchi",
-    district: "Kilinochchi",
-    province: "Northern Province",
-  },
-  {
-    id: "LK032",
-    name: "Station Mannar",
-    latitude: 8.977,
-    longitude: 79.911,
-    area: "Mannar",
-    district: "Mannar",
-    province: "Northern Province",
-  },
+  const phaseIcons = {
+    leaflet: <Activity className="h-6 w-6" />,
+    geojson: <MapPin className="h-6 w-6" />,
+    rendering: <Layers className="h-6 w-6" />,
+    parent: <Settings className="h-6 w-6" />,
+    transitioning: <Settings className="h-6 w-6" />,
+  };
 
-  // Eastern Province
-  {
-    id: "LK011",
-    name: "Station Batticaloa",
-    latitude: 7.712,
-    longitude: 81.6784,
-    area: "Manmunai North",
-    district: "Batticaloa",
-    province: "Eastern Province",
-  },
-  {
-    id: "LK012",
-    name: "Station Trincomalee",
-    latitude: 8.5874,
-    longitude: 81.2152,
-    area: "Town & Gravets",
-    district: "Trincomalee",
-    province: "Eastern Province",
-  },
-  {
-    id: "LK018",
-    name: "Station Eravur",
-    latitude: 7.733,
-    longitude: 81.628,
-    area: "Eravur",
-    district: "Batticaloa",
-    province: "Eastern Province",
-  },
-  {
-    id: "LK019",
-    name: "Station Kinniya",
-    latitude: 8.433,
-    longitude: 81.183,
-    area: "Kinniya",
-    district: "Trincomalee",
-    province: "Eastern Province",
-  },
-  {
-    id: "LK020",
-    name: "Station Ampara",
-    latitude: 7.283,
-    longitude: 81.682,
-    area: "Ampara",
-    district: "Ampara",
-    province: "Eastern Province",
-  },
+  return (
+    <div className="text-center text-muted-foreground p-8">
+      <div className="relative mb-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-purple-500/20 rounded-full blur-xl animate-pulse" />
+        <div className="relative bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-full p-4 inline-flex items-center justify-center">
+          <div className="text-cyan-400 animate-spin">
+            <Loader2 className="h-8 w-8" />
+          </div>
+        </div>
+      </div>
 
-  // North Western Province
-  {
-    id: "LK013",
-    name: "Station Kurunegala",
-    latitude: 7.4863,
-    longitude: 80.3647,
-    area: "Kurunegala",
-    district: "Kurunegala",
-    province: "North Western Province",
-  },
-  {
-    id: "LK033",
-    name: "Station Kuliyapitiya",
-    latitude: 7.473,
-    longitude: 80.042,
-    area: "Kuliyapitiya",
-    district: "Kurunegala",
-    province: "North Western Province",
-  },
-  {
-    id: "LK034",
-    name: "Station Puttalam",
-    latitude: 8.036,
-    longitude: 79.828,
-    area: "Puttalam",
-    district: "Puttalam",
-    province: "North Western Province",
-  },
+      <div className="space-y-3">
+        <div className="flex items-center justify-center gap-3 text-lg font-medium">
+          <div className="text-cyan-400">{phaseIcons[phase]}</div>
+          <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+            {phaseMessages[phase]}
+            {dots}
+          </span>
+        </div>
 
-  // North Central Province
-  {
-    id: "LK014",
-    name: "Station Anuradhapura",
-    latitude: 8.3114,
-    longitude: 80.4037,
-    area: "Nuwaragam Palatha East",
-    district: "Anuradhapura",
-    province: "North Central Province",
-  },
-  {
-    id: "LK035",
-    name: "Station Polonnaruwa",
-    latitude: 7.939,
-    longitude: 81.002,
-    area: "Polonnaruwa Town",
-    district: "Polonnaruwa",
-    province: "North Central Province",
-  },
-  {
-    id: "LK036",
-    name: "Station Mihintale",
-    latitude: 8.35,
-    longitude: 80.515,
-    area: "Mihintale",
-    district: "Anuradhapura",
-    province: "North Central Province",
-  },
+        {progress !== undefined && (
+          <div className="w-64 mx-auto">
+            <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="text-xs text-slate-400 mt-2">
+              {Math.round(progress)}% complete
+            </div>
+          </div>
+        )}
 
-  // Uva Province
-  {
-    id: "LK015",
-    name: "Station Badulla",
-    latitude: 6.9934,
-    longitude: 81.055,
-    area: "Badulla",
-    district: "Badulla",
-    province: "Uva Province",
-  },
-  {
-    id: "LK037",
-    name: "Station Bandarawela",
-    latitude: 6.828,
-    longitude: 80.987,
-    area: "Bandarawela",
-    district: "Badulla",
-    province: "Uva Province",
-  },
-  {
-    id: "LK038",
-    name: "Station Monaragala",
-    latitude: 6.873,
-    longitude: 81.349,
-    area: "Monaragala",
-    district: "Monaragala",
-    province: "Uva Province",
-  },
-
-  // Sabaragamuwa Province
-  {
-    id: "LK016",
-    name: "Station Ratnapura",
-    latitude: 6.6828,
-    longitude: 80.3992,
-    area: "Ratnapura",
-    district: "Ratnapura",
-    province: "Sabaragamuwa Province",
-  },
-  {
-    id: "LK017",
-    name: "Station Kegalle",
-    latitude: 7.2513,
-    longitude: 80.3464,
-    area: "Kegalle",
-    district: "Kegalle",
-    province: "Sabaragamuwa Province",
-  },
-  {
-    id: "LK039",
-    name: "Station Balangoda",
-    latitude: 6.662,
-    longitude: 80.698,
-    area: "Balangoda",
-    district: "Ratnapura",
-    province: "Sabaragamuwa Province",
-  },
-  {
-    id: "LK040",
-    name: "Station Mawanella",
-    latitude: 7.252,
-    longitude: 80.439,
-    area: "Mawanella",
-    district: "Kegalle",
-    province: "Sabaragamuwa Province",
-  },
-
-  // Additional filler points (to reach 50)
-  {
-    id: "LK041",
-    name: "Station Hikkaduwa",
-    latitude: 6.14,
-    longitude: 80.101,
-    area: "Hikkaduwa",
-    district: "Galle",
-    province: "Southern Province",
-  },
-  {
-    id: "LK042",
-    name: "Station Arugam Bay",
-    latitude: 6.837,
-    longitude: 81.83,
-    area: "Arugam Bay",
-    district: "Ampara",
-    province: "Eastern Province",
-  },
-  {
-    id: "LK043",
-    name: "Station Hatton",
-    latitude: 6.898,
-    longitude: 80.599,
-    area: "Hatton",
-    district: "Nuwara Eliya",
-    province: "Central Province",
-  },
-  {
-    id: "LK044",
-    name: "Station Avissawella",
-    latitude: 6.951,
-    longitude: 80.204,
-    area: "Avissawella",
-    district: "Colombo",
-    province: "Western Province",
-  },
-  {
-    id: "LK045",
-    name: "Station Chilaw",
-    latitude: 7.575,
-    longitude: 79.795,
-    area: "Chilaw",
-    district: "Puttalam",
-    province: "North Western Province",
-  },
-  {
-    id: "LK046",
-    name: "Station Medirigiriya",
-    latitude: 7.984,
-    longitude: 80.951,
-    area: "Medirigiriya",
-    district: "Polonnaruwa",
-    province: "North Central Province",
-  },
-  {
-    id: "LK047",
-    name: "Station Wellawaya",
-    latitude: 6.733,
-    longitude: 81.1,
-    area: "Wellawaya",
-    district: "Monaragala",
-    province: "Uva Province",
-  },
-  {
-    id: "LK048",
-    name: "Station Ruwanwella",
-    latitude: 7.031,
-    longitude: 80.315,
-    area: "Ruwanwella",
-    district: "Kegalle",
-    province: "Sabaragamuwa Province",
-  },
-  {
-    id: "LK049",
-    name: "Station Vavuniya",
-    latitude: 8.756,
-    longitude: 80.498,
-    area: "Vavuniya",
-    district: "Vavuniya",
-    province: "Northern Province",
-  },
-  {
-    id: "LK050",
-    name: "Station Mullaitivu",
-    latitude: 9.267,
-    longitude: 80.815,
-    area: "Mullaitivu",
-    district: "Mullaitivu",
-    province: "Northern Province",
-  },
-];
+        <div className="text-sm text-slate-400 max-w-md mx-auto">
+          {phase === "leaflet" &&
+            "Setting up interactive map components and controls"}
+          {phase === "geojson" &&
+            "Fetching and parsing geographic boundary data"}
+          {phase === "rendering" &&
+            "Calculating colors and drawing map regions"}
+          {phase === "parent" && "Synchronizing with updated configuration"}
+          {phase === "transitioning" && "Smoothly applying visual changes"}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* =========================
-   Component
+   Main Component
 ========================= */
 const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
   data,
@@ -599,178 +221,284 @@ const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
   const baseTileLayer = useRef<any>(null);
   const geoJsonLayer = useRef<any>(null);
   const pointsLayer = useRef<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const markersClusterGroup = useRef<any>(null);
   const [leaflet, setLeaflet] = useState<any>(null);
+
+  // Loading phases
+  const [isLeafletLoading, setIsLeafletLoading] = useState(true);
+  const [isFetchingGeoJSON, setIsFetchingGeoJSON] = useState(false);
+  const [isRenderingLayer, setIsRenderingLayer] = useState(false);
+  const [isParentLoading, setIsParentLoading] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // UI & hover
   const [uiCollapsed, setUiCollapsed] = useState(false);
-  const [hoveredRegion, setHoveredRegion] = useState<any>(null);
+  const [hoveredRegion, setHoveredRegion] = useState<{
+    name: string | undefined;
+    info: { count: number; stations: DataPoint[]; metric: number };
+  } | null>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  // Fixed opacity state management
+  const [localOpacity, setLocalOpacity] = useState(() => config.opacity ?? 0.7);
+
+  // GeoJSON
   const [geoData, setGeoData] = useState<any>(null);
 
-  const [opacity, setOpacity] = useState([config.opacity ?? 0.7]);
-  const [showPoints, setShowPoints] = useState(config.showPoints ?? false);
-  const [showBorders, setShowBorders] = useState(config.showBorders ?? true);
+  // Extract config values
+  const effectiveOpacity =
+    config.opacity !== undefined ? config.opacity : localOpacity;
+  const parentShowPoints = config.showPoints ?? false;
+  const parentShowBorders = config.showBorders ?? true;
+  const parentSelectBy: SelectByKey = config.selectBy ?? "province";
+  const parentAggregation: AggregationKey = config.Aggregation ?? "count";
+  const parentAggregationField = config.AggregationField ?? "";
+  const dataMode = config.dataMode ?? "auto";
+
+  // Determine data mode automatically
+  const detectedDataMode = useMemo(() => {
+    if (dataMode !== "auto") return dataMode;
+
+    if (!data || data.length === 0) return "aggregated";
+
+    // Check if data has aggregated fields
+    const hasAggregatedFields = data.some(
+      (point) =>
+        point.point_count !== undefined ||
+        point.avg_utilization !== undefined ||
+        point.total_revenue !== undefined
+    );
+
+    // Check if data has individual station fields
+    const hasIndividualFields = data.some(
+      (point) =>
+        point.tboxid !== undefined ||
+        point.status !== undefined ||
+        (point.utilization_rate !== undefined &&
+          point.point_count === undefined)
+    );
+
+    if (hasAggregatedFields && !hasIndividualFields) return "aggregated";
+    if (hasIndividualFields && !hasAggregatedFields) return "individual";
+
+    // Mixed or individual data by default
+    return "individual";
+  }, [data, dataMode]);
+
+  const stations = useMemo(() => data || [], [data]);
+
+  // Default region properties
+  const defaultRegionPropByLevel: Record<SelectByKey, string> = {
+    area: "ADM3_EN",
+    district: "ADM2_EN",
+    province: "ADM1_EN",
+  };
+
+  const computedDefaultRegionProp = defaultRegionPropByLevel[parentSelectBy];
+  const [regionProperty, setRegionProperty] = useState<string>(
+    config.regionProperty || computedDefaultRegionProp
+  );
+
   const [mapProvider, setMapProvider] = useState<
     "openstreetmap" | "cartodb_dark" | "cartodb_light" | "satellite"
   >(config.mapProvider || "cartodb_dark");
 
-  // === Strict ADM mapping for each level ===
-  const defaultRegionPropByLevel: Record<SelectByKey, string> = {
-    area: "ADM3_EN", // DS divisions / areas
-    district: "ADM2_EN", // Districts
-    province: "ADM1_EN", // Provinces
-  };
-
-  const initialSelectBy: SelectByKey = config.selectBy || "province";
-  const [selectBy, setSelectBy] = useState<SelectByKey>(initialSelectBy);
-
-  // regionProperty is reset automatically when selectBy changes
-  const [regionProperty, setRegionProperty] = useState<string>(
-    config.regionProperty || defaultRegionPropByLevel[initialSelectBy]
-  );
-
-  // Palette selection
   const [paletteKey, setPaletteKey] = useState<PaletteKey>(
     config.palette || "YlOrRd"
   );
 
-  // discover region property options from geojson (if present)
-  const [regionPropertyOptions, setRegionPropertyOptions] = useState<string[]>(
-    []
-  );
+  // Sync local opacity with config changes
+  useEffect(() => {
+    if (config.opacity !== undefined) {
+      setLocalOpacity(config.opacity);
+    }
+  }, [config.opacity]);
 
-  // Use hardcoded stations unless data provided
-  const stations = useMemo<DataPoint[]>(() => {
-    if (data && data.length > 0) return data;
-    return hardcodedStations;
-  }, [data]);
+  // Track mouse movement over the map
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!mapRef.current) return;
+      const rect = mapRef.current.getBoundingClientRect();
+      setMousePosition({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+    };
+
+    const mapElement = mapRef.current;
+    if (mapElement) {
+      mapElement.addEventListener("mousemove", handleMouseMove);
+      return () => {
+        mapElement.removeEventListener("mousemove", handleMouseMove);
+      };
+    }
+  }, []);
+
+  // Parent changes → show loading
+  useEffect(() => {
+    setIsParentLoading(true);
+  }, [
+    data,
+    config.selectBy,
+    parentSelectBy,
+    parentAggregation,
+    parentAggregationField,
+  ]);
+
+  // Transition flag when selectBy changes
+  const prevSelectBy = useRef<SelectByKey>(parentSelectBy);
+  useEffect(() => {
+    if (prevSelectBy.current !== parentSelectBy) {
+      setIsTransitioning(true);
+      prevSelectBy.current = parentSelectBy;
+      setRegionProperty(
+        config.regionProperty || defaultRegionPropByLevel[parentSelectBy]
+      );
+      const t = setTimeout(() => setIsTransitioning(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [parentSelectBy, config.regionProperty]);
 
   /* =========================
-     GeoJSON source resolution by selectBy
+     GeoJSON source per selectBy
   ========================= */
   const getGeoUrlForLevel = (level: SelectByKey) => {
-    if (geojsonData) return null; // user provided
-    // Adjust these paths to where you host your files
-    if (level === "district") return "/srilanka_districts.geojson"; // ADM2 polygons
-    if (level === "province") return "/srilanka_provinces.geojson"; // ADM1 polygons
-    return "/srilanka.geojson"; // ADM3 polygons for Area
+    if (geojsonData) return null;
+    if (level === "district") return "/srilanka_districts.geojson";
+    if (level === "province") return "/srilanka_provinces.geojson";
+    return "/srilanka.geojson";
   };
 
-  /* =========================
-     Load GeoJSON (prop or per selectBy)
-  ========================= */
+  // Load GeoJSON
   useEffect(() => {
+    let abort = false;
     const loadGeoJSON = async () => {
+      setIsFetchingGeoJSON(true);
       try {
         if (geojsonData) {
-          setGeoData(geojsonData);
+          if (!abort) setGeoData(geojsonData);
           return;
         }
-        const url = getGeoUrlForLevel(selectBy);
+        const url = getGeoUrlForLevel(parentSelectBy);
         if (!url) return;
         const response = await fetch(url);
-        if (response.ok) {
-          const json = await response.json();
-          setGeoData(json);
-        } else {
-          console.warn("Could not load GeoJSON:", url);
+        if (!abort) {
+          if (response.ok) {
+            const json = await response.json();
+            setGeoData(json);
+          } else {
+            console.warn("Could not load GeoJSON:", url);
+            setGeoData(null);
+          }
+        }
+      } catch (err) {
+        if (!abort) {
+          console.error("Error loading GeoJSON:", err);
           setGeoData(null);
         }
-      } catch (error) {
-        console.error("Error loading GeoJSON:", error);
-        setGeoData(null);
+      } finally {
+        if (!abort) setIsFetchingGeoJSON(false);
       }
     };
     loadGeoJSON();
-  }, [geojsonData, selectBy]);
+    return () => {
+      abort = true;
+    };
+  }, [geojsonData, parentSelectBy]);
 
-  // Reset regionProperty to the strict ADM key whenever level changes
-  useEffect(() => {
-    setRegionProperty(defaultRegionPropByLevel[selectBy]);
-  }, [selectBy]);
-
-  // discover property keys; prefer the default ADM key for the level
+  // Discover region property options
+  const [regionPropertyOptions, setRegionPropertyOptions] = useState<string[]>(
+    []
+  );
   useEffect(() => {
     if (!geoData?.features?.length) return;
     const sampleProps = geoData.features[0]?.properties || {};
     const keys = Object.keys(sampleProps);
-
     const likely = keys.filter(
       (k) =>
         /^(ADM1|ADM2|ADM3).*_EN$/i.test(k) ||
         /(NAME|ADM).*(EN|_1|_2|_3)?$/i.test(k) ||
         /^NAME$/i.test(k)
     );
-
-    const preferred = defaultRegionPropByLevel[selectBy];
+    const preferred =
+      config.regionProperty || defaultRegionPropByLevel[parentSelectBy];
     const unique = Array.from(
       new Set([preferred, regionProperty, ...likely].filter(Boolean))
     );
     setRegionPropertyOptions(unique);
-  }, [geoData, regionProperty, selectBy]);
+  }, [geoData, regionProperty, parentSelectBy, config.regionProperty]);
 
   /* =========================
-     Map providers with styling
+     Map providers
   ========================= */
   const mapProviders = {
     openstreetmap: {
       name: "OpenStreetMap",
       url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
       attribution: "© OpenStreetMap contributors",
-      borderColor: "#1f2937", // Dark gray for clear visibility
+      borderColor: "#1f2937",
       regionBaseColor: "#ffffff",
     },
     cartodb_dark: {
       name: "Carto Dark",
       url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
       attribution: "© OpenStreetMap contributors © CARTO",
-      borderColor: "#facc15", // Bright yellow for high contrast on dark map
+      borderColor: "#facc15",
       regionBaseColor: "#1e293b",
     },
     cartodb_light: {
       name: "Carto Light",
       url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
       attribution: "© OpenStreetMap contributors © CARTO",
-      borderColor: "#111827", // Almost black, stands out on light map
+      borderColor: "#111827",
       regionBaseColor: "#f8fafc",
     },
     satellite: {
       name: "Satellite",
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       attribution: "© Esri",
-      borderColor: "#00E5FF", // Electric cyan stands out on greens/browns/blues
+      borderColor: "#00E5FF",
       regionBaseColor: "#000000",
     },
   };
 
   /* =========================
-     Load Leaflet
+     Load Leaflet & init map
   ========================= */
   useEffect(() => {
     const loadLeaflet = async () => {
       try {
         const L = await import("leaflet");
         await import("leaflet/dist/leaflet.css");
+
+        // Try to load MarkerCluster for better point handling
+        try {
+          const MarkerCluster = await import("leaflet.markercluster");
+          await import("leaflet.markercluster/dist/MarkerCluster.css");
+          await import("leaflet.markercluster/dist/MarkerCluster.Default.css");
+        } catch {
+          console.warn("MarkerCluster not available, using standard markers");
+        }
+
         setLeaflet(L);
       } catch (error) {
         console.error("Failed to load Leaflet:", error);
-        setIsLoading(false);
+      } finally {
+        setIsLeafletLoading(false);
       }
     };
     loadLeaflet();
   }, []);
 
-  /* =========================
-     Initialize map
-  ========================= */
   useEffect(() => {
     if (!leaflet || !mapRef.current || mapInstance.current) return;
     const L = (leaflet as any).default || leaflet;
-
     const map = L.map(mapRef.current, {
       zoomControl: true,
       dragging: true,
       scrollWheelZoom: true,
     });
-    // Initial center: Sri Lanka
     map.setView([7.8731, 80.7718], 7);
     mapInstance.current = map;
 
@@ -782,15 +510,19 @@ const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
     if (provider.url.includes("{s}")) tileOptions.subdomains = "abcd";
     baseTileLayer.current = L.tileLayer(provider.url, tileOptions).addTo(map);
 
-    setIsLoading(false);
+    // Initialize cluster group if available
+    if (L.markerClusterGroup) {
+      markersClusterGroup.current = L.markerClusterGroup({
+        chunkedLoading: true,
+        maxClusterRadius: 50,
+      });
+      map.addLayer(markersClusterGroup.current);
+    }
   }, [leaflet]);
 
-  /* =========================
-     Update base tile on provider change
-  ========================= */
+  // Update base tile on provider change
   useEffect(() => {
     if (!leaflet || !mapInstance.current) return;
-
     const provider = mapProviders[mapProvider];
     const tileOptions: any = {
       attribution: provider.attribution,
@@ -802,7 +534,6 @@ const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
       mapInstance.current.removeLayer(baseTileLayer.current);
       baseTileLayer.current = null;
     }
-
     const L = (leaflet as any).default || leaflet;
     baseTileLayer.current = L.tileLayer(provider.url, tileOptions).addTo(
       mapInstance.current
@@ -810,121 +541,119 @@ const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
   }, [mapProvider, leaflet]);
 
   /* =========================
-     Helpers: get region name with fallbacks
+     Aggregation - Handle both modes
   ========================= */
-  function getRegionNameFromFeature(
-    feature: any,
-    preferredKey: string
-  ): string | undefined {
-    if (!feature?.properties) return undefined;
-    const props = feature.properties;
-    // Always try the selected target property first, then common fallbacks
-    console.log("preferredKey: ", preferredKey);
-    const candidates = [preferredKey, "ADM3_EN", "ADM2_EN", "ADM1_EN", "NAME"];
-    for (const k of candidates) {
-      if (props[k] != null && String(props[k]).trim() !== "")
-        return String(props[k]);
-    }
-    return undefined;
-  }
+  const { regionMap, domain } = useMemo(() => {
+    if (!geoData) return { regionMap: new Map(), domain: { min: 0, max: 1 } };
 
-  /* =========================
-     Count-based region data with selectBy matching
-  ========================= */
-  const regionData = useMemo(() => {
-    if (!geoData) return new Map<string, any>();
+    if (detectedDataMode === "aggregated") {
+      const regionMap = new Map();
+      let minVal = Infinity;
+      let maxVal = -Infinity;
 
-    const aggregated = new Map<string, any>();
+      stations.forEach((station) => {
+        const regionName =
+          station.province || station.district || station.area || station.name;
+        const metric =
+          station.point_count ||
+          station.avg_utilization ||
+          station.total_revenue ||
+          1;
 
-    // Initialize all polygons
-    geoData.features?.forEach((feature: any) => {
-      const regionName = getRegionNameFromFeature(feature, regionProperty);
-      if (regionName) {
-        aggregated.set(regionName, {
-          name: regionName,
-          stations: [] as DataPoint[],
-          count: 0,
+        regionMap.set(regionName, {
+          count: station.point_count || 1,
+          stations: [station],
+          metric: metric,
         });
-      }
-    });
 
-    if (!stations.length) return aggregated;
+        minVal = Math.min(minVal, metric);
+        maxVal = Math.max(maxVal, metric);
+      });
 
-    const polygonKeys = Array.from(aggregated.keys());
-    const loweredKeys = polygonKeys.map((k) => k.toLowerCase());
-
-    const pickCandidatesForStation = (s: DataPoint): string[] => {
-      if (selectBy === "district") {
-        return [s.district].filter(Boolean) as string[];
-      }
-      if (selectBy === "province") {
-        // prefer explicit province, then region (legacy)
-        return [s.province, s.region].filter(Boolean) as string[];
-      }
-      // area: area name, then region, then station name
-      return [s.area, s.region, s.name].filter(Boolean) as string[];
-    };
-
-    stations.forEach((station) => {
-      const candidates = pickCandidatesForStation(station);
-
-      let matchedKey: string | undefined;
-
-      // exact match
-      for (const c of candidates) {
-        if (c && aggregated.has(c)) {
-          matchedKey = c;
-          break;
+      // Handle single region case
+      if (minVal === maxVal) {
+        if (minVal === 0) {
+          // If all values are 0, show minimum color
+          return { regionMap, domain: { min: 0, max: 1 } };
+        } else {
+          // For non-zero single value, create range around it
+          return {
+            regionMap,
+            domain: {
+              min: Math.max(0, minVal * 0.5), // 50% of value as min
+              max: minVal * 1.5, // 150% of value as max
+            },
+          };
         }
       }
 
-      // case-insensitive "includes" both ways
-      if (!matchedKey) {
-        for (const c of candidates) {
-          const target = String(c).toLowerCase();
-          const idx = loweredKeys.findIndex(
-            (k) => k.includes(target) || target.includes(k)
-          );
-          if (idx !== -1) {
-            matchedKey = polygonKeys[idx];
-            break;
-          }
+      return {
+        regionMap,
+        domain: {
+          min: minVal === Infinity ? 0 : minVal,
+          max: maxVal === -Infinity ? 1 : maxVal,
+        },
+      };
+    } else {
+      // Use the existing aggregation library for individual points
+      const result = aggregateByRegion({
+        geoData,
+        stations,
+        selectBy: parentSelectBy,
+        regionProperty,
+        aggregation: parentAggregation,
+        aggregationField: parentAggregationField,
+      });
+
+      // Handle single region case for individual data mode
+      if (result.domain.min === result.domain.max) {
+        if (result.domain.min === 0) {
+          return { ...result, domain: { min: 0, max: 1 } };
+        } else {
+          return {
+            ...result,
+            domain: {
+              min: Math.max(0, result.domain.min * 0.5),
+              max: result.domain.max * 1.5,
+            },
+          };
         }
       }
 
-      if (matchedKey) {
-        const bucket = aggregated.get(matchedKey);
-        bucket.stations.push(station);
-        bucket.count += 1;
-      }
-    });
-
-    return aggregated;
-  }, [stations, geoData, regionProperty, selectBy]);
-
+      return result;
+    }
+  }, [
+    geoData,
+    stations,
+    parentSelectBy,
+    regionProperty,
+    parentAggregation,
+    parentAggregationField,
+    detectedDataMode,
+  ]);
   /* =========================
-     Color scale (D3 sequential palette)
+     Color scale
   ========================= */
-  const { getColor, getLegendCSS, maxCount } = useMemo(() => {
-    const counts = Array.from(regionData.values()).map((r: any) => r.count);
-    const max = Math.max(...counts, 1);
+  const { getColor } = useMemo(() => {
     const interpolator = PALETTES[paletteKey].interpolator;
-    const seq = scaleSequential(interpolator).domain([0, max]);
+    const seq = scaleSequential(interpolator).domain([domain.min, domain.max]);
 
     return {
-      getColor: (count: number) => {
-        if (count <= 0) return "rgba(156, 163, 175, 0.2)";
-        return seq(count);
+      getColor: (value: number) => {
+        if (value <= domain.min) return "rgba(156, 163, 175, 0.2)";
+        return seq(value);
       },
-      getLegendCSS: () => cssGradientFromInterpolator(interpolator),
-      maxCount: max,
     };
-  }, [regionData, paletteKey]);
+  }, [domain, paletteKey]);
 
   /* =========================
-     Points management
+     Points layer - Optimized for different modes
   ========================= */
   const clearPoints = () => {
+    if (markersClusterGroup.current) {
+      markersClusterGroup.current.clearLayers();
+    }
+
     if (mapInstance.current && pointsLayer.current) {
       pointsLayer.current.forEach((marker) => {
         mapInstance.current.removeLayer(marker);
@@ -937,23 +666,74 @@ const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
     if (!leaflet || !mapInstance.current) return;
     const L = (leaflet as any).default || leaflet;
 
-    stations.forEach((station) => {
+    clearPoints();
+
+    const pointsToShow =
+      detectedDataMode === "aggregated" && !parentShowPoints
+        ? [] // Don't show points for aggregated data unless explicitly requested
+        : stations.filter(
+            (station) =>
+              station.latitude !== undefined &&
+              station.longitude !== undefined &&
+              station.latitude !== 0 &&
+              station.longitude !== 0
+          );
+
+    if (pointsToShow.length === 0) return;
+
+    const markers: any[] = [];
+
+    pointsToShow.forEach((station) => {
       const statusColors: Record<string, string> = {
         active: "#10b981",
         warning: "#f59e0b",
         maintenance: "#ef4444",
       };
 
-      const marker = L.circleMarker([station.latitude, station.longitude], {
-        radius: 6,
-        fillColor: statusColors[station.status || ""] || "#6b7280",
-        color: "#ffffff",
-        weight: 2,
-        opacity: 0.9,
-        fillOpacity: 0.8,
-      }).addTo(mapInstance.current);
+      const isAggregated = detectedDataMode === "aggregated";
+      const markerColor = isAggregated
+        ? "#06b6d4" // Cyan for aggregated points
+        : statusColors[station.status || ""] || "#10B981";
 
-      const popupContent = `
+      const markerSize = isAggregated
+        ? Math.max(6, Math.min(20, (station.point_count || 1) / 5)) // Size based on point count
+        : 4;
+
+      const marker = L.circleMarker([station.latitude, station.longitude], {
+        radius: markerSize,
+        fillColor: markerColor,
+        color: "#ffffff",
+        weight: isAggregated ? 3 : 2,
+        opacity: 0.9,
+        fillOpacity: isAggregated ? 0.7 : 0.8,
+      });
+
+      const popupContent = isAggregated
+        ? `
+        <div style="color: white; font-family: system-ui, sans-serif;">
+          <div style="font-weight: 600; margin-bottom: 8px;">${
+            station.name
+          }</div>
+          <div style="font-size: 13px;">
+            <div>Region Type: ${
+              station.province
+                ? "Province"
+                : station.district
+                ? "District"
+                : "Area"
+            }</div>
+            <div>Total Points: ${station.point_count || "N/A"}</div>
+            <div>Avg Utilization: ${
+              station.avg_utilization?.toFixed(1) || "N/A"
+            }%</div>
+            <div>Total Revenue: $${
+              station.total_revenue?.toLocaleString() || "N/A"
+            }</div>
+            <div>Unique Stations: ${station.unique_stations || "N/A"}</div>
+          </div>
+        </div>
+      `
+        : `
         <div style="color: white; font-family: system-ui, sans-serif;">
           <div style="font-weight: 600; margin-bottom: 8px;">${
             station.name
@@ -964,139 +744,252 @@ const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
             <div>Area: ${station.area || "N/A"}</div>
             <div>Status: ${station.status ?? "n/a"}</div>
             <div>Type: ${station.type ?? "n/a"}</div>
-            <div>Utilization: ${station.utilization_rate ?? "N/A"}%</div>
+            ${
+              station.utilization_rate
+                ? `<div>Utilization: ${station.utilization_rate.toFixed(
+                    1
+                  )}%</div>`
+                : ""
+            }
+            ${
+              station.revenue
+                ? `<div>Revenue: $${station.revenue.toLocaleString()}</div>`
+                : ""
+            }
           </div>
         </div>
       `;
 
       marker.bindPopup(popupContent, { className: "custom-popup" });
       marker.on("click", () => onDataPointClick?.(station));
-      pointsLayer.current.push(marker);
+
+      markers.push(marker);
     });
+
+    // Use cluster group for individual points if available and we have many points
+    if (
+      markersClusterGroup.current &&
+      detectedDataMode === "individual" &&
+      markers.length > 50
+    ) {
+      markersClusterGroup.current.addLayers(markers);
+    } else {
+      // Add markers directly to map
+      markers.forEach((marker) => {
+        marker.addTo(mapInstance.current);
+        pointsLayer.current.push(marker);
+      });
+    }
   };
 
   useEffect(() => {
     if (!mapInstance.current || !leaflet) return;
-    clearPoints();
-    if (showPoints) addPoints();
-  }, [showPoints, stations, leaflet]);
+
+    if (parentShowPoints || detectedDataMode === "individual") {
+      addPoints();
+    } else {
+      clearPoints();
+    }
+  }, [parentShowPoints, stations, leaflet, detectedDataMode]);
 
   /* =========================
-     GeoJSON layer + fit to bounds on change
+     GeoJSON layer + tooltip + settling
   ========================= */
-  const hoverNameRef = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!leaflet || !mapInstance.current || !geoData) return;
+    if (!leaflet || !mapInstance.current || !geoData) {
+      return;
+    }
     const L = (leaflet as any).default || leaflet;
 
+    setIsRenderingLayer(true);
+
+    // remove previous layer
     if (geoJsonLayer.current) {
-      mapInstance.current.removeLayer(geoJsonLayer.current);
+      try {
+        mapInstance.current.removeLayer(geoJsonLayer.current);
+      } catch {}
       geoJsonLayer.current = null;
     }
 
     const provider = mapProviders[mapProvider];
 
+    // Helper: Leaflet sticky tooltip content
+    const makeTooltipHTML = (name?: string) => {
+      const r = name ? regionMap.get(name) : undefined;
+      const count = r?.count ?? 0;
+      const metric = r?.metric ?? 0;
+
+      // Different tooltip content for aggregated vs individual data
+      if (detectedDataMode === "aggregated") {
+        const station = r?.stations?.[0];
+        return `
+          <div class="region-tooltip-content">
+            <div class="rt-title">${name || "—"}</div>
+            <div class="rt-line"><strong>${
+              station?.point_count || count
+            }</strong> total points</div>
+            ${
+              station?.avg_utilization
+                ? `<div class="rt-line"><strong>${station.avg_utilization.toFixed(
+                    1
+                  )}%</strong> avg utilization</div>`
+                : ""
+            }
+            ${
+              station?.total_revenue
+                ? `<div class="rt-line"><strong>$${station.total_revenue.toLocaleString()}</strong> total revenue</div>`
+                : ""
+            }
+          </div>
+        `;
+      } else {
+        const top = (r?.stations ?? [])
+          .slice(0, 3)
+          .map((s) => s.name)
+          .join(", ");
+
+        return `
+          <div class="region-tooltip-content">
+            <div class="rt-title">${name || "—"}</div>
+            <div class="rt-line"><strong>${count}</strong> station(s)</div>
+            ${
+              parentAggregation !== "count"
+                ? `<div class="rt-line"><strong>${metric.toFixed(
+                    2
+                  )}</strong> ${makeLegendLabel(
+                    parentAggregation,
+                    parentAggregationField
+                  )}</div>`
+                : ""
+            }
+            ${top ? `<div class="rt-line rt-small">${top}</div>` : ""}
+          </div>
+        `;
+      }
+    };
+
     geoJsonLayer.current = L.geoJSON(geoData, {
       style: (feature: any) => {
         const regionName = getRegionNameFromFeature(feature, regionProperty);
-        const regionInfo = regionName ? regionData.get(regionName) : undefined;
-        const count = regionInfo ? regionInfo.count : 0;
+        const regionInfo = regionName ? regionMap.get(regionName) : undefined;
+        const metric = regionInfo ? regionInfo.metric : 0;
 
         return {
-          fillColor: getColor(count),
-          weight: showBorders
-            ? selectBy === "area"
-              ? 0.5
-              : 2 // thinner for area, thicker for district/province
-            : 0,
-          opacity: showBorders ? 1 : 0,
+          fillColor: getColor(metric),
+          weight: parentShowBorders ? (parentSelectBy === "area" ? 0.5 : 2) : 0,
+          opacity: parentShowBorders ? 1 : 0,
           color: provider.borderColor,
           dashArray: "",
-          fillOpacity: count > 0 ? opacity[0] : 0.12,
-          stroke: showBorders,
+          fillOpacity: metric > domain.min ? effectiveOpacity : 0.12,
+          stroke: parentShowBorders,
         };
       },
       onEachFeature: (feature, layer) => {
+        const name = getRegionNameFromFeature(feature, regionProperty);
+        const info = name ? regionMap.get(name) : undefined;
+
         layer.on({
-          mouseover: () => {
-            const regionName = getRegionNameFromFeature(
-              feature,
-              regionProperty
-            );
-            const regionInfo = regionName
-              ? regionData.get(regionName)
-              : undefined;
-            if (hoverNameRef.current !== regionName) {
-              hoverNameRef.current = regionName || null;
-              setHoveredRegion({
-                name: regionName,
-                info: regionInfo || { count: 0, stations: [] },
-              });
-            }
+          mouseover: (e) => {
+            setHoveredRegion({
+              name,
+              info: info || { count: 0, stations: [], metric: 0 },
+            });
+            setShowTooltip(true);
           },
           mouseout: () => {
-            hoverNameRef.current = null;
+            setShowTooltip(false);
             setHoveredRegion(null);
           },
           click: () => {
-            const regionName = getRegionNameFromFeature(
-              feature,
-              regionProperty
-            );
-            const regionInfo = regionName
-              ? regionData.get(regionName)
-              : undefined;
-            if (onRegionClick && regionInfo) {
-              onRegionClick(feature, regionInfo.stations);
-            }
+            if (onRegionClick && info) onRegionClick(feature, info.stations);
           },
         });
       },
     }).addTo(mapInstance.current);
 
-    // Fit to bounds of the newly added admin layer
-    try {
-      const b = geoJsonLayer.current.getBounds();
-      if (b && b.isValid && b.isValid()) {
-        mapInstance.current.fitBounds(b, { padding: [20, 20] });
-      }
-    } catch (e) {
-      // ignore
-    }
+    // Fit bounds & wait for next frame to ensure UI settle
+    const settle = async () => {
+      try {
+        const b = geoJsonLayer.current?.getBounds?.();
+        if (b?.isValid && b.isValid()) {
+          mapInstance.current.fitBounds(b, { padding: [20, 20] });
+        }
+      } catch {}
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      setIsRenderingLayer(false);
+      setIsParentLoading(false);
+    };
+    settle();
+
+    return () => {
+      try {
+        if (geoJsonLayer.current) {
+          mapInstance.current.removeLayer(geoJsonLayer.current);
+          geoJsonLayer.current = null;
+        }
+      } catch {}
+    };
   }, [
     leaflet,
     geoData,
     regionProperty,
-    showBorders,
+    parentShowBorders,
     mapProvider,
-    opacity,
-    regionData,
+    effectiveOpacity,
+    regionMap,
     getColor,
     onRegionClick,
+    parentSelectBy,
+    domain,
+    parentAggregation,
+    parentAggregationField,
+    detectedDataMode,
   ]);
 
   /* =========================
-     Stats
+     Stats - Updated for both modes
   ========================= */
   const stats = useMemo(() => {
-    const counts = Array.from(regionData.values()).map((r: any) => r.count);
-    if (counts.length === 0)
-      return { total: 0, max: 0, min: 0, avg: 0, totalRegions: 0 };
+    if (detectedDataMode === "aggregated") {
+      const totalPoints = stations.reduce(
+        (sum, station) => sum + (station.point_count || 1),
+        0
+      );
+      const avgUtilization =
+        stations.length > 0
+          ? stations.reduce(
+              (sum, station) => sum + (station.avg_utilization || 0),
+              0
+            ) / stations.length
+          : 0;
 
-    const activeCounts = counts.filter((c: number) => c > 0);
-    return {
-      total: stations.length,
-      max: Math.max(...counts, 0),
-      min: activeCounts.length > 0 ? Math.min(...activeCounts) : 0,
-      avg:
-        activeCounts.length > 0
-          ? activeCounts.reduce((sum: number, c: number) => sum + c, 0) /
-            activeCounts.length
-          : 0,
-      totalRegions: activeCounts.length,
-    };
-  }, [regionData, stations]);
+      return {
+        total: totalPoints,
+        max: domain.max,
+        min: domain.min,
+        avg: avgUtilization,
+        totalRegions: stations.length,
+        dataMode: "aggregated" as const,
+      };
+    } else {
+      const metrics = Array.from(regionMap.values()).map((r) => r.metric);
+      const counts = Array.from(regionMap.values()).map((r) => r.count);
+      const activeMetrics = metrics.filter((m) => m > domain.min);
+
+      return {
+        total: stations.length,
+        max: domain.max,
+        min: domain.min,
+        avg:
+          activeMetrics.length > 0
+            ? activeMetrics.reduce((sum, m) => sum + m, 0) /
+              activeMetrics.length
+            : 0,
+        totalRegions: counts.filter((c) => c > 0).length,
+        dataMode: "individual" as const,
+      };
+    }
+  }, [regionMap, stations, domain, detectedDataMode]);
 
   const selectByLabel: Record<SelectByKey, string> = {
     area: "Area",
@@ -1104,317 +997,331 @@ const GeoChoroplethMap: React.FC<ChoroplethProps> = ({
     province: "Province",
   };
 
-  /* =========================
-     Render
-  ========================= */
+  // Determine which loading phase we're in
+  const getLoadingPhase = ():
+    | "leaflet"
+    | "geojson"
+    | "rendering"
+    | "parent"
+    | "transitioning" => {
+    if (isLeafletLoading) return "leaflet";
+    if (isFetchingGeoJSON) return "geojson";
+    if (isRenderingLayer) return "rendering";
+    if (isParentLoading) return "parent";
+    if (isTransitioning) return "transitioning";
+    return "leaflet";
+  };
+
+  // One source of truth for loading overlay
+  const showLoadingOverlay =
+    isLeafletLoading ||
+    isFetchingGeoJSON ||
+    isRenderingLayer ||
+    isParentLoading ||
+    isTransitioning;
+
   return (
     <div
-      className={`relative w-full h-screen bg-background overflow-hidden ${className}`}
+      className={`relative w-full h-[100%] bg-background overflow-hidden ${className}`}
     >
       {/* Header */}
-      <div className="absolute top-4 left-4 z-[999]">
-        <Card className="bg-card/95 backdrop-blur-sm border border-border/50 p-3">
+      <div className="absolute top-3 left-12 z-[999]">
+        <Card className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 px-3 py-2 rounded-md text-xs font-medium">
           <div className="flex items-center space-x-2">
             <Layers className="h-5 w-5 text-primary" />
             <span className="text-foreground font-medium">
-              Station Density Map
+              GPS Choropleth Map
             </span>
+            <span className="text-cyan-400 font-mono text-[10px] bg-slate-700 px-2 py-0.5 rounded">
+              {detectedDataMode === "aggregated"
+                ? "Aggregated View"
+                : makeLegendLabel(parentAggregation, parentAggregationField)}
+            </span>
+            {detectedDataMode === "aggregated" && (
+              <span className="text-amber-400 font-mono text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                <BarChart3 className="h-3 w-3 inline mr-1" />
+                AGG
+              </span>
+            )}
+            {detectedDataMode === "individual" && (
+              <span className="text-green-400 font-mono text-[10px] bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
+                <Users className="h-3 w-3 inline mr-1" />
+                IND
+              </span>
+            )}
           </div>
+
           <div className="text-xs text-muted-foreground mt-1">
-            {stats.totalRegions} {selectByLabel[selectBy]} polygons •{" "}
-            {stations.length} stations
+            {stats.totalRegions} {parentSelectBy} regions • {stats.total} total
+            points
+            {detectedDataMode === "aggregated" && (
+              <span className="text-cyan-400"> (server-aggregated)</span>
+            )}
           </div>
         </Card>
       </div>
 
       {/* Settings Toggle */}
-      <div className="absolute top-4 right-4 z-[999]">
-        <Button
-          variant="outline"
-          size="sm"
+      <div className="absolute top-2 right-2 z-[999]">
+        <button
           onClick={() => setUiCollapsed(!uiCollapsed)}
-          className="bg-card/95 backdrop-blur-sm border border-border/50"
+          className="bg-slate-800/90 hover:bg-slate-800/95 backdrop-blur-sm border border-slate-700 text-slate-300 hover:text-white rounded-lg p-2 transition-all duration-200"
         >
           {uiCollapsed ? (
             <Menu className="h-4 w-4" />
           ) : (
             <X className="h-4 w-4" />
           )}
-        </Button>
+        </button>
       </div>
 
       {/* Settings Panel */}
       {!uiCollapsed && (
-        <div className="absolute top-16 right-4 z-[998] max-w-xs">
-          <Card className="bg-card/95 backdrop-blur-sm border border-border/50 p-4">
-            <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+        <div className="absolute top-12 right-2 z-[998] w-64">
+          <div className="bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-700 p-4">
+            <div className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
               <Settings className="h-4 w-4" />
               Map Settings
             </div>
-            <div className="space-y-4 text-xs">
-              {/* Select By */}
-              <div className="space-y-2">
-                <label className="text-foreground block text-xs font-medium">
-                  Select By
-                </label>
-                <Select
-                  value={selectBy}
-                  onValueChange={(v) => setSelectBy(v as SelectByKey)}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="area">Area</SelectItem>
-                    <SelectItem value="district">District</SelectItem>
-                    <SelectItem value="province">Province</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
-              {/* Map Style */}
-              <div className="space-y-2">
-                <label className="text-foreground block text-xs font-medium">
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
                   Map Style
                 </label>
-                <Select value={mapProvider} onValueChange={setMapProvider}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cartodb_light">Carto Light</SelectItem>
-                    <SelectItem value="cartodb_dark">Carto Dark</SelectItem>
-                    <SelectItem value="openstreetmap">OpenStreetMap</SelectItem>
-                    <SelectItem value="satellite">Satellite</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  value={mapProvider}
+                  onChange={(e) => setMapProvider(e.target.value as any)}
+                  className="w-full text-xs bg-slate-800 border border-slate-600 text-white rounded px-2 py-1 focus:border-cyan-400 focus:outline-none"
+                >
+                  <option value="openstreetmap">OpenStreetMap</option>
+                  <option value="cartodb_light">Light</option>
+                  <option value="cartodb_dark">Dark</option>
+                  <option value="satellite">Satellite</option>
+                </select>
               </div>
 
-              {/* Region Property (advanced override) */}
-              {/* <div className="space-y-2">
-                <label className="text-foreground block text-xs font-medium">
-                  Region Property
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Color Palette
                 </label>
-                <Select
-                  value={regionProperty}
-                  onValueChange={setRegionProperty}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(regionPropertyOptions.length
-                      ? regionPropertyOptions
-                      : ["ADM3_EN", "ADM2_EN", "ADM1_EN", "NAME_EN", "NAME"]
-                    ).map((k) => (
-                      <SelectItem key={k} value={k}>
-                        {k}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div> */}
-
-              {/* Palette */}
-              <div className="space-y-2">
-                <label className="text-foreground block text-xs font-medium">
-                  Palette
-                </label>
-                <Select
+                <select
                   value={paletteKey}
-                  onValueChange={(v) => setPaletteKey(v as PaletteKey)}
+                  onChange={(e) => setPaletteKey(e.target.value as any)}
+                  className="w-full text-xs bg-slate-800 border border-slate-600 text-white rounded px-2 py-1 focus:border-cyan-400 focus:outline-none"
                 >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(PALETTES).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Opacity */}
-              <div className="space-y-2">
-                <label className="text-foreground block text-xs font-medium">
-                  Fill Opacity
-                </label>
-                <Slider
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  value={opacity}
-                  onValueChange={setOpacity}
+                  {Object.entries(PALETTES).map(([key, p]) => (
+                    <option key={key} value={key}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <div
+                  className="h-2 w-full rounded mt-2"
+                  style={{
+                    background: cssGradientFromInterpolator(
+                      PALETTES[paletteKey].interpolator,
+                      [0, 0.25, 0.5, 0.75, 1]
+                    ),
+                  }}
                 />
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  {domain.min.toFixed(2)} → {domain.max.toFixed(2)}
+                </div>
               </div>
 
-              {/* Toggles */}
-              <div className="flex items-center justify-between">
-                <label className="text-foreground text-xs font-medium">
-                  Show Data Points
-                </label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPoints(!showPoints)}
-                  className="h-8 px-2"
-                >
-                  {showPoints ? (
-                    <Eye className="h-3 w-3" />
+              <div className="h-px bg-slate-700/50" />
+
+              <div className="text-xs text-slate-400 bg-slate-700/50 rounded p-2">
+                <div className="flex items-center gap-2 mb-1">
+                  {detectedDataMode === "aggregated" ? (
+                    <BarChart3 className="h-3 w-3 text-cyan-400" />
                   ) : (
-                    <EyeOff className="h-3 w-3" />
+                    <Users className="h-3 w-3 text-green-400" />
                   )}
-                </Button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="text-foreground text-xs font-medium">
-                  Show Borders
-                </label>
-                <Switch
-                  checked={showBorders}
-                  onCheckedChange={setShowBorders}
-                />
+                  <span className="font-medium">
+                    {detectedDataMode === "aggregated"
+                      ? "Aggregated Mode"
+                      : "Individual Mode"}
+                  </span>
+                </div>
+                {detectedDataMode === "aggregated" ? (
+                  <div>
+                    Data pre-aggregated by server. Each point represents
+                    multiple stations grouped by {parentSelectBy}.
+                  </div>
+                ) : (
+                  <div>
+                    Showing individual station points. Regions colored by{" "}
+                    {makeLegendLabel(parentAggregation, parentAggregationField)}
+                    .
+                  </div>
+                )}
               </div>
             </div>
-          </Card>
+          </div>
         </div>
       )}
 
       {/* Hover Tooltip */}
-      {hoveredRegion && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[1000] pointer-events-none">
-          <Card className="bg-card/95 backdrop-blur-sm border border-border/50 p-3 shadow-lg">
-            <div className="text-sm font-medium text-foreground mb-2">
-              {hoveredRegion.name}
-            </div>
-            {hoveredRegion.info && (
-              <div className="text-xs text-muted-foreground space-y-1">
-                <div>Station Count: {hoveredRegion.info.count}</div>
-                {hoveredRegion.info.count > 0 && (
-                  <div className="text-xs">
-                    {hoveredRegion.info.stations
-                      .slice(0, 3)
-                      .map((station: DataPoint) => (
-                        <div key={station.id} className="truncate">
-                          • {station.name}
-                        </div>
-                      ))}
-                    {hoveredRegion.info.stations.length > 3 && (
-                      <div>
-                        ... and {hoveredRegion.info.stations.length - 3} more
-                      </div>
-                    )}
-                  </div>
+      {showTooltip && hoveredRegion && (
+        <div
+          className="absolute z-[9999] pointer-events-none"
+          style={{
+            left: `${mousePosition.x + 15}px`,
+            top: `${mousePosition.y + 15}px`,
+          }}
+        >
+          <div className="inline-block w-fit max-w-[80vw] sm:max-w-[28rem] bg-slate-800/95 backdrop-blur-sm border border-slate-700 rounded-md p-3 shadow-xl">
+            <h3 className="text-sm font-medium text-white break-words">
+              {hoveredRegion.name || "Unknown Region"}
+            </h3>
+
+            {detectedDataMode === "aggregated" ? (
+              <div className="mt-1 space-y-1 text-xs text-slate-300">
+                <p>
+                  {hoveredRegion.info.stations[0]?.point_count ||
+                    hoveredRegion.info.count}{" "}
+                  total points
+                </p>
+              </div>
+            ) : (
+              <div className="mt-1 space-y-1 text-xs text-slate-300">
+                <p>
+                  {hoveredRegion.info.count} individual station
+                  {hoveredRegion.info.count !== 1 ? "s" : ""}
+                </p>
+                {parentAggregation !== "count" && (
+                  <p>
+                    {makeLegendLabel(parentAggregation, parentAggregationField)}
+                    : {hoveredRegion.info.metric.toFixed(2)}
+                  </p>
                 )}
               </div>
             )}
-          </Card>
+          </div>
         </div>
       )}
 
-      {/* Legend */}
-      <div className="absolute bottom-4 right-4 z-[999]">
-        <Card className="bg-card/95 backdrop-blur-sm border border-border/50 p-3">
-          <div className="text-sm font-medium text-foreground mb-2">
-            Station Density by {selectByLabel[selectBy]}
+      {/* Enhanced stat cards */}
+      <div className="absolute bottom-4 right-4 z-[999] flex gap-2">
+        <Card className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 px-3 py-2 rounded-md text-xs">
+          <div className="text-[10px] text-muted-foreground">
+            {detectedDataMode === "aggregated"
+              ? "Total GPS points"
+              : "Individual stations"}
           </div>
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-xs text-muted-foreground">0</span>
-            <div
-              className="w-24 h-3 rounded-full border border-border/30"
-              style={{ background: getLegendCSS() }}
-            />
-            <span className="text-xs text-muted-foreground">{maxCount}</span>
+          <div className="text-sm font-medium">{stats.total}</div>
+        </Card>
+        <Card className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 px-3 py-2 rounded-md text-xs">
+          <div className="text-[10px] text-muted-foreground">
+            Active {parentSelectBy}s
           </div>
-          <div className="text-xs text-muted-foreground">
-            Stations per {selectByLabel[selectBy]}
+          <div className="text-sm font-medium">{stats.totalRegions}</div>
+        </Card>
+        <Card className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 px-3 py-2 rounded-md text-xs">
+          <div className="text-[10px] text-muted-foreground">
+            Total {parentSelectBy}s
+          </div>
+          <div className="text-sm font-medium">
+            {geoData?.features?.length || 0}
           </div>
         </Card>
+        {/* <Card className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 text-slate-300 px-3 py-2 rounded-md text-xs">
+          <div className="text-[10px] text-muted-foreground">
+            {detectedDataMode === "aggregated"
+              ? "Avg utilization"
+              : `Max / Avg ${parentAggregation}`}
+          </div>
+          <div className="text-sm font-medium">
+            {detectedDataMode === "aggregated"
+              ? `${stats.avg.toFixed(1)}%`
+              : `${stats.max.toFixed(1)} / ${stats.avg.toFixed(1)}`}
+          </div>
+        </Card> */}
       </div>
 
-      {/* Stats */}
-      <div className="absolute bottom-4 left-4 z-[999]">
-        <Card className="bg-card/95 backdrop-blur-sm border border-border/50 p-3">
-          <div className="text-xs text-muted-foreground space-y-1">
-            <div>Total Stations: {stats.total}</div>
-            <div>
-              Max per {selectByLabel[selectBy]}: {stats.max}
-            </div>
-            <div>
-              Min per {selectByLabel[selectBy]}: {stats.min}
-            </div>
-            <div>
-              Avg per {selectByLabel[selectBy]}: {stats.avg.toFixed(1)}
-            </div>
-          </div>
-        </Card>
-      </div>
+      {/* Map container */}
+      <div ref={mapRef} className="absolute inset-0" />
 
-      {/* Map Container */}
-      <div className="absolute inset-0">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-[1001]">
-            <div className="flex flex-col items-center text-foreground">
-              <Loader2 className="h-8 w-8 animate-spin mb-2" />
-              <p className="text-sm">Loading choropleth map...</p>
-            </div>
-          </div>
-        )}
-        <div ref={mapRef} className="h-full w-full" />
-      </div>
+      {/* Enhanced Loading Overlay */}
+      {showLoadingOverlay && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-slate-900/85 backdrop-blur-md z-[1002]"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <EnhancedLoader phase={getLoadingPhase()} />
+        </div>
+      )}
 
       {/* No Data State */}
-      {!geoData && !isLoading && (
+      {!geoData && !showLoadingOverlay && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-[1002]">
           <div className="text-center text-muted-foreground p-6">
             <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <div className="text-lg font-medium mb-2">
-              Loading GeoJSON Data...
+              Loading GeoJSON Data…
             </div>
             <div className="text-sm">
               Please ensure the GeoJSON file is available for{" "}
-              {selectByLabel[selectBy]} level.
+              {selectByLabel[parentSelectBy]} level.
             </div>
           </div>
         </div>
       )}
 
-      {/* Custom popup styles */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-          .custom-popup .leaflet-popup-content-wrapper {
-            background-color: hsl(var(--card));
-            border: 1px solid hsl(var(--border));
-            border-radius: 12px;
-            color: hsl(var(--foreground));
-            backdrop-filter: blur(12px);
-          }
-          .custom-popup .leaflet-popup-content {
-            margin: 12px;
-            color: hsl(var(--foreground));
-          }
-          .custom-popup .leaflet-popup-tip {
-            background-color: hsl(var(--card));
-            border: 1px solid hsl(var(--border));
-          }
-          .custom-popup a.leaflet-popup-close-button {
-            color: hsl(var(--muted-foreground));
-            font-size: 18px;
-            padding: 4px 8px;
-            border-radius: 4px;
-          }
-          .custom-popup a.leaflet-popup-close-button:hover {
-            color: hsl(var(--foreground));
-            background-color: hsl(var(--accent));
-          }
-        `,
-        }}
-      />
+      {/* Transition overlay */}
+      {isTransitioning && (
+        <div className="absolute inset-0 pointer-events-none bg-slate-900/20 transition-opacity duration-300 z-[1001]" />
+      )}
+
+      {/* Custom CSS for enhanced styling */}
+      <style jsx>{`
+        .custom-popup {
+          background: rgba(30, 41, 59, 0.95) !important;
+          backdrop-filter: blur(8px) !important;
+          border: 1px solid rgb(71, 85, 105) !important;
+          border-radius: 8px !important;
+        }
+
+        .custom-popup .leaflet-popup-content-wrapper {
+          background: transparent !important;
+          color: white !important;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        .custom-popup .leaflet-popup-tip {
+          background: rgba(30, 41, 59, 0.95) !important;
+          border: 1px solid rgb(71, 85, 105) !important;
+        }
+
+        .leaflet-cluster-anim .leaflet-marker-icon,
+        .leaflet-cluster-anim .leaflet-marker-shadow {
+          transition: all 0.3s ease-out !important;
+        }
+
+        .marker-cluster-small {
+          background-color: rgba(6, 182, 212, 0.6) !important;
+          border: 2px solid rgba(6, 182, 212, 0.8) !important;
+        }
+
+        .marker-cluster-medium {
+          background-color: rgba(251, 146, 60, 0.6) !important;
+          border: 2px solid rgba(251, 146, 60, 0.8) !important;
+        }
+
+        .marker-cluster-large {
+          background-color: rgba(239, 68, 68, 0.6) !important;
+          border: 2px solid rgba(239, 68, 68, 0.8) !important;
+        }
+
+        .marker-cluster div {
+          background-color: rgba(255, 255, 255, 0.9) !important;
+          color: #333 !important;
+          font-weight: bold !important;
+        }
+      `}</style>
     </div>
   );
 };

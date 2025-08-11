@@ -54,8 +54,8 @@ function MapFallback({ height = "500px" }: { height?: string }) {
 
 // Create the actual map component that will be dynamically loaded
 function CartoMapComponent({
-  center = [6.696449, 79.985743],
-  zoom = 13,
+  center = [7.8731, 80.7718],
+  zoom = 7,
   markers = [],
   routes = [],
   clusters = [],

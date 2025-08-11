@@ -3,8 +3,8 @@
 import type React from "react";
 import DashboardOverview from "@/components/dashboard-overview";
 import { AlertCircle, Check, Info, RefreshCw } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
+import { TrendingUp } from "lucide-react";
 
 // Sample data - in a real app, this would come from your API
 export const SAMPLE_SCOOTERS = [
@@ -275,7 +275,31 @@ export const SAMPLE_API_DATA = {
 };
 
 export default function Home() {
-  return <DashboardOverview />;
+  return (
+    <div className="min-h-screen p-4 lg:p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header Section */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
+            <TrendingUp className="h-4 w-4 text-cyan-400 mr-2" />
+            <span className="text-cyan-400 text-sm font-medium">
+              Fleet Analytics
+            </span>
+          </div>
+          <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
+            Fleet Overview Dashboard
+          </h1>
+          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+            Monitor your scooter fleet with real-time telemetry and performance
+            metrics
+          </p>
+        </div>
+
+        {/* Main Content */}
+        <DashboardOverview />
+      </div>
+    </div>
+  );
 }
 
 // Component for nav items

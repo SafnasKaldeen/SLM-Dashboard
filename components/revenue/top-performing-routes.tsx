@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MapPin } from "lucide-react";
+import { MapPin, ArrowDownUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { da, is } from "date-fns/locale";
 
 interface StationData {
   LOCATIONNAME: string;
@@ -30,13 +32,84 @@ export function TopPerformingStations({
   data,
   loading,
 }: TopPerformingStationsProps) {
+  const [isDescending, setIsDescending] = useState(true);
+  const toggleOrder = () => setIsDescending((prev) => !prev);
+
   const topStations = data?.data || [];
 
-  const sortedStations = [...topStations].sort(
-    (a, b) => b.LATEST_NET_REVENUE - a.LATEST_NET_REVENUE
+  const sortedStations = useMemo(() => {
+    return [...topStations].sort((a, b) =>
+      isDescending
+        ? b.LATEST_NET_REVENUE - a.LATEST_NET_REVENUE
+        : a.LATEST_NET_REVENUE - b.LATEST_NET_REVENUE
+    );
+  }, [topStations, isDescending]);
+
+  const maxRevenue = data?.data.reduce(
+    (max, station) => Math.max(max, station.LATEST_NET_REVENUE || 0),
+    0
   );
 
-  const maxRevenue = sortedStations[0]?.LATEST_NET_REVENUE || 0;
+  const getBadge = (index: number) => {
+    if (isDescending) {
+      if (index === 0)
+        return (
+          <Badge
+            className="text-[12px] bg-yellow-400 text-black cursor-help"
+            title="Top 1 Station"
+          >
+            🥇 Gold
+          </Badge>
+        );
+      if (index === 1)
+        return (
+          <Badge
+            className="text-[12px] bg-gray-300 text-black cursor-help"
+            title="Top 2 Station"
+          >
+            🥈 Silver
+          </Badge>
+        );
+      if (index === 2)
+        return (
+          <Badge
+            className="text-[12px] bg-orange-300 text-black cursor-help"
+            title="Top 3 Station"
+          >
+            🥉 Bronze
+          </Badge>
+        );
+    } else {
+      if (index === 0)
+        return (
+          <Badge
+            className="text-[12px] bg-red-500 text-white cursor-help"
+            title="Lowest performer"
+          >
+            🛑 Lowest
+          </Badge>
+        );
+      if (index === 1)
+        return (
+          <Badge
+            className="text-[12px] bg-yellow-200 text-black cursor-help"
+            title="Low performer"
+          >
+            ⚠️ Low
+          </Badge>
+        );
+      if (index === 2)
+        return (
+          <Badge
+            className="text-[12px] bg-orange-200 text-black cursor-help"
+            title="Moderate performer"
+          >
+            🟠 Moderate
+          </Badge>
+        );
+    }
+    return null;
+  };
 
   if (loading) {
     return (
@@ -81,40 +154,32 @@ export function TopPerformingStations({
     );
   }
 
-  const getBadge = (index: number) => {
-    if (index === 0)
-      return (
-        <Badge
-          className="text-[12px] bg-yellow-400 text-black cursor-help"
-          title="Top 1 Station"
-        >
-          🥇 Gold
-        </Badge>
-      );
-    if (index === 1)
-      return (
-        <Badge
-          className="text-[12px] bg-gray-300 text-black cursor-help"
-          title="Top 2 Station"
-        >
-          🥈 Silver
-        </Badge>
-      );
-    if (index === 2)
-      return (
-        <Badge
-          className="text-[12px] bg-orange-300 text-black cursor-help"
-          title="Top 3 Station"
-        >
-          🥉 Bronze
-        </Badge>
-      );
-    return null;
-  };
-
   return (
     <div className="space-y-4">
-      {sortedStations.map((station, index) => {
+      <div className="flex justify-between items-center mt-4">
+        <div className="text-xl font-semibold">
+          {isDescending
+            ? "Top Performing BSS Stations"
+            : "Lowest Performing BSS Stations"}
+          <div className="text-sm text-muted-foreground font-normal">
+            {isDescending
+              ? "Stations generating the highest revenue"
+              : "Stations generating the lowest revenue"}
+          </div>
+        </div>
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={toggleOrder}
+          className="text-xs gap-1"
+        >
+          <ArrowDownUp className="w-4 h-4" />
+          {isDescending ? "Descending" : "Ascending"}
+        </Button>
+      </div>
+
+      {sortedStations.slice(0, 5).map((station, index) => {
         const utilizationRate = parseFloat(station.STATION_UTILIZATION);
         const displayUtilization = !isNaN(utilizationRate)
           ? `${utilizationRate.toFixed(1)}% utilization`

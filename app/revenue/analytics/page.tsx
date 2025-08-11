@@ -275,7 +275,7 @@ export default function RevenueAnalyticsPage() {
       </Tabs>
 
       {/* Quick Insights Section */}
-      <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+      <Card className="bg-gray-50 dark:rounded-lg border bg-background p-2 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <PieChart className="w-5 h-5" />

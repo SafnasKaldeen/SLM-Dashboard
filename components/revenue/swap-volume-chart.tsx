@@ -24,7 +24,6 @@ import { AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { useSwaps } from "@/hooks/Snowflake/useSwaps";
-
 function groupByCategory(areawiseData) {
   const categoriesMap = new Map();
 
@@ -39,23 +38,25 @@ function groupByCategory(areawiseData) {
     categoriesMap.get(LOCATION).areas.push({
       area: STATIONNAME,
       swaps: TOTAL_SWAPS,
-      percentage: 0,
       key: STATIONNAME,
     });
   });
 
-  // Calculate percentage per category
+  // Calculate percentage and sort areas by percentage
   for (const category of categoriesMap.values()) {
     const totalSwapsCategory = category.areas.reduce(
       (sum, a) => sum + a.swaps,
       0
     );
-    category.areas = category.areas.map((area) => ({
-      ...area,
-      percentage: totalSwapsCategory
-        ? ((area.swaps / totalSwapsCategory) * 100).toFixed(1)
-        : 0,
-    }));
+
+    category.areas = category.areas
+      .map((area) => ({
+        ...area,
+        percentage: totalSwapsCategory
+          ? ((area.swaps / totalSwapsCategory) * 100).toFixed(1)
+          : 0,
+      }))
+      .sort((a, b) => b.percentage - a.percentage); // sort descending
   }
 
   // Create "All Stations" category combining all areas
@@ -69,16 +70,17 @@ function groupByCategory(areawiseData) {
 
   const allStationsCategory = {
     category: "All Stations",
-    areas: allAreas.map((area) => ({
-      ...area,
-      percentage: totalSwapsAll
-        ? ((area.swaps / totalSwapsAll) * 100).toFixed(1)
-        : 0,
-    })),
+    areas: allAreas
+      .map((area) => ({
+        ...area,
+        percentage: totalSwapsAll
+          ? ((area.swaps / totalSwapsAll) * 100).toFixed(1)
+          : 0,
+      }))
+      .sort((a, b) => b.percentage - a.percentage),
     color: "#8884d8", // fixed color for all stations
   };
 
-  // Return with "All Stations" first
   return [allStationsCategory, ...Array.from(categoriesMap.values())];
 }
 
@@ -171,7 +173,7 @@ export default function AreaSwapsChart({ filters }) {
                   >
                     {category.areas.map((entry, index) => (
                       <Cell
-                        key={entry.key} // unique key
+                        key={`${category.category}-${entry.area}`}
                         fill={`hsl(${(index * 40) % 360}, 70%, 60%)`}
                       />
                     ))}

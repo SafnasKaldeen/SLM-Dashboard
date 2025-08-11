@@ -1,48 +1,102 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import axios from "axios";
 import {
   PieChart,
   Pie,
   Cell,
-  ResponsiveContainer,
   Tooltip,
   Legend,
+  ResponsiveContainer,
 } from "recharts";
+import { format } from "date-fns";
+import type { GPSFilters } from "@/types/gps";
 
-interface DistanceByBatteryTypeProps {
-  filters?: any;
-  data?: {
-    BATTERY_TYPE: string;
-    MAKE?: string;
-    TOTAL_DISTANCE: number;
-  }[];
-  loading?: boolean;
+interface BatteryData {
+  BATTERY_NAME: string;
+  TOTAL_DISTANCE: number;
+  VEHICLE_COUNT: number;
 }
 
-export function DistanceByBatteryType({
+const batteryTypeColors: Record<string, string> = {
+  GREEN: "#10b981",
+  BLUE: "#0ea5e9",
+  ORANGE: "#f59e0b",
+};
+
+const allowedBatteryTypes = ["GREEN", "BLUE", "ORANGE"];
+
+function buildBatteryDistanceQuery(
+  startDate: string,
+  endDate: string,
+  batteryTypes: string[] = []
+) {
+  const typesToFilter =
+    batteryTypes.length > 0 ? batteryTypes : allowedBatteryTypes;
+
+  const batteryFilter = `AND BATTERY_NAME IN (${typesToFilter
+    .map((t) => `'${t}'`)
+    .join(", ")})`;
+
+  return `
+    SELECT 
+      BATTERY_NAME,
+      COUNT(DISTINCT TBOXID) AS VEHICLE_COUNT,
+      SUM(DISTANCE_KM) AS TOTAL_DISTANCE
+    FROM REPORT_DB.GPS_DASHBOARD.VEHICLE_DAILY_DISTANCE
+    WHERE GPS_DATE BETWEEN '${startDate}' AND '${endDate}'
+      AND TBOXID IS NOT NULL
+      AND DISTANCE_KM > 0
+      ${batteryFilter}
+    GROUP BY BATTERY_NAME
+    ORDER BY TOTAL_DISTANCE DESC
+    LIMIT 50;
+  `;
+}
+
+export default function DistanceByBatteryType({
   filters,
-  data = [],
-  loading = false,
-}: DistanceByBatteryTypeProps) {
-  const colors = [
-    "#0ea5e9",
-    "#10b981",
-    "#f59e0b",
-    "#ef4444",
-    "#8b5cf6",
-    "#06b6d4",
-    "#84cc16",
-    "#f97316",
-    "#ec4899",
-    "#6366f1",
-  ];
+}: {
+  filters: GPSFilters;
+}) {
+  const [data, setData] = useState<BatteryData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!filters?.dateRange?.from || !filters?.dateRange?.to) {
+      return;
+    }
+
+    const startDate = format(filters.dateRange.from, "yyyy-MM-dd");
+    const endDate = format(filters.dateRange.to, "yyyy-MM-dd");
+    const query = buildBatteryDistanceQuery(
+      startDate,
+      endDate,
+      filters.selectedBatteryTypes || []
+    );
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.post("/api/snowflake/query", { query });
+        setData(response.data);
+      } catch (error) {
+        console.error("Error fetching battery data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [filters]);
 
   if (loading) {
     return (
       <div className="w-full h-[300px] rounded-lg bg-background p-6">
         <div className="h-6 w-1/3 rounded-md bg-gray-300 mb-4 animate-pulse" />
         <div className="flex justify-center items-center h-[240px] gap-2 flex-wrap">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
               className="rounded-full animate-pulse"
@@ -61,57 +115,36 @@ export function DistanceByBatteryType({
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-        <p>No data available for selected filters.</p>
+        <p>No data available for selected period.</p>
       </div>
     );
   }
 
-  // Group by BATTERY_TYPE and sum TOTAL_DISTANCE
-  const grouped = new Map<
-    string,
-    { distance: number; color: string; count: number }
-  >();
-
-  data.forEach((d, i) => {
-    const key = d.BATTERY_TYPE || "Unknown";
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        distance: d.TOTAL_DISTANCE ?? 0,
-        color: colors[grouped.size % colors.length],
-        count: 1,
-      });
-    } else {
-      const entry = grouped.get(key)!;
-      entry.distance += d.TOTAL_DISTANCE ?? 0;
-      entry.count += 1;
-    }
-  });
-
-  const totalDistance = Array.from(grouped.values()).reduce(
-    (sum, g) => sum + g.distance,
+  const totalDistance = data.reduce(
+    (sum, item) => sum + item.TOTAL_DISTANCE,
     0
   );
 
-  const chartData = Array.from(grouped.entries()).map(
-    ([name, { distance, color, count }]) => ({
-      name,
-      value:
-        totalDistance > 0 ? Math.round((distance / totalDistance) * 100) : 0,
-      distance,
-      vehicles: count,
-      color,
-    })
-  );
+  const chartData = data.map((item) => ({
+    name: item.BATTERY_NAME,
+    value:
+      totalDistance > 0
+        ? Math.round((item.TOTAL_DISTANCE / totalDistance) * 100)
+        : 0,
+    distance: item.TOTAL_DISTANCE,
+    vehicleCount: item.VEHICLE_COUNT,
+    color: batteryTypeColors[item.BATTERY_NAME] ?? "#888888",
+  }));
 
   return (
-    <ResponsiveContainer width="100%" height={600}>
+    <ResponsiveContainer width="100%" height={550}>
       <PieChart>
         <Pie
           data={chartData}
           cx="50%"
           cy="50%"
           innerRadius={60}
-          outerRadius={200}
+          outerRadius={180}
           paddingAngle={3}
           dataKey="value"
         >
@@ -140,7 +173,7 @@ export function DistanceByBatteryType({
                       Distance: {d.distance.toLocaleString()} km
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Vehicles: {d.vehicles}
+                      Vehicles: {d.vehicleCount.toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -151,7 +184,7 @@ export function DistanceByBatteryType({
         />
         <Legend
           content={({ payload }) => (
-            <div className="flex flex-wrap justify-center gap-4 mt-4">
+            <div className="flex flex-wrap justify-center gap-y-4 gap-x-2 pb-10">
               {payload?.map((entry, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <div

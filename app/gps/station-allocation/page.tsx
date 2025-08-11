@@ -13,7 +13,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { MapPin, Layers, Radar, Ruler, Maximize } from "lucide-react";
+import {
+  MapPin,
+  Layers,
+  Radar,
+  Ruler,
+  Maximize,
+  Activity,
+  Database,
+} from "lucide-react";
 import CartoMap from "@/components/maps/carto-map";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +34,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import DashboardLayout from "@/components/dashboard-layout";
+interface SnowflakeDataPoint {
+  MEAN_LAT: number;
+  MEAN_LONG: number;
+  density: number;
+  density_log: number;
+  TBOXID: string;
+  MEAN_TIMESTAMP: string;
+}
+
+interface TopLocation {
+  MEAN_LAT: number;
+  MEAN_LONG: number;
+  density: number;
+  label: string;
+}
+
+interface MapMeta {
+  center_LAT: number;
+  center_LONG: number;
+  zoom: number;
+}
+
+interface SnowflakeResponse {
+  heatmap_data: SnowflakeDataPoint[];
+  top_locations: TopLocation[];
+  map_meta: MapMeta;
+}
 
 interface StationAllocationData {
   clusters: Array<{
@@ -39,22 +73,29 @@ interface StationAllocationData {
       lng: number;
       capacity: number;
       available: number;
+      tboxId?: string;
+      timestamp?: string;
     }>;
   }>;
+  topLocations: TopLocation[];
   totalStations: number;
   totalCapacity: number;
   totalAvailable: number;
+  mapCenter: { lat: number; lng: number };
+  zoom: number;
 }
 
 export default function StationAllocationPage() {
   const [activeTab, setActiveTab] = useState("density");
-  const [eps, setEps] = useState(0.5);
-  const [minSamples, setMinSamples] = useState(5);
+  const [eps, setEps] = useState(0.001);
+  const [minSamples, setMinSamples] = useState(50);
   const [maxRadius, setMaxRadius] = useState(2.0);
   const [outlierThreshold, setOutlierThreshold] = useState(5.0);
-  const [topN, setTopN] = useState(10);
-  const [zoomLevel, setZoomLevel] = useState(14);
-  const [stageName, setStageName] = useState("production");
+  const [topN, setTopN] = useState(5);
+  const [zoomLevel, setZoomLevel] = useState(13);
+  const [province, setProvince] = useState("North Central");
+  const [district, setDistrict] = useState("");
+  const [area, setArea] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [stationData, setStationData] = useState<StationAllocationData | null>(
     null
@@ -67,241 +108,156 @@ export default function StationAllocationPage() {
     setError(null);
 
     try {
-      // In a real app, this would be an actual API call
-      // const response = await fetch('/api/DensityBased-station-allocation', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ eps, minSamples, topN, zoomLevel, stageName }),
-      // });
-      // const data = await response.json();
+      // Build the Snowflake stored procedure call
+      const query = `
+        CALL REPORT_DB.GPS_DASHBOARD.CLUSTER_CHARGING_STATIONS(
+          eps => ${eps},
+          min_samples => ${minSamples},
+          top_n => ${topN},
+          zoom_level => ${zoomLevel},
+          stage_name => '@CLUSTERING_ALGOS',
+          start_time => '2024-08-01 00:00:00',
+          end_time => '2025-07-31 23:59:59',
+          area => ${area ? `'${area}'` : "NULL"},
+          province => ${province ? `'${province}'` : "NULL"},
+          district => ${district ? `'${district}'` : "NULL"}
+        );
+      `;
 
-      // For demo purposes, we'll simulate a response
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Call your Snowflake API
+      const response = await fetch("/api/snowflake/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
 
-      // Sample response data
-      const data = {
-        status: "success",
-        data: {
-          clusters: [
-            {
-              id: 1,
-              centroid: { lat: 6.698123, lng: 79.986789 },
-              stations: [
-                {
-                  id: "ST001",
-                  name: "Central Hub",
-                  lat: 6.698123,
-                  lng: 79.986789,
-                  capacity: 15,
-                  available: 8,
-                },
-                {
-                  id: "ST002",
-                  name: "City Center",
-                  lat: 6.697456,
-                  lng: 79.985678,
-                  capacity: 10,
-                  available: 3,
-                },
-                {
-                  id: "ST003",
-                  name: "Main Street",
-                  lat: 6.699234,
-                  lng: 79.987123,
-                  capacity: 8,
-                  available: 5,
-                },
-              ],
-            },
-            {
-              id: 2,
-              centroid: { lat: 6.702345, lng: 79.992345 },
-              stations: [
-                {
-                  id: "ST004",
-                  name: "North Plaza",
-                  lat: 6.702345,
-                  lng: 79.992345,
-                  capacity: 12,
-                  available: 6,
-                },
-                {
-                  id: "ST005",
-                  name: "Tech Park",
-                  lat: 6.703456,
-                  lng: 79.993456,
-                  capacity: 20,
-                  available: 12,
-                },
-              ],
-            },
-            {
-              id: 3,
-              centroid: { lat: 6.694567, lng: 79.982345 },
-              stations: [
-                {
-                  id: "ST006",
-                  name: "South Market",
-                  lat: 6.694567,
-                  lng: 79.982345,
-                  capacity: 10,
-                  available: 2,
-                },
-                {
-                  id: "ST007",
-                  name: "Beach Road",
-                  lat: 6.693456,
-                  lng: 79.981234,
-                  capacity: 8,
-                  available: 4,
-                },
-              ],
-            },
-          ],
-          totalStations: 7,
-          totalCapacity: 83,
-          totalAvailable: 40,
-        },
-      };
-
-      if (data.status === "success") {
-        setStationData(data.data);
-      } else {
-        setError(data.detail || "Failed to allocate stations");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    } catch (err) {
-      setError("An error occurred while allocating stations");
+
+      const snowflakeResults = await response.json();
+
+      // Parse the results - assuming first row contains the JSON result
+      const snowflakeData: SnowflakeResponse =
+        typeof snowflakeResults[0] === "string"
+          ? JSON.parse(snowflakeResults[0])
+          : snowflakeResults[0];
+
+      // Transform Snowflake data to our component format
+      const transformedData = transformSnowflakeData(snowflakeData);
+      setStationData(transformedData);
+    } catch (err: any) {
+      setError(`Failed to process clustering data: ${err.message}`);
       console.error(err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const transformSnowflakeData = (
+    data: SnowflakeResponse
+  ): StationAllocationData => {
+    // Group heatmap data by location (using rounded coordinates for clustering)
+    const clusterMap = new Map<string, any>();
+
+    data.heatmap_data.forEach((point, index) => {
+      // Round to 3 decimal places for clustering similar locations
+      const lat = parseFloat(point.MEAN_LAT.toFixed(3));
+      const lng = parseFloat(point.MEAN_LONG.toFixed(3));
+      const key = `${lat},${lng}`;
+
+      if (!clusterMap.has(key)) {
+        clusterMap.set(key, {
+          id: clusterMap.size + 1,
+          centroid: { lat, lng },
+          stations: [],
+        });
+      }
+
+      const cluster = clusterMap.get(key);
+      cluster.stations.push({
+        id: `${point.TBOXID}_${index}`,
+        name: `Station ${point.TBOXID}`,
+        lat: point.MEAN_LAT,
+        lng: point.MEAN_LONG,
+        capacity: Math.round(point.density / 10), // Scale density to reasonable capacity
+        available: Math.round(point.density / 20), // Assume 50% availability
+        tboxId: point.TBOXID,
+        timestamp: point.MEAN_TIMESTAMP,
+      });
+    });
+
+    const clusters = Array.from(clusterMap.values());
+
+    const totalStations = clusters.reduce(
+      (sum, cluster) => sum + cluster.stations.length,
+      0
+    );
+    const totalCapacity = clusters.reduce(
+      (sum, cluster) =>
+        sum + cluster.stations.reduce((s, st) => s + st.capacity, 0),
+      0
+    );
+    const totalAvailable = clusters.reduce(
+      (sum, cluster) =>
+        sum + cluster.stations.reduce((s, st) => s + st.available, 0),
+      0
+    );
+
+    return {
+      clusters,
+      topLocations: data.top_locations,
+      totalStations,
+      totalCapacity,
+      totalAvailable,
+      mapCenter: {
+        lat: data.map_meta.center_LAT,
+        lng: data.map_meta.center_LONG,
+      },
+      zoom: data.map_meta.zoom,
+    };
   };
 
   const handleGeoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // In a real app, this would be an actual API call
-      // const response = await fetch('/api/GeoBased-station-allocation', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ maxRadius, outlierThreshold, topN, zoomLevel, stageName }),
-      // });
-      // const data = await response.json();
-
-      // For demo purposes, we'll simulate a response with the same data structure
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Using the same sample data for demo purposes
-      const data = {
-        status: "success",
-        data: {
-          clusters: [
-            {
-              id: 1,
-              centroid: { lat: 6.698123, lng: 79.986789 },
-              stations: [
-                {
-                  id: "ST001",
-                  name: "Central Hub",
-                  lat: 6.698123,
-                  lng: 79.986789,
-                  capacity: 15,
-                  available: 8,
-                },
-                {
-                  id: "ST002",
-                  name: "City Center",
-                  lat: 6.697456,
-                  lng: 79.985678,
-                  capacity: 10,
-                  available: 3,
-                },
-                {
-                  id: "ST003",
-                  name: "Main Street",
-                  lat: 6.699234,
-                  lng: 79.987123,
-                  capacity: 8,
-                  available: 5,
-                },
-              ],
-            },
-            {
-              id: 2,
-              centroid: { lat: 6.702345, lng: 79.992345 },
-              stations: [
-                {
-                  id: "ST004",
-                  name: "North Plaza",
-                  lat: 6.702345,
-                  lng: 79.992345,
-                  capacity: 12,
-                  available: 6,
-                },
-                {
-                  id: "ST005",
-                  name: "Tech Park",
-                  lat: 6.703456,
-                  lng: 79.993456,
-                  capacity: 20,
-                  available: 12,
-                },
-              ],
-            },
-            {
-              id: 3,
-              centroid: { lat: 6.694567, lng: 79.982345 },
-              stations: [
-                {
-                  id: "ST006",
-                  name: "South Market",
-                  lat: 6.694567,
-                  lng: 79.982345,
-                  capacity: 10,
-                  available: 2,
-                },
-                {
-                  id: "ST007",
-                  name: "Beach Road",
-                  lat: 6.693456,
-                  lng: 79.981234,
-                  capacity: 8,
-                  available: 4,
-                },
-              ],
-            },
-          ],
-          totalStations: 7,
-          totalCapacity: 83,
-          totalAvailable: 40,
-        },
-      };
-
-      if (data.status === "success") {
-        setStationData(data.data);
-      } else {
-        setError(data.detail || "Failed to allocate stations");
-      }
-    } catch (err) {
-      setError("An error occurred while allocating stations");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    // For now, use the same clustering approach but with different parameters
+    // You can modify this to call a different stored procedure if needed
+    await handleDensitySubmit(e);
   };
 
   // Prepare map data from station data
   const mapMarkers = stationData
-    ? stationData.clusters.flatMap((cluster) =>
-        cluster.stations.map((station) => ({
-          position: [station.lat, station.lng] as [number, number],
-          popup: `<strong>${station.name}</strong><br>Capacity: ${station.capacity}<br>Available: ${station.available}`,
-          color: getAvailabilityColor(station.available, station.capacity),
-        }))
-      )
+    ? [
+        // Regular stations
+        ...stationData.clusters.flatMap((cluster) =>
+          cluster.stations.map((station) => ({
+            position: [station.lat, station.lng] as [number, number],
+            popup: `<div class="p-2">
+              <strong>${station.name}</strong><br>
+              <span class="text-sm text-gray-600">ID: ${
+                station.tboxId
+              }</span><br>
+              Capacity: ${station.capacity}<br>
+              Available: ${station.available}<br>
+              <span class="text-xs text-gray-500">${new Date(
+                station.timestamp || ""
+              ).toLocaleString()}</span>
+            </div>`,
+            color: getAvailabilityColor(station.available, station.capacity),
+          }))
+        ),
+        // Top locations with special markers
+        ...stationData.topLocations.map((location) => ({
+          position: [location.MEAN_LAT, location.MEAN_LONG] as [number, number],
+          popup: `<div class="p-2">
+            <strong>${location.label}</strong><br>
+            High Density Location<br>
+            Density: ${location.density}
+          </div>`,
+          color: "#dc2626", // Red for top locations
+          size: "large",
+        })),
+      ]
     : [];
 
   const mapClusters = stationData
@@ -310,7 +266,7 @@ export default function StationAllocationPage() {
           number,
           number
         ],
-        radius: 500, // Radius in meters
+        radius: Math.min(500 + cluster.stations.length * 50, 2000), // Variable radius based on station count
         color: "#06b6d4", // cyan
         fillColor: "#06b6d4",
         fillOpacity: 0.1,
@@ -318,513 +274,414 @@ export default function StationAllocationPage() {
     : [];
 
   const mapCenter = stationData
-    ? [
-        stationData.clusters.reduce(
-          (sum, cluster) => sum + cluster.centroid.lat,
-          0
-        ) / stationData.clusters.length,
-        stationData.clusters.reduce(
-          (sum, cluster) => sum + cluster.centroid.lng,
-          0
-        ) / stationData.clusters.length,
-      ]
-    : [6.696449, 79.985743];
+    ? [stationData.mapCenter.lat, stationData.mapCenter.lng]
+    : [8.3765, 80.3593]; // Default Sri Lanka coordinates
 
   function getAvailabilityColor(available: number, capacity: number): string {
-    const percentage = (available / capacity) * 100;
+    const percentage = capacity > 0 ? (available / capacity) * 100 : 0;
     if (percentage > 50) return "#10b981"; // green
     if (percentage > 20) return "#f59e0b"; // amber
     return "#ef4444"; // red
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">
-            Station Allocation
+    <div className="min-h-screen p-4 lg:p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header Section */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
+            <Activity className="h-4 w-4 text-cyan-400 mr-2" />
+            <span className="text-cyan-400 text-sm font-medium">
+              Intelligent Allocation
+            </span>
+          </div>
+          <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
+            Station Allocation Analysis
           </h1>
-          <p className="text-slate-400">
-            Optimize charging station placement using clustering algorithms
+          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+            Optimize charging station placement using advanced clustering
+            algorithms and batch data analysis
           </p>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Station Allocation Form */}
-        <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-slate-100">
-              Allocation Parameters
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Configure parameters for station allocation algorithms
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-2 mb-4 bg-slate-800/50 p-1">
-                <TabsTrigger
-                  value="density"
-                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-                >
-                  Density-Based
-                </TabsTrigger>
-                <TabsTrigger
-                  value="geo"
-                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-cyan-400"
-                >
-                  Geo-Based
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="density" className="space-y-6">
-                <form onSubmit={handleDensitySubmit} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="eps"
-                        className="text-slate-300 flex items-center justify-between"
-                      >
-                        <div className="flex items-center">
-                          <Ruler className="h-4 w-4 mr-2 text-cyan-500" />
-                          Epsilon (km)
-                        </div>
-                        <span className="text-cyan-400">{eps}</span>
-                      </Label>
-                      <Slider
-                        id="eps"
-                        min={0.1}
-                        max={2}
-                        step={0.1}
-                        value={[eps]}
-                        onValueChange={(value) => setEps(value[0])}
-                        className="py-4"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Maximum distance between points in a cluster
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="minSamples"
-                        className="text-slate-300 flex items-center justify-between"
-                      >
-                        <div className="flex items-center">
-                          <Layers className="h-4 w-4 mr-2 text-cyan-500" />
-                          Min Samples
-                        </div>
-                        <span className="text-cyan-400">{minSamples}</span>
-                      </Label>
-                      <Slider
-                        id="minSamples"
-                        min={1}
-                        max={10}
-                        step={1}
-                        value={[minSamples]}
-                        onValueChange={(value) => setMinSamples(value[0])}
-                        className="py-4"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Minimum number of points to form a cluster
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="topN"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <Maximize className="h-4 w-4 mr-2 text-cyan-500" />
-                        Top N Results
-                      </Label>
-                      <Select
-                        value={topN.toString()}
-                        onValueChange={(value) =>
-                          setTopN(Number.parseInt(value))
-                        }
-                      >
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select limit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="zoomLevel"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <MapPin className="h-4 w-4 mr-2 text-cyan-500" />
-                        Zoom Level
-                      </Label>
-                      <Select
-                        value={zoomLevel.toString()}
-                        onValueChange={(value) =>
-                          setZoomLevel(Number.parseInt(value))
-                        }
-                      >
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select zoom level" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10 - City</SelectItem>
-                          <SelectItem value="12">12 - District</SelectItem>
-                          <SelectItem value="14">14 - Neighborhood</SelectItem>
-                          <SelectItem value="16">16 - Streets</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="stageName"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <Radar className="h-4 w-4 mr-2 text-cyan-500" />
-                        Environment
-                      </Label>
-                      <Select value={stageName} onValueChange={setStageName}>
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select environment" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="development">
-                            Development
-                          </SelectItem>
-                          <SelectItem value="staging">Staging</SelectItem>
-                          <SelectItem value="production">Production</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+        {/* Statistics Cards */}
+        {stationData && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <Card className="bg-slate-900/80 border-slate-700/50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-cyan-500/10 rounded-lg">
+                    <MapPin className="h-5 w-5 text-cyan-400" />
                   </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Layers className="mr-2 h-4 w-4" />
-                        Run Density Clustering
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="geo" className="space-y-6">
-                <form onSubmit={handleGeoSubmit} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="maxRadius"
-                        className="text-slate-300 flex items-center justify-between"
-                      >
-                        <div className="flex items-center">
-                          <Ruler className="h-4 w-4 mr-2 text-cyan-500" />
-                          Max Radius (km)
-                        </div>
-                        <span className="text-cyan-400">{maxRadius}</span>
-                      </Label>
-                      <Slider
-                        id="maxRadius"
-                        min={0.5}
-                        max={5}
-                        step={0.1}
-                        value={[maxRadius]}
-                        onValueChange={(value) => setMaxRadius(value[0])}
-                        className="py-4"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Maximum radius for station coverage
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="outlierThreshold"
-                        className="text-slate-300 flex items-center justify-between"
-                      >
-                        <div className="flex items-center">
-                          <Layers className="h-4 w-4 mr-2 text-cyan-500" />
-                          Outlier Threshold (km)
-                        </div>
-                        <span className="text-cyan-400">
-                          {outlierThreshold}
-                        </span>
-                      </Label>
-                      <Slider
-                        id="outlierThreshold"
-                        min={1}
-                        max={10}
-                        step={0.5}
-                        value={[outlierThreshold]}
-                        onValueChange={(value) => setOutlierThreshold(value[0])}
-                        className="py-4"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Distance threshold for outlier detection
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="topN"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <Maximize className="h-4 w-4 mr-2 text-cyan-500" />
-                        Top N Results
-                      </Label>
-                      <Select
-                        value={topN.toString()}
-                        onValueChange={(value) =>
-                          setTopN(Number.parseInt(value))
-                        }
-                      >
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select limit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="zoomLevel"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <MapPin className="h-4 w-4 mr-2 text-cyan-500" />
-                        Zoom Level
-                      </Label>
-                      <Select
-                        value={zoomLevel.toString()}
-                        onValueChange={(value) =>
-                          setZoomLevel(Number.parseInt(value))
-                        }
-                      >
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select zoom level" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10 - City</SelectItem>
-                          <SelectItem value="12">12 - District</SelectItem>
-                          <SelectItem value="14">14 - Neighborhood</SelectItem>
-                          <SelectItem value="16">16 - Streets</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="stageName"
-                        className="text-slate-300 flex items-center"
-                      >
-                        <Radar className="h-4 w-4 mr-2 text-cyan-500" />
-                        Environment
-                      </Label>
-                      <Select value={stageName} onValueChange={setStageName}>
-                        <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-300">
-                          <SelectValue placeholder="Select environment" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="development">
-                            Development
-                          </SelectItem>
-                          <SelectItem value="staging">Staging</SelectItem>
-                          <SelectItem value="production">Production</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <MapPin className="mr-2 h-4 w-4" />
-                        Run Geo Clustering
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-
-            {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
-          </CardContent>
-        </Card>
-
-        {/* Map and Station Details */}
-        <div className="lg:col-span-2 space-y-6">
-          <CartoMap
-            center={mapCenter as [number, number]}
-            zoom={13}
-            markers={mapMarkers}
-            clusters={mapClusters}
-            height="400px"
-          />
-
-          {stationData && (
-            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-slate-100">
-                  Station Allocation Results
-                </CardTitle>
-                <CardDescription className="text-slate-400">
-                  {activeTab === "density" ? "Density-based" : "Geo-based"}{" "}
-                  clustering results
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                    <div className="text-slate-400 text-sm mb-1">
-                      Total Stations
-                    </div>
-                    <div className="text-xl font-bold text-cyan-400">
+                  <div>
+                    <p className="text-2xl font-bold text-slate-100">
                       {stationData.totalStations}
-                    </div>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                    <div className="text-slate-400 text-sm mb-1">
-                      Total Capacity
-                    </div>
-                    <div className="text-xl font-bold text-cyan-400">
-                      {stationData.totalCapacity}
-                    </div>
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                    <div className="text-slate-400 text-sm mb-1">
-                      Available Slots
-                    </div>
-                    <div className="text-xl font-bold text-cyan-400">
-                      {stationData.totalAvailable}
-                    </div>
-                  </div>
-                </div>
-
-                <Separator className="my-4 bg-slate-700/50" />
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-slate-200">
-                    Clusters
-                  </h3>
-                  <div className="space-y-6">
-                    {stationData.clusters.map((cluster) => (
-                      <div key={cluster.id} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-md font-medium text-cyan-400">
-                            Cluster {cluster.id}
-                          </h4>
-                          <Badge className="bg-slate-800/50 text-slate-300 border-slate-600/50">
-                            {cluster.stations.length} stations
-                          </Badge>
-                        </div>
-                        <div className="bg-slate-800/30 rounded-md p-2 text-xs text-slate-400">
-                          Centroid: {cluster.centroid.lat.toFixed(6)},{" "}
-                          {cluster.centroid.lng.toFixed(6)}
-                        </div>
-                        <div className="grid grid-cols-1 gap-2">
-                          {cluster.stations.map((station) => (
-                            <div
-                              key={station.id}
-                              className="flex items-center p-2 rounded-md bg-slate-800/30 border border-slate-700/30"
-                            >
-                              <div
-                                className={`h-8 w-8 rounded-full flex items-center justify-center mr-3 bg-${getAvailabilityColor(
-                                  station.available,
-                                  station.capacity
-                                ).replace(
-                                  "#",
-                                  ""
-                                )}/30 text-${getAvailabilityColor(
-                                  station.available,
-                                  station.capacity
-                                ).replace(
-                                  "#",
-                                  ""
-                                )} border border-${getAvailabilityColor(
-                                  station.available,
-                                  station.capacity
-                                ).replace("#", "")}/50`}
-                                style={{
-                                  backgroundColor: `${getAvailabilityColor(
-                                    station.available,
-                                    station.capacity
-                                  )}30`,
-                                  color: getAvailabilityColor(
-                                    station.available,
-                                    station.capacity
-                                  ),
-                                  borderColor: `${getAvailabilityColor(
-                                    station.available,
-                                    station.capacity
-                                  )}50`,
-                                }}
-                              >
-                                <MapPin className="h-4 w-4" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="text-sm font-medium text-slate-300">
-                                  {station.name}{" "}
-                                  <span className="text-xs text-slate-500">
-                                    ({station.id})
-                                  </span>
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  {station.lat.toFixed(6)},{" "}
-                                  {station.lng.toFixed(6)}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-sm font-medium text-slate-300">
-                                  {station.available}/{station.capacity}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  Available
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                    </p>
+                    <p className="text-sm text-slate-400">Total Stations</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          )}
+
+            <Card className="bg-slate-900/80 border-slate-700/50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-green-500/10 rounded-lg">
+                    <Activity className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-100">
+                      {stationData.totalCapacity}
+                    </p>
+                    <p className="text-sm text-slate-400">Total Capacity</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900/80 border-slate-700/50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-amber-500/10 rounded-lg">
+                    <Database className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-100">
+                      {stationData.totalAvailable}
+                    </p>
+                    <p className="text-sm text-slate-400">Available Now</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900/80 border-slate-700/50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-red-500/10 rounded-lg">
+                    <Layers className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-100">
+                      {stationData.clusters.length}
+                    </p>
+                    <p className="text-sm text-slate-400">Clusters</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          {/* Configuration Panel */}
+          <div className="xl:col-span-4">
+            <Card className="bg-slate-900/80 border-slate-700/50 backdrop-blur-xl shadow-2xl h-[100%]">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-cyan-500/10 rounded-lg">
+                    <Database className="h-5 w-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-slate-100 text-lg">
+                      Clustering Configuration
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">
+                      Configure parameters for Snowflake clustering analysis
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <form onSubmit={handleDensitySubmit} className="space-y-6">
+                  {/* Location Filters */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-slate-300">
+                      Location Filters
+                    </h3>
+
+                    <div className="space-y-3">
+                      <Label className="text-slate-300 text-sm">Province</Label>
+                      <Select value={province} onValueChange={setProvince}>
+                        <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-slate-300">
+                          <SelectValue placeholder="Select Province" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="North Central">
+                            North Central
+                          </SelectItem>
+                          <SelectItem value="Western">Western</SelectItem>
+                          <SelectItem value="Southern">Southern</SelectItem>
+                          <SelectItem value="Eastern">Eastern</SelectItem>
+                          <SelectItem value="Northern">Northern</SelectItem>
+                          <SelectItem value="North Western">
+                            North Western
+                          </SelectItem>
+                          <SelectItem value="Central">Central</SelectItem>
+                          <SelectItem value="Uva">Uva</SelectItem>
+                          <SelectItem value="Sabaragamuwa">
+                            Sabaragamuwa
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-slate-300 text-sm">
+                          District
+                        </Label>
+                        <Select value={district} onValueChange={setDistrict}>
+                          <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-slate-300 h-9 text-xs">
+                            <SelectValue placeholder="Optional" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">All Districts</SelectItem>
+                            <SelectItem value="Anuradhapura">
+                              Anuradhapura
+                            </SelectItem>
+                            <SelectItem value="Polonnaruwa">
+                              Polonnaruwa
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-slate-300 text-sm">Area</Label>
+                        <Select value={area} onValueChange={setArea}>
+                          <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-slate-300 h-9 text-xs">
+                            <SelectValue placeholder="Optional" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">All Areas</SelectItem>
+                            <SelectItem value="Urban">Urban</SelectItem>
+                            <SelectItem value="Suburban">Suburban</SelectItem>
+                            <SelectItem value="Rural">Rural</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="bg-slate-700/30" />
+
+                  {/* Clustering Parameters */}
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <Label
+                        htmlFor="eps"
+                        className="text-slate-300 flex items-center justify-between text-sm font-medium"
+                      >
+                        <div className="flex items-center">
+                          <Ruler className="h-4 w-4 mr-2 text-cyan-400" />
+                          Epsilon Distance
+                        </div>
+                        <span className="text-cyan-400 font-mono">
+                          {eps} km
+                        </span>
+                      </Label>
+                      <Slider
+                        id="eps"
+                        min={0.001}
+                        max={0.01}
+                        step={0.001}
+                        value={[eps]}
+                        onValueChange={(value) => setEps(value[0])}
+                        className="py-2"
+                      />
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Maximum distance between points in a cluster
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label
+                        htmlFor="minSamples"
+                        className="text-slate-300 flex items-center justify-between text-sm font-medium"
+                      >
+                        <div className="flex items-center">
+                          <Layers className="h-4 w-4 mr-2 text-cyan-400" />
+                          Minimum Samples
+                        </div>
+                        <span className="text-cyan-400 font-mono">
+                          {minSamples}
+                        </span>
+                      </Label>
+                      <Slider
+                        id="minSamples"
+                        min={10}
+                        max={100}
+                        step={10}
+                        value={[minSamples]}
+                        onValueChange={(value) => setMinSamples(value[0])}
+                        className="py-2"
+                      />
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Minimum number of points to form a cluster
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <Label className="text-slate-300 flex items-center text-sm font-medium">
+                          <Maximize className="h-4 w-4 mr-2 text-cyan-400" />
+                          Results Limit
+                        </Label>
+                        <Select
+                          value={topN.toString()}
+                          onValueChange={(value) =>
+                            setTopN(Number.parseInt(value))
+                          }
+                        >
+                          <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-slate-300 h-10">
+                            <SelectValue placeholder="Select limit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label className="text-slate-300 flex items-center text-sm font-medium">
+                          <MapPin className="h-4 w-4 mr-2 text-cyan-400" />
+                          Zoom Level
+                        </Label>
+                        <Select
+                          value={zoomLevel.toString()}
+                          onValueChange={(value) =>
+                            setZoomLevel(Number.parseInt(value))
+                          }
+                        >
+                          <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-slate-300 h-10">
+                            <SelectValue placeholder="Select zoom" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10">City</SelectItem>
+                            <SelectItem value="12">District</SelectItem>
+                            <SelectItem value="13">Area</SelectItem>
+                            <SelectItem value="15">Neighborhood</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 h-12"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-3"></div>
+                        Processing Clusters...
+                      </>
+                    ) : (
+                      <>
+                        <Layers className="mr-3 h-4 w-4" />
+                        Run Clustering Analysis
+                      </>
+                    )}
+                  </Button>
+                </form>
+
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mt-6">
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Map and Results */}
+          <div className="xl:col-span-8 space-y-8">
+            {/* Map Section */}
+            <Card className="bg-slate-900/80 border-slate-700/50 backdrop-blur-xl shadow-2xl overflow-hidden">
+              <CardContent className="p-0">
+                <div className="relative">
+                  <CartoMap
+                    center={mapCenter as [number, number]}
+                    zoom={stationData?.zoom || 8}
+                    markers={mapMarkers}
+                    clusters={mapClusters}
+                    height="620px"
+                  />
+                  {!stationData && (
+                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center">
+                      <div className="text-center space-y-4">
+                        <div className="p-4 bg-slate-800/50 rounded-full mx-auto w-fit">
+                          <MapPin className="h-8 w-8 text-slate-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium text-slate-300 mb-2">
+                            No Clustering Results Yet
+                          </h3>
+                          <p className="text-slate-500 text-sm max-w-md">
+                            Configure your parameters and run the clustering
+                            analysis to visualize station allocations
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Top Locations */}
+            {stationData && stationData.topLocations.length > 0 && (
+              <Card className="bg-slate-900/80 border-slate-700/50 backdrop-blur-xl shadow-2xl">
+                <CardHeader>
+                  <CardTitle className="text-slate-100 flex items-center">
+                    <MapPin className="h-5 w-5 mr-2 text-red-400" />
+                    Top Recommended Locations
+                  </CardTitle>
+                  <CardDescription className="text-slate-400">
+                    High-density areas optimal for charging station placement
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {stationData.topLocations.map((location, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700/50"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-red-500/10 rounded-lg">
+                            <MapPin className="h-4 w-4 text-red-400" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-200">
+                              {location.label}
+                            </p>
+                            <p className="text-sm text-slate-400">
+                              Lat: {location.MEAN_LAT.toFixed(6)}, Lng:{" "}
+                              {location.MEAN_LONG.toFixed(6)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge
+                            variant="secondary"
+                            className="bg-red-500/20 text-red-300"
+                          >
+                            Density: {location.density.toLocaleString()}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>
