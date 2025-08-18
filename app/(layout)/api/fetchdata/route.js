@@ -1,6 +1,6 @@
 // app/api/data/route.js
 
-import clientPromise from "../../../database/lib/mongodb";
+import clientPromise from "@/lib/mongodb"; // Adjust the import path as necessary
 
 export async function GET() {
   try {
