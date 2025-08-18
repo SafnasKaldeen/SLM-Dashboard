@@ -44,6 +44,7 @@ import {
   DollarSign,
   TrendingUp,
   BrainCog,
+  Bike,
   Target,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -74,7 +75,7 @@ export function MainSidebar() {
     fleet: { icon: <Users className="h-4 w-4" />, color: "text-blue-500" },
     gps: { icon: <MapPin className="h-4 w-4" />, color: "text-cyan-500" },
     battery: { icon: <Battery className="h-4 w-4" />, color: "text-green-500" },
-    motor: { icon: <Zap className="h-4 w-4" />, color: "text-amber-500" },
+    motor: { icon: <Bike className="h-4 w-4" />, color: "text-amber-500" },
     charging: {
       icon: <BatteryCharging className="h-4 w-4" />,
       color: "text-purple-500",
@@ -160,11 +161,11 @@ export function MainSidebar() {
           label: "Density Analysis",
           icon: <Hexagon className="h-4 w-4" />,
         },
-        {
-          path: "/gps/batch-analysis",
-          label: "GPS Batch Analysis",
-          icon: <FileBarChart className="h-4 w-4" />,
-        },
+        // {
+        //   path: "/gps/batch-analysis",
+        //   label: "GPS Batch Analysis",
+        //   icon: <FileBarChart className="h-4 w-4" />,
+        // },
       ],
     },
     {
@@ -195,35 +196,41 @@ export function MainSidebar() {
       ],
     },
     {
-      id: "motor",
-      label: "Motor Analytics",
+      id: "Vehicles",
+      label: "Vehicle Analytics",
       icon: categoryIcons.motor,
+      show: true,
       items: [
         {
-          path: "/motor",
+          path: "/vehicles",
           label: "Overview",
           icon: <Activity className="h-4 w-4" />,
         },
         {
-          path: "/motor/diagnostics",
-          label: "Diagnostics",
+          path: "/vehicles/proximity",
+          label: "Proximity",
           icon: <Cpu className="h-4 w-4" />,
         },
+        // {
+        //   path: "/vehicles/360",
+        //   label: "Vehicle 360 view",
+        //   icon: <Gauge className="h-4 w-4" />,
+        // },
+        // {
+        //   path: "/vehicles/maintenance",
+        //   label: "Maintenance",
+        //   icon: <Wrench className="h-4 w-4" />,
+        // },
         {
-          path: "/motor/efficiency",
-          label: "Efficiency",
-          icon: <Gauge className="h-4 w-4" />,
-        },
-        {
-          path: "/motor/maintenance",
-          label: "Maintenance",
-          icon: <Wrench className="h-4 w-4" />,
+          path: "/vehicles/charging",
+          label: "Home Charging",
+          icon: <Zap className="h-4 w-4" />,
         },
       ],
     },
     {
       id: "charging",
-      label: "Charging Stations",
+      label: "Swapping Stations",
       icon: categoryIcons.charging,
       show: true,
       items: [

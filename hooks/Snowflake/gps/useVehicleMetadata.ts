@@ -69,7 +69,6 @@ const useVehicleMetadata = (filters: Filters) => {
   const buildAggregationQuery = (currentFilters: Filters) => {
     const { dateRange, aggregation, selectedTboxes, selectedBmses, selectedBatteryTypes } = currentFilters;
 
-    // Map aggregation to proper DATE_TRUNC values
     const dateTrunc = aggregation === "weekly"
       ? "WEEK"
       : aggregation === "monthly"
@@ -80,12 +79,10 @@ const useVehicleMetadata = (filters: Filters) => {
       ? "YEAR"
       : "DAY";
 
-    // Use provided date range or default to last year
     const dateCondition = dateRange?.from
       ? buildDateCondition("GPS_DATE", dateRange.from, dateRange.to)
       : buildDateCondition("GPS_DATE", subYears(new Date(), 1));
 
-    // Build filter conditions
     const tboxCondition = selectedTboxes.length > 0 
       ? `AND TBOXID IN (${selectedTboxes.map((id) => `'${id}'`).join(",")})` 
       : "";
@@ -124,12 +121,10 @@ const useVehicleMetadata = (filters: Filters) => {
     try {
       setLoading(true);
       const query = buildAggregationQuery(currentFilters);
-      // console.log("Generated Aggregation Query:", query);
       
       const response = await axios.post("/api/snowflake/query", { query });
       const data = response.data || [];
-      // console.log("Fetched Aggregated Data:", data);
-      // Process the data to ensure proper formatting
+      
       const processedData = data.map((row: any) => ({
         ...row,
         period_start: row.period_start || row.PERIOD_START,
@@ -156,7 +151,6 @@ const useVehicleMetadata = (filters: Filters) => {
       setLoading(true);
       setError(null);
 
-      // Get a broader sample for metadata extraction
       const query = `
         SELECT 
           TBOXID,
@@ -176,7 +170,6 @@ const useVehicleMetadata = (filters: Filters) => {
         LIMIT 100000;
       `;
 
-      // console.log("Generated Raw Data Query:", query);
       const response = await axios.post("/api/snowflake/query", { query });
       setAllData(response.data || []);
     } catch (err) {
@@ -192,14 +185,12 @@ const useVehicleMetadata = (filters: Filters) => {
     if (tableColumns.length === 0) return;
 
     const loadData = async () => {
-      // Load raw data first for metadata
       await fetchAllData();
       
-      // Initial aggregation should always be monthly for the last year
       const initialFilters = {
         ...filters,
         aggregation: "monthly" as const,
-        dateRange: undefined // Use default 1-year range
+        dateRange: undefined
       };
       
       const aggregated = await fetchAggregatedData(initialFilters);
@@ -209,13 +200,10 @@ const useVehicleMetadata = (filters: Filters) => {
     loadData();
   }, [tableColumns]);
 
-  // Reload aggregated data when filters change (but not on initial load)
+  // Reload aggregated data when filters change
   useEffect(() => {
     if (tableColumns.length > 0 && allData.length > 0) {
-      // Only reload if this isn't the initial load
-      // We can detect initial load by checking if we have existing aggregated data
       fetchAggregatedData(filters).then((data) => {
-        // console.log("Filter change - new aggregated data:", data);
         setAggregatedData(data);
       });
     }
@@ -226,7 +214,7 @@ const useVehicleMetadata = (filters: Filters) => {
     return value !== undefined && value !== null ? String(value) : null;
   };
 
-  // Generate cascading metadata from raw data, not aggregated data
+  // Generate cascading metadata based on current filter selections
   const { cascadingMetadata } = useMemo(() => {
     if (allData.length === 0) {
       return {
@@ -234,16 +222,97 @@ const useVehicleMetadata = (filters: Filters) => {
       };
     }
 
+    // Filter the data based on current selections to create cascading effect
+    let filteredData = allData;
+
+    // Apply TBOX filter first
+    if (filters.selectedTboxes.length > 0) {
+      filteredData = filteredData.filter(row => 
+        row.TBOXID && filters.selectedTboxes.includes(row.TBOXID.toString())
+      );
+    }
+
+    // Apply BMS filter
+    if (filters.selectedBmses.length > 0) {
+      filteredData = filteredData.filter(row => 
+        row.BMSID && filters.selectedBmses.includes(row.BMSID)
+      );
+    }
+
+    // Apply Battery Type filter
+    if (filters.selectedBatteryTypes.length > 0) {
+      filteredData = filteredData.filter(row => 
+        row.BATTERY_NAME && filters.selectedBatteryTypes.includes(row.BATTERY_NAME)
+      );
+    }
+
+    // Generate available options from filtered data
     const availableTboxes = new Set<string>();
     const availableBmses = new Set<string>();
     const availableBatteryNames = new Set<string>();
 
-    // Use raw data for complete metadata
-    allData.forEach((row) => {
-      if (row.TBOXID) availableTboxes.add(row.TBOXID.toString());
-      if (row.BMSID) availableBmses.add(row.BMSID);
-      if (row.BATTERY_NAME) availableBatteryNames.add(row.BATTERY_NAME);
-    });
+    // If no filters are applied, show all available options
+    const dataToUse = filteredData.length > 0 ? filteredData : allData;
+
+    // Generate cascading options based on current filter state
+    if (filters.selectedTboxes.length === 0 && filters.selectedBmses.length === 0 && filters.selectedBatteryTypes.length === 0) {
+      // No filters applied, show all options
+      allData.forEach((row) => {
+        if (row.TBOXID) availableTboxes.add(row.TBOXID.toString());
+        if (row.BMSID) availableBmses.add(row.BMSID);
+        if (row.BATTERY_NAME) availableBatteryNames.add(row.BATTERY_NAME);
+      });
+    } else {
+      // Apply cascading logic
+      
+      // For TBOX: if BMS or Battery Type is selected, only show TBOXes that have those combinations
+      let tboxFilteredData = allData;
+      if (filters.selectedBmses.length > 0) {
+        tboxFilteredData = tboxFilteredData.filter(row => 
+          row.BMSID && filters.selectedBmses.includes(row.BMSID)
+        );
+      }
+      if (filters.selectedBatteryTypes.length > 0) {
+        tboxFilteredData = tboxFilteredData.filter(row => 
+          row.BATTERY_NAME && filters.selectedBatteryTypes.includes(row.BATTERY_NAME)
+        );
+      }
+      tboxFilteredData.forEach((row) => {
+        if (row.TBOXID) availableTboxes.add(row.TBOXID.toString());
+      });
+
+      // For BMS: if TBOX or Battery Type is selected, only show BMSes that have those combinations
+      let bmsFilteredData = allData;
+      if (filters.selectedTboxes.length > 0) {
+        bmsFilteredData = bmsFilteredData.filter(row => 
+          row.TBOXID && filters.selectedTboxes.includes(row.TBOXID.toString())
+        );
+      }
+      if (filters.selectedBatteryTypes.length > 0) {
+        bmsFilteredData = bmsFilteredData.filter(row => 
+          row.BATTERY_NAME && filters.selectedBatteryTypes.includes(row.BATTERY_NAME)
+        );
+      }
+      bmsFilteredData.forEach((row) => {
+        if (row.BMSID) availableBmses.add(row.BMSID);
+      });
+
+      // For Battery Types: if TBOX or BMS is selected, only show Battery Types that have those combinations
+      let batteryFilteredData = allData;
+      if (filters.selectedTboxes.length > 0) {
+        batteryFilteredData = batteryFilteredData.filter(row => 
+          row.TBOXID && filters.selectedTboxes.includes(row.TBOXID.toString())
+        );
+      }
+      if (filters.selectedBmses.length > 0) {
+        batteryFilteredData = batteryFilteredData.filter(row => 
+          row.BMSID && filters.selectedBmses.includes(row.BMSID)
+        );
+      }
+      batteryFilteredData.forEach((row) => {
+        if (row.BATTERY_NAME) availableBatteryNames.add(row.BATTERY_NAME);
+      });
+    }
 
     return {
       cascadingMetadata: {
@@ -252,7 +321,7 @@ const useVehicleMetadata = (filters: Filters) => {
         batteryTypes: Array.from(availableBatteryNames).sort(),
       },
     };
-  }, [allData]);
+  }, [allData, filters.selectedTboxes, filters.selectedBmses, filters.selectedBatteryTypes]);
 
   const getDefaultDateRange = () => {
     const today = new Date();
@@ -265,7 +334,6 @@ const useVehicleMetadata = (filters: Filters) => {
     tboxes: cascadingMetadata.tboxes,
     bmses: cascadingMetadata.bmses,
     batteryTypes: cascadingMetadata.batteryTypes,
-    // allData,
     aggregatedData,
     loading,
     error,

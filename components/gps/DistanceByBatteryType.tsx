@@ -48,7 +48,6 @@ function buildBatteryDistanceQuery(
     WHERE GPS_DATE BETWEEN '${startDate}' AND '${endDate}'
       AND TBOXID IS NOT NULL
       AND DISTANCE_KM > 0
-      ${batteryFilter}
     GROUP BY BATTERY_NAME
     ORDER BY TOTAL_DISTANCE DESC
     LIMIT 50;
@@ -126,7 +125,7 @@ export default function DistanceByBatteryType({
   );
 
   const chartData = data.map((item) => ({
-    name: item.BATTERY_NAME,
+    name: item.BATTERY_NAME ?? "Unknown",
     value:
       totalDistance > 0
         ? Math.round((item.TOTAL_DISTANCE / totalDistance) * 100)

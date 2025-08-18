@@ -164,9 +164,9 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
     
     // Apply limit of 1000 GPS points when no specific TBoxes are selected
     // This is the key change - always apply the limit when no specific TBoxes are selected
-    if (filters.selectedTboxes.length === 0) {
+    // if (filters.selectedTboxes.length === 0) {
       query += ` LIMIT 1000`;
-    }
+    // }
 
     return query;
   }, [buildDateRangeCondition, buildGeographicalCondition]);
@@ -322,6 +322,8 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
         },
         body: JSON.stringify({ query }),
       });
+
+      console.log('Fetching GPS data with query:', query);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

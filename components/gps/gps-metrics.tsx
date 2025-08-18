@@ -90,9 +90,9 @@ export function GPSMetrics({
 
   const metrics = [
     {
-      title: "Total GPS Points",
+      title: "Total GPS Records",
       value: totalGPSPoints.toLocaleString(),
-      description: "Number of GPS data points recorded",
+      description: "Number of GPS points",
       icon: Satellite,
     },
     {

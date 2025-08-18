@@ -27,40 +27,20 @@ interface ScooterData {
   GPS_POINTS: number;
 }
 
-function buildScooterDistanceQuery(
-  startDate: string,
-  endDate: string,
-  batteryTypes: string[] = []
-) {
-  // Base query
-  let query = `
+function buildScooterDistanceQuery(startDate: string, endDate: string) {
+  return `
     SELECT 
       TBOXID,
       BATTERY_NAME,
       CAPACITY,
-      DATE_TRUNC('MONTH', GPS_DATE) AS PERIOD_START,
       SUM(DISTANCE_KM) AS TOTAL_DISTANCE,
-      COUNT(*) AS GPS_POINTS,
       MAX(GPS_DATE) AS LAST_USED
     FROM REPORT_DB.GPS_DASHBOARD.VEHICLE_DAILY_DISTANCE
     WHERE GPS_DATE BETWEEN '${startDate}' AND '${endDate}'
+      AND BMSID != 'NULL_BMS'
+    GROUP BY TBOXID, BATTERY_NAME, CAPACITY
+    ORDER BY TOTAL_DISTANCE DESC;
   `;
-
-  // Add battery type filter if specified
-  if (batteryTypes && batteryTypes.length > 0) {
-    const batteryTypeFilter = batteryTypes
-      .map((type) => `'${type}'`)
-      .join(", ");
-    query += ` AND BATTERY_NAME IN (${batteryTypeFilter})`;
-  }
-
-  query += `
-    GROUP BY TBOXID, BATTERY_NAME, CAPACITY, PERIOD_START
-    ORDER BY TOTAL_DISTANCE DESC
-    LIMIT 100;
-  `;
-
-  return query;
 }
 
 async function fetchTopScooters(
@@ -223,6 +203,7 @@ export default function TopPerformingScooters({
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
+      year: "numeric",
       month: "short",
       day: "numeric",
     });
@@ -230,7 +211,7 @@ export default function TopPerformingScooters({
 
   const formatDistance = (distance: number) => {
     return distance >= 1000
-      ? `${(distance / 1000).toFixed(1)}k km`
+      ? `${distance.toFixed(1)}km`
       : `${distance.toFixed(1)} km`;
   };
 
@@ -386,7 +367,7 @@ export default function TopPerformingScooters({
                         {scooter.TBOXID}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>Last used: {formatDate(scooter.LAST_USED)}</span>
                       <Badge
                         variant="outline"
@@ -394,11 +375,11 @@ export default function TopPerformingScooters({
                           scooter.BATTERY_NAME
                         )}`}
                       >
-                        {scooter.BATTERY_NAME}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
                         {scooter.CAPACITY} Ah
                       </Badge>
+                      {/* <Badge variant="outline" className="text-xs">
+                        {scooter.CAPACITY} Ah
+                      </Badge> */}
                     </div>
                     {/* <div className="text-xs text-muted-foreground">
                       Period: {scooter.PERIOD_START.slice(0, 7)} •{" "}
@@ -410,7 +391,7 @@ export default function TopPerformingScooters({
                       {formatDistance(scooter.TOTAL_DISTANCE)}
                     </p>
 
-                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                    <div className="flex items-center gap-4 flex-wrap justify-end">
                       {getBadge(index)}
                       <Badge
                         variant={

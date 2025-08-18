@@ -28,7 +28,6 @@ const TrendSection = ({ filters }) => {
     totalRevenue, // ✅ Added missing totalRevenue
     revenuePerSwap,
     averageSwapTime,
-    monthlySwapEfficiency,
     performanceComparison, // ✅ Added for growth calculations
     areawiseData,
     datewiseData,
@@ -118,7 +117,7 @@ const TrendSection = ({ filters }) => {
             ) : (
               <RevenueAnalyticsChart
                 filters={filters}
-                data={monthlySwapEfficiency} // Your time-series data
+                data={datewiseData} // Your time-series data
                 loading={loading}
                 error={error?.message}
               />

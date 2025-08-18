@@ -1,0 +1,38 @@
+{
+  "Records": [
+    {
+      "eventID": "6d58250ca0f50455adecda425a3c15ae",
+      "eventName": "MODIFY",
+      "eventVersion": "1.1",
+      "eventSource": "aws:dynamodb",
+      "awsRegion": "ap-southeast-1",
+      "dynamodb": {
+        "ApproximateCreationDateTime": 1754974050,
+        "Keys": {
+          "createdAt": { "N": "0" },
+          "pk": { "S": "P#7a98ab56-7411-4125-82ad-9121472d9147" }
+        },
+        "NewImage": {
+          "refundPercentage": { "S": "0" },
+          "locationName": { "S": "Panadura" },
+          "previousWalletBal": { "S": "N/A" },
+          "chargePercentage": { "S": "100" },
+          "paymentType": { "S": "BATTERY_SWAP" },
+          "trnxId": { "S": "P#c21acb00-5c40-4f83-baf8-93b0ce21db72" },
+          "createdAt": { "N": "0" },
+          "createdEpoch": { "N": "1754974035389" },
+          "packageDetailID": { "S": "P#None" },
+          "locationId": { "S": "P#f9655640-a39a-4607-803a-eea0ddd040ba" },
+          "paymentId": { "S": "7a98ab56-7411-4125-82ad-9121472d9147" },
+          "paymentTries": { "N": "1" },
+          "ratingId": { "S": "P#0ad036b6-a991-4757-bbeb-b6c3dc74c66c" },
+          "customerId": { "S": "P#6982ec5b-2efe-4c31-97a0-7a398b79589b" },
+          "paymentMethod": { "S": "CARD_PAYMENT" },
+          "chargeAmount": { "S": "250.00" },
+          "model": { "S": "Payment" },
+          "stationName": { "S": "Panadura  1 Station" }
+        }
+      }
+    }
+  ]
+}

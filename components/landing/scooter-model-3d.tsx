@@ -46,7 +46,7 @@ function ImageFallback() {
   );
 }
 
-// Load GLB - Fixed to accept isAutoRotating prop
+// Load GLB - Fixed scaling issue
 function LoadedScooterModel({
   glbPath,
   isAutoRotating,
@@ -58,6 +58,7 @@ function LoadedScooterModel({
 }) {
   const { scene } = useGLTF(glbPath);
   const meshRef = useRef<THREE.Group>(null);
+  const [isScaled, setIsScaled] = useState(false);
 
   // Only rotate when isAutoRotating is true
   useFrame((_, delta) => {
@@ -67,7 +68,7 @@ function LoadedScooterModel({
   });
 
   useEffect(() => {
-    if (scene) {
+    if (scene && !isScaled) {
       const box = new THREE.Box3().setFromObject(scene);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
@@ -77,12 +78,14 @@ function LoadedScooterModel({
       scene.scale.setScalar(scale);
       scene.position.copy(center).multiplyScalar(-scale);
 
+      setIsScaled(true);
+
       // Notify parent that model has loaded
       if (onLoad) {
         onLoad();
       }
     }
-  }, [scene, onLoad]);
+  }, [scene, isScaled, onLoad]);
 
   return <primitive ref={meshRef} object={scene} />;
 }
@@ -178,9 +181,9 @@ export function SimpleScooter3D() {
       {/* Loading overlay - outside Canvas */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm z-10">
-          <div className="text-center space-y-4">
+          <div className="text-center">
             <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-gray-300">Loading 3D Scooter Model...</p>
+            <p className="text-gray-300 mt-2">Loading 3D Scooter Model...</p>
           </div>
         </div>
       )}
@@ -342,15 +345,6 @@ export function SimpleScooter3D() {
           <RotateCcw className="w-4 h-4" />
         </Button>
       </div>
-
-      {/* Controls Instructions */}
-      {/* <div className="absolute bottom-4 left-4 z-20">
-        <div className="bg-black/80 backdrop-blur-md rounded-lg p-3 text-xs text-gray-300 space-y-1 border border-white/10">
-          <div>• Drag to rotate</div>
-          <div>• Scroll to zoom</div>
-          <div>• Right-click + drag to pan</div>
-        </div>
-      </div> */}
 
       {/* Status indicator */}
       <div className="absolute top-4 right-4 z-20">

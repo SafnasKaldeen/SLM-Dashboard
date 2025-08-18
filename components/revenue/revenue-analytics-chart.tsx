@@ -23,7 +23,7 @@ interface RevenueAnalyticsChartProps {
     selectedAreas?: string[];
     selectedStations?: string[];
   };
-  data?: any[]; // monthlySwapEfficiency or your time-series data
+  data?: any[];
   loading?: boolean;
   error?: string;
 }
@@ -34,83 +34,121 @@ export function RevenueAnalyticsChart({
   loading = false,
   error,
 }: RevenueAnalyticsChartProps) {
-  const [viewType, setViewType] = useState<"daily" | "hourly">("daily");
+  // Get the aggregation level from filters, default to daily since your data appears to be daily
+  const aggregation = filters?.aggregation || "daily";
 
   // Transform your data into the format needed for charts
   const chartData = useMemo(() => {
     if (!data || !Array.isArray(data) || data.length === 0) {
-      return { daily: [], hourly: [] };
+      return [];
     }
 
-    // Process your actual data structure
+    // Process your actual data structure - mapping to your exact field names
     const processedData = data.map((item, index) => {
-      // Adapt based on your actual data structure
-      // This assumes your data has properties like: date, revenue, swaps, etc.
-      const revenue =
-        item.revenue || item.totalRevenue || item.total_revenue || 0;
-      const swaps = item.swaps || item.totalSwaps || item.total_swaps || 0;
-      const efficiency =
-        item.averageEfficiency ||
-        item.swapEfficiency ||
-        item.swap_efficiency ||
-        Math.min(100);
-      const avgPerSwap =
-        item.avgPerSwap ||
-        item.revenuePerSwap ||
-        item.revenue_per_swap ||
-        (revenue && swaps ? revenue / swaps : 0);
+      const revenue = item.TOTAL_REVENUE || 0;
+      const swaps = item.TOTAL_SWAPS || 0;
+      const efficiency = item.SWAP_EFFICIENCY || 0;
+      const avgPerSwap = item.AVERAGE_REVENUE_PER_SWAP || 0;
+      const date = item.DATE || `Day ${index + 1}`;
+
+      // Format the period label based on aggregation
+      let periodLabel;
+
+      if (aggregation === "daily") {
+        // For daily view, show the date as-is or format it nicely
+        const dateObj = new Date(date);
+        periodLabel = isNaN(dateObj.getTime())
+          ? date
+          : dateObj.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            });
+      } else if (aggregation === "monthly") {
+        // For monthly, group by month
+        const dateObj = new Date(date);
+        periodLabel = isNaN(dateObj.getTime())
+          ? date
+          : dateObj.toLocaleDateString("en-US", {
+              month: "short",
+              year: "numeric",
+            });
+      } else if (aggregation === "quarterly") {
+        // For quarterly, group by quarter
+        const dateObj = new Date(date);
+        if (!isNaN(dateObj.getTime())) {
+          const quarter = Math.floor(dateObj.getMonth() / 3) + 1;
+          periodLabel = `Q${quarter} ${dateObj.getFullYear()}`;
+        } else {
+          periodLabel = date;
+        }
+      } else {
+        // For annually, group by year
+        const dateObj = new Date(date);
+        periodLabel = isNaN(dateObj.getTime())
+          ? date
+          : dateObj.getFullYear().toString();
+      }
+
+      // Calculate optimal revenue (what revenue would be at 100% efficiency)
+      const optimalRevenue =
+        efficiency > 0 ? (revenue / efficiency) * 100 : revenue;
 
       return {
-        // For daily view - adapt field names based on your actual data
-        date: item.date || item.period || item.month || `Day ${index + 1}`,
+        period: periodLabel,
         revenue,
         swaps,
         avgPerSwap,
         efficiency,
-        optimalRevenue: revenue / (efficiency / 100), // Calculate optimal revenue
-        // For hourly view (if you have hourly data)
-        hour:
-          item.hour || item.time || `${String(index % 24).padStart(2, "0")}:00`,
+        optimalRevenue,
+        date: date, // Keep original date for sorting if needed
       };
     });
 
-    // Generate hourly data if not available (optional - you might want to remove this)
-    const hourlyData = Array.from({ length: 24 }, (_, hour) => {
-      const hourStr = `${String(hour).padStart(2, "0")}:00`;
-      const dailyAvg =
-        processedData.reduce((sum, d) => sum + d.revenue, 0) /
-          processedData.length || 0;
-      const swapAvg =
-        processedData.reduce((sum, d) => sum + d.swaps, 0) /
-          processedData.length || 0;
+    return processedData;
+  }, [data, aggregation]);
 
-      // Simulate hourly distribution (peak hours: 7-9, 17-19)
-      const peakMultiplier =
-        (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)
-          ? 1.5
-          : hour >= 1 && hour <= 5
-          ? 0.3
-          : 1;
+  // Get display labels based on aggregation
+  const getDisplayLabels = () => {
+    switch (aggregation) {
+      case "daily":
+        return {
+          periodLabel: "Date",
+          title: "Revenue from Swaps",
+          combinedTitle: "Revenue vs Swaps",
+          efficiencyTitle: "Swap Efficiency",
+        };
+      case "monthly":
+        return {
+          periodLabel: "Month",
+          title: "Revenue from Swaps",
+          combinedTitle: "Revenue vs Swaps",
+          efficiencyTitle: "Swap Efficiency",
+        };
+      case "quarterly":
+        return {
+          periodLabel: "Quarter",
+          title: "Revenue from Swaps",
+          combinedTitle: "Revenue vs Swaps",
+          efficiencyTitle: "Swap Efficiency",
+        };
+      case "annually":
+        return {
+          periodLabel: "Year",
+          title: "Revenue from Swaps",
+          combinedTitle: "Revenue vs Swaps",
+          efficiencyTitle: "Swap Efficiency",
+        };
+      default:
+        return {
+          periodLabel: "Period",
+          title: "Revenue from Swaps",
+          combinedTitle: "Revenue vs Swaps",
+          efficiencyTitle: "Swap Efficiency",
+        };
+    }
+  };
 
-      const revenue = Math.round((dailyAvg * peakMultiplier) / 24);
-      const swaps = Math.round((swapAvg * peakMultiplier) / 24);
-      const efficiency = Math.min(100, Math.max(70, 85 + Math.random() * 15));
-
-      return {
-        hour: hourStr,
-        revenue,
-        swaps,
-        avgPerSwap: dailyAvg / swapAvg || 8.0,
-        efficiency,
-        optimalRevenue: revenue / (efficiency / 100),
-      };
-    });
-
-    return {
-      daily: processedData,
-      hourly: hourlyData,
-    };
-  }, [data]);
+  const labels = getDisplayLabels();
 
   // Loading state
   if (loading) {
@@ -147,7 +185,7 @@ export function RevenueAnalyticsChart({
   }
 
   // No data state
-  if (!chartData.daily.length && !chartData.hourly.length) {
+  if (!chartData.length) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center p-8">
@@ -165,52 +203,40 @@ export function RevenueAnalyticsChart({
     );
   }
 
-  const currentData = viewType === "daily" ? chartData.daily : chartData.hourly;
-  const timeKey = viewType === "daily" ? "date" : "hour";
+  // Calculate some summary stats
+  const totalRevenue = chartData.reduce((sum, item) => sum + item.revenue, 0);
+  const totalSwaps = chartData.reduce((sum, item) => sum + item.swaps, 0);
+  const avgEfficiency =
+    chartData.reduce((sum, item) => sum + item.efficiency, 0) /
+    chartData.length;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          {/* <Button
-            variant={viewType === "daily" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("daily")}
-            disabled={!chartData.daily.length}
-          >
-            Daily View
-          </Button>
-          <Button
-            variant={viewType === "hourly" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("hourly")}
-            disabled={!chartData.hourly.length}
-          >
-            Hourly View
-          </Button> */}
-        </div>
-
-        {/* Data summary */}
-        <div className="text-xs text-muted-foreground">
-          {currentData.length} data points
+        {/* Show current aggregation level and summary stats */}
+        <div className="text-sm text-muted-foreground capitalize">
+          {aggregation} View • {chartData.length} data points
         </div>
       </div>
 
       <Tabs defaultValue="revenue" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="revenue">Revenue from Swaps</TabsTrigger>
-          <TabsTrigger value="combined">Revenue vs Swaps</TabsTrigger>
-          <TabsTrigger value="efficiency">Swap Efficiency</TabsTrigger>
+          <TabsTrigger value="revenue">{labels.title}</TabsTrigger>
+          <TabsTrigger value="combined">{labels.combinedTitle}</TabsTrigger>
+          <TabsTrigger value="efficiency">{labels.efficiencyTitle}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="revenue">
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={currentData}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
-                dataKey={timeKey}
+                dataKey="period"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
               />
               <YAxis
                 className="text-xs fill-muted-foreground"
@@ -221,11 +247,11 @@ export function RevenueAnalyticsChart({
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
                     return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
-                        <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border bg-background p-3 shadow-sm">
+                        <div className="grid grid-cols-2 gap-3">
                           <div className="flex flex-col">
                             <span className="text-[0.70rem] uppercase text-muted-foreground">
-                              {viewType === "daily" ? "Date" : "Hour"}
+                              {labels.periodLabel}
                             </span>
                             <span className="font-bold text-muted-foreground">
                               {label}
@@ -235,8 +261,8 @@ export function RevenueAnalyticsChart({
                             <span className="text-[0.70rem] uppercase text-muted-foreground">
                               Revenue
                             </span>
-                            <span className="font-bold">
-                              ${payload[0].value?.toLocaleString()}
+                            <span className="font-bold text-primary">
+                              {payload[0].value?.toLocaleString()}
                             </span>
                           </div>
                           <div className="flex flex-col">
@@ -252,7 +278,7 @@ export function RevenueAnalyticsChart({
                               Avg per Swap
                             </span>
                             <span className="font-bold">
-                              ${data.avgPerSwap?.toFixed(2)}
+                              {data.avgPerSwap?.toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -276,29 +302,39 @@ export function RevenueAnalyticsChart({
 
         <TabsContent value="combined">
           <ResponsiveContainer width="100%" height={400}>
-            <ComposedChart data={currentData}>
+            <ComposedChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
-                dataKey={timeKey}
+                dataKey="period"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
               />
               <YAxis
                 yAxisId="left"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                label={{
+                  value: "Revenue",
+                  angle: -90,
+                  position: "insideLeft",
+                }}
               />
               <YAxis
                 yAxisId="right"
                 orientation="right"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                label={{ value: "Swaps", angle: 90, position: "insideRight" }}
               />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
+                    const data = payload[0].payload;
                     return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
+                      <div className="rounded-lg border bg-background p-3 shadow-sm">
                         <div className="grid gap-2">
                           <div className="font-medium">{label}</div>
                           <div className="grid grid-cols-2 gap-4">
@@ -306,16 +342,32 @@ export function RevenueAnalyticsChart({
                               <span className="text-[0.70rem] uppercase text-muted-foreground">
                                 Revenue
                               </span>
-                              <div className="font-bold">
-                                ${payload[0]?.value?.toLocaleString()}
+                              <div className="font-bold text-primary">
+                                {data.revenue?.toLocaleString()}
                               </div>
                             </div>
                             <div>
                               <span className="text-[0.70rem] uppercase text-muted-foreground">
                                 Battery Swaps
                               </span>
+                              <div className="font-bold text-orange-600">
+                                {data.swaps?.toLocaleString()}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                Avg per Swap
+                              </span>
                               <div className="font-bold">
-                                {payload[1]?.value?.toLocaleString()}
+                                {data.avgPerSwap?.toFixed(2)}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                Efficiency
+                              </span>
+                              <div className="font-bold">
+                                {data.efficiency?.toFixed(1)}%
                               </div>
                             </div>
                           </div>
@@ -331,14 +383,16 @@ export function RevenueAnalyticsChart({
                 dataKey="revenue"
                 fill="hsl(var(--primary))"
                 opacity={0.8}
+                radius={[2, 2, 0, 0]}
               />
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="swaps"
-                stroke="hsl(var(--destructive))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--destructive))", strokeWidth: 2, r: 4 }}
+                stroke="#ea580c"
+                strokeWidth={3}
+                dot={{ fill: "#ea580c", strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, fill: "#ea580c" }}
               />
             </ComposedChart>
           </ResponsiveContainer>
@@ -346,46 +400,53 @@ export function RevenueAnalyticsChart({
 
         <TabsContent value="efficiency">
           <ResponsiveContainer width="100%" height={400}>
-            <ComposedChart data={currentData}>
+            <ComposedChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
-                dataKey={timeKey}
+                dataKey="period"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
               />
               <YAxis
-                yAxisId="left"
+                yAxisId="swaps"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
+                label={{
+                  value: "Battery Swaps",
+                  angle: -90,
+                  position: "insideLeft",
+                }}
               />
               <YAxis
-                yAxisId="right"
+                yAxisId="efficiency"
                 orientation="right"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
-                domain={[70, 100]}
-              />
-              <YAxis
-                yAxisId="optimal"
-                orientation="right"
-                className="text-xs fill-muted-foreground"
-                tick={{ fontSize: 12 }}
-                hide // Hide this axis as we're using it just for the optimal revenue line
+                domain={[90, 100]}
+                label={{
+                  value: "Efficiency (%)",
+                  angle: 90,
+                  position: "insideRight",
+                }}
               />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
+                    const revenueGap = data.optimalRevenue - data.revenue;
                     return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
+                      <div className="rounded-lg border bg-background p-3 shadow-sm">
                         <div className="grid gap-2">
                           <div className="font-medium">{label}</div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
                               <span className="text-[0.70rem] uppercase text-muted-foreground">
                                 Battery Swaps
                               </span>
-                              <div className="font-bold">
+                              <div className="font-bold text-blue-600">
                                 {data.swaps?.toLocaleString()}
                               </div>
                             </div>
@@ -393,29 +454,41 @@ export function RevenueAnalyticsChart({
                               <span className="text-[0.70rem] uppercase text-muted-foreground">
                                 Efficiency
                               </span>
-                              <div className="font-bold">
-                                {data.efficiency}%
+                              <div className="font-bold text-green-600">
+                                {data.efficiency?.toFixed(2)}%
                               </div>
                             </div>
                             <div>
                               <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                Revenue
+                                Actual Revenue
                               </span>
-                              <div className="font-bold">
-                                ${data.revenue?.toLocaleString()}
+                              <div className="font-bold text-primary">
+                                {data.revenue?.toLocaleString()}
                               </div>
                             </div>
                             <div>
                               <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                Optimal Revenue
+                                Potential Revenue
                               </span>
-                              <div className="font-bold">
-                                $
+                              <div className="font-bold text-green-600">
                                 {data.optimalRevenue
                                   ?.toFixed(0)
-                                  ?.toLocaleString()}
+                                  ?.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
                               </div>
                             </div>
+                            {revenueGap > 0 && (
+                              <div className="col-span-2">
+                                <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                  Revenue Gap
+                                </span>
+                                <div className="font-bold text-red-500">
+                                  -
+                                  {revenueGap
+                                    ?.toFixed(0)
+                                    ?.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -425,34 +498,117 @@ export function RevenueAnalyticsChart({
                 }}
               />
               <Bar
-                yAxisId="left"
+                yAxisId="swaps"
                 dataKey="swaps"
-                fill="hsl(var(--chart-2))"
+                fill="#3b82f6"
                 opacity={0.6}
                 radius={[4, 4, 0, 0]}
               />
               <Line
-                yAxisId="right"
+                yAxisId="efficiency"
                 type="monotone"
                 dataKey="efficiency"
-                stroke="hsl(var(--chart-1))"
+                stroke="#16a34a"
                 strokeWidth={3}
-                dot={{ fill: "hsl(var(--chart-1))", strokeWidth: 2, r: 5 }}
-              />
-              <Line
-                yAxisId="optimal"
-                type="monotone"
-                dataKey="optimalRevenue"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                // strokeDasharray="5 5"
-                dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
-                name="Optimal Revenue"
+                dot={{ fill: "#16a34a", strokeWidth: 2, r: 5 }}
+                activeDot={{ r: 7, fill: "#16a34a" }}
               />
             </ComposedChart>
           </ResponsiveContainer>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Demo component to show the chart with your sample data
+export default function Demo() {
+  const sampleData = [
+    {
+      AVERAGE_REVENUE_PER_SWAP: 250,
+      DATE: "2025-05-01",
+      SWAP_EFFICIENCY: 100,
+      TOTAL_REVENUE: 4750,
+      TOTAL_SWAPS: 19,
+    },
+    {
+      AVERAGE_REVENUE_PER_SWAP: 246.739130435,
+      DATE: "2025-05-02",
+      SWAP_EFFICIENCY: 98.717692308,
+      TOTAL_REVENUE: 5675,
+      TOTAL_SWAPS: 23,
+    },
+    {
+      AVERAGE_REVENUE_PER_SWAP: 247,
+      DATE: "2025-05-03",
+      SWAP_EFFICIENCY: 98.727272727,
+      TOTAL_REVENUE: 6175,
+      TOTAL_SWAPS: 25,
+    },
+    {
+      AVERAGE_REVENUE_PER_SWAP: 247.115384615,
+      DATE: "2025-05-04",
+      SWAP_EFFICIENCY: 98.541666667,
+      TOTAL_REVENUE: 6425,
+      TOTAL_SWAPS: 26,
+    },
+    {
+      AVERAGE_REVENUE_PER_SWAP: 245.967741935,
+      DATE: "2025-05-05",
+      SWAP_EFFICIENCY: 98.214285714,
+      TOTAL_REVENUE: 7625,
+      TOTAL_SWAPS: 31,
+    },
+    {
+      AVERAGE_REVENUE_PER_SWAP: 246.739130435,
+      DATE: "2025-05-06",
+      SWAP_EFFICIENCY: 99.242727273,
+      TOTAL_REVENUE: 5675,
+      TOTAL_SWAPS: 23,
+    },
+    {
+      AVERAGE_REVENUE_PER_SWAP: 246.052631579,
+      DATE: "2025-05-07",
+      SWAP_EFFICIENCY: 98.148888889,
+      TOTAL_REVENUE: 4675,
+      TOTAL_SWAPS: 19,
+    },
+    {
+      AVERAGE_REVENUE_PER_SWAP: 250,
+      DATE: "2025-05-08",
+      SWAP_EFFICIENCY: 100,
+      TOTAL_REVENUE: 5000,
+      TOTAL_SWAPS: 20,
+    },
+  ];
+
+  const [selectedAggregation, setSelectedAggregation] = useState("daily");
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Battery Swap Revenue Analytics</h2>
+        <div className="flex gap-2">
+          {["daily", "monthly", "quarterly", "annually"].map((agg) => (
+            <Button
+              key={agg}
+              variant={selectedAggregation === agg ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedAggregation(agg)}
+              className="capitalize"
+            >
+              {agg}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <RevenueAnalyticsChart
+        filters={{ aggregation: selectedAggregation as any }}
+        data={sampleData}
+        loading={false}
+        error={undefined}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,12 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import type { GPSFilters } from "@/types/gps";
@@ -54,6 +61,29 @@ export function GPSFilters({
   );
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<"from" | "to">("from");
+
+  // Track original counts for cascading info
+  const [originalCounts, setOriginalCounts] = useState({
+    tboxes: 0,
+    bmses: 0,
+    batteryTypes: 0,
+  });
+
+  // Update original counts when data first loads (no filters applied)
+  useEffect(() => {
+    const hasFilters =
+      filters.selectedTboxes.length > 0 ||
+      filters.selectedBmses.length > 0 ||
+      filters.selectedBatteryTypes.length > 0;
+
+    if (!hasFilters && !loading) {
+      setOriginalCounts({
+        tboxes: tboxes.length,
+        bmses: bmses.length,
+        batteryTypes: batteryTypes.length,
+      });
+    }
+  }, [tboxes.length, bmses.length, batteryTypes.length, loading, filters]);
 
   // Sync tempRange with filters.dateRange
   useEffect(() => {
@@ -184,6 +214,33 @@ export function GPSFilters({
   const isDateRangeDisabled = filters.quickTime !== "custom";
   const isDailyDisabled = filters.quickTime === "history";
 
+  // Check if options are being filtered by cascading
+  const isCascadingActive =
+    filters.selectedTboxes.length > 0 ||
+    filters.selectedBmses.length > 0 ||
+    filters.selectedBatteryTypes.length > 0;
+
+  const getCascadingInfo = (type: "tboxes" | "bmses" | "batteryTypes") => {
+    if (!isCascadingActive) return null;
+
+    const currentCount =
+      type === "tboxes"
+        ? tboxes.length
+        : type === "bmses"
+        ? bmses.length
+        : batteryTypes.length;
+    const originalCount = originalCounts[type];
+
+    if (currentCount < originalCount) {
+      return {
+        filtered: currentCount,
+        total: originalCount,
+        isFiltered: true,
+      };
+    }
+    return null;
+  };
+
   const MonthYearSelector = ({
     date,
     onMonthChange,
@@ -273,43 +330,82 @@ export function GPSFilters({
     selectedItems: string[],
     placeholder: string,
     onItemChange: (item: string, checked: boolean) => void,
+    filterType: "tboxes" | "bmses" | "batteryTypes",
     disabled = false
-  ) => (
-    <Select
-      onValueChange={(value) => onItemChange(value, true)}
-      disabled={disabled || loading}
-    >
-      <SelectTrigger className={disabled ? "opacity-50" : ""}>
-        <SelectValue
-          placeholder={
-            loading
-              ? "Loading..."
-              : disabled
-              ? "No options available"
-              : placeholder
-          }
-        />
-      </SelectTrigger>
-      <SelectContent>
-        {loading ? (
-          <div className="flex items-center justify-center p-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="ml-2 text-sm">Loading...</span>
+  ) => {
+    const cascadingInfo = getCascadingInfo(filterType);
+
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Select
+            onValueChange={(value) => onItemChange(value, true)}
+            disabled={disabled || loading}
+          >
+            <SelectTrigger className={disabled ? "opacity-50" : ""}>
+              <SelectValue
+                placeholder={
+                  loading
+                    ? "Loading..."
+                    : disabled
+                    ? "No options available"
+                    : placeholder
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {loading ? (
+                <div className="flex items-center justify-center p-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="ml-2 text-sm">Loading...</span>
+                </div>
+              ) : items.length === 0 ? (
+                <div className="p-2 text-sm text-muted-foreground">
+                  No options available
+                </div>
+              ) : (
+                items.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+
+          {cascadingInfo && (
+            <TooltipProvider>
+              <Tooltip>
+                {/* <TooltipTrigger asChild>
+                  <div className="flex items-center">
+                    <Info className="h-4 w-4 text-amber-500" />
+                  </div>
+                </TooltipTrigger> */}
+                <TooltipContent>
+                  <p>
+                    Showing {cascadingInfo.filtered} of {cascadingInfo.total}{" "}
+                    options
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Options filtered by other selections
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+
+        {cascadingInfo && (
+          <div className="text-xs text-amber-600 flex items-center gap-1">
+            <Info className="h-3 w-3" />
+            <span>
+              {cascadingInfo.filtered} of {cascadingInfo.total} available
+            </span>
           </div>
-        ) : items.length === 0 ? (
-          <div className="p-2 text-sm text-muted-foreground">
-            No options available
-          </div>
-        ) : (
-          items.map((item) => (
-            <SelectItem key={item} value={item}>
-              {item}
-            </SelectItem>
-          ))
         )}
-      </SelectContent>
-    </Select>
-  );
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -321,6 +417,14 @@ export function GPSFilters({
             {getActiveFiltersCount() > 0 && (
               <Badge variant="secondary">
                 {getActiveFiltersCount()} active
+              </Badge>
+            )}
+            {isCascadingActive && (
+              <Badge
+                variant="outline"
+                className="text-amber-600 border-amber-300"
+              >
+                Cascading Active
               </Badge>
             )}
             {loading && (
@@ -580,7 +684,8 @@ export function GPSFilters({
               filters.selectedTboxes,
               "Select TBOX IDs",
               (item, checked) =>
-                handleFilterArrayChange("selectedTboxes", item, checked)
+                handleFilterArrayChange("selectedTboxes", item, checked),
+              "tboxes"
             )}
             <div className="flex flex-wrap gap-1">
               {filters.selectedTboxes.map((tbox) => (
@@ -605,7 +710,8 @@ export function GPSFilters({
               filters.selectedBmses,
               "Select BMS IDs",
               (item, checked) =>
-                handleFilterArrayChange("selectedBmses", item, checked)
+                handleFilterArrayChange("selectedBmses", item, checked),
+              "bmses"
             )}
             <div className="flex flex-wrap gap-1">
               {filters.selectedBmses.map((bms) => (
@@ -630,7 +736,8 @@ export function GPSFilters({
               filters.selectedBatteryTypes,
               "Select battery types",
               (item, checked) =>
-                handleFilterArrayChange("selectedBatteryTypes", item, checked)
+                handleFilterArrayChange("selectedBatteryTypes", item, checked),
+              "batteryTypes"
             )}
             <div className="flex flex-wrap gap-1">
               {filters.selectedBatteryTypes.map((type) => (
@@ -655,19 +762,49 @@ export function GPSFilters({
         {isExpanded && (
           <>
             <div className="text-xs text-muted-foreground border-t pt-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span>Available filters:</span>
                 <span className="px-2 py-1 bg-muted rounded">Date Range</span>
                 <span className="px-2 py-1 bg-muted rounded">
-                  TBOX IDs ({tboxes.length})
+                  TBOX IDs ({tboxes.length}
+                  {originalCounts.tboxes > 0 &&
+                  originalCounts.tboxes !== tboxes.length
+                    ? `/${originalCounts.tboxes}`
+                    : ""}
+                  )
                 </span>
                 <span className="px-2 py-1 bg-muted rounded">
-                  BMS IDs ({bmses.length})
+                  BMS IDs ({bmses.length}
+                  {originalCounts.bmses > 0 &&
+                  originalCounts.bmses !== bmses.length
+                    ? `/${originalCounts.bmses}`
+                    : ""}
+                  )
                 </span>
                 <span className="px-2 py-1 bg-muted rounded">
-                  Battery Type IDs ({batteryTypes.length})
+                  Battery Type IDs ({batteryTypes.length}
+                  {originalCounts.batteryTypes > 0 &&
+                  originalCounts.batteryTypes !== batteryTypes.length
+                    ? `/${originalCounts.batteryTypes}`
+                    : ""}
+                  )
                 </span>
               </div>
+              {isCascadingActive && (
+                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                  <div className="flex items-center gap-1 text-amber-700">
+                    <Info className="h-4 w-4" />
+                    <span className="font-medium">
+                      Cascading Filters Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Filter options are automatically filtered based on your
+                    current selections. Only combinations that exist in the data
+                    are shown.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t mt-4">
@@ -676,22 +813,53 @@ export function GPSFilters({
                 <div className="text-sm space-y-1">
                   <div className="flex justify-between">
                     <span>Available TBOX IDs:</span>
-                    <span className="font-mono">{tboxes.length}</span>
+                    <span className="font-mono">
+                      {tboxes.length}
+                      {originalCounts.tboxes > 0 &&
+                        originalCounts.tboxes !== tboxes.length && (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            / {originalCounts.tboxes}
+                          </span>
+                        )}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Available BMS IDs:</span>
-                    <span className="font-mono">{bmses.length}</span>
+                    <span className="font-mono">
+                      {bmses.length}
+                      {originalCounts.bmses > 0 &&
+                        originalCounts.bmses !== bmses.length && (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            / {originalCounts.bmses}
+                          </span>
+                        )}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Available Battery Type IDs:</span>
-                    <span className="font-mono">{batteryTypes.length}</span>
+                    <span className="font-mono">
+                      {batteryTypes.length}
+                      {originalCounts.batteryTypes > 0 &&
+                        originalCounts.batteryTypes !== batteryTypes.length && (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            / {originalCounts.batteryTypes}
+                          </span>
+                        )}
+                    </span>
                   </div>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Filter Tips</Label>
                 <div className="text-xs text-muted-foreground space-y-1">
-                  <p>• All filters operate independently at the same level</p>
+                  <p>
+                    • Filters cascade automatically - selecting one filter
+                    restricts others
+                  </p>
+                  <p>• Only valid combinations from the data are shown</p>
                   <p>• Use "Clear All" to reset all filters to defaults</p>
                   <p>
                     • Default range: Last year (this month last year to last
