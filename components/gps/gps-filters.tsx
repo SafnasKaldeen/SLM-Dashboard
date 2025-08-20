@@ -149,7 +149,16 @@ export function GPSFilters({
         dateRange: range,
       });
     } else {
-      updateFilters({ quickTime: value });
+      // When switching to custom, preserve current date range or use existing one
+      const currentRange = filters.dateRange || getDefaultDateRange();
+      setTempRange(currentRange);
+      updateFilters({
+        quickTime: value,
+        // Keep the existing date range when switching to custom
+        dateRange: currentRange,
+      });
+      // Automatically open the calendar when switching to custom
+      setIsCalendarOpen(true);
     }
   };
 
@@ -173,13 +182,18 @@ export function GPSFilters({
 
     if (datePickerMode === "from") {
       newRange.from = date;
+      // If the new from date is after the current to date, clear the to date
       if (newRange.to && date > newRange.to) {
         newRange.to = undefined;
       }
+      // Auto-switch to "to" mode after selecting from date
+      setDatePickerMode("to");
     } else if (datePickerMode === "to") {
       newRange.to = date;
+      // If the new to date is before the current from date, clear the from date
       if (newRange.from && date < newRange.from) {
         newRange.from = undefined;
+        setDatePickerMode("from");
       }
     }
 
@@ -201,9 +215,16 @@ export function GPSFilters({
     setIsCalendarOpen(false);
   };
 
+  const cancelDateRange = () => {
+    // Revert to the current filter's date range
+    setTempRange(filters.dateRange);
+    setIsCalendarOpen(false);
+    setDatePickerMode("from");
+  };
+
   const getActiveFiltersCount = () => {
     let count = 0;
-    if (filters.dateRange?.from || filters.dateRange?.to) count++;
+    if (filters.quickTime !== "last_year") count++; // Count non-default time selection
     if (filters.selectedTboxes.length > 0) count++;
     if (filters.selectedBmses.length > 0) count++;
     if (filters.selectedBatteryTypes.length > 0) count++;
@@ -364,11 +385,13 @@ export function GPSFilters({
                   No options available
                 </div>
               ) : (
-                items.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item}
-                  </SelectItem>
-                ))
+                items
+                  .filter((item) => !selectedItems.includes(item))
+                  .map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))
               )}
             </SelectContent>
           </Select>
@@ -376,11 +399,11 @@ export function GPSFilters({
           {cascadingInfo && (
             <TooltipProvider>
               <Tooltip>
-                {/* <TooltipTrigger asChild>
+                <TooltipTrigger asChild>
                   <div className="flex items-center">
                     <Info className="h-4 w-4 text-amber-500" />
                   </div>
-                </TooltipTrigger> */}
+                </TooltipTrigger>
                 <TooltipContent>
                   <p>
                     Showing {cascadingInfo.filtered} of {cascadingInfo.total}{" "}
@@ -476,7 +499,14 @@ export function GPSFilters({
 
           {/* Date Range Picker */}
           <div className="space-y-2">
-            <Label>Date Range</Label>
+            <Label>
+              Date Range
+              {filters.quickTime === "custom" && (
+                <span className="text-xs text-blue-600 ml-1">
+                  (Custom Mode)
+                </span>
+              )}
+            </Label>
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -485,7 +515,7 @@ export function GPSFilters({
                     isDateRangeDisabled
                       ? "opacity-50 cursor-not-allowed bg-muted"
                       : "hover:bg-accent hover:text-accent-foreground"
-                  }`}
+                  } ${filters.quickTime === "custom" ? "border-blue-300" : ""}`}
                   disabled={isDateRangeDisabled}
                   onClick={() =>
                     !isDateRangeDisabled && setIsCalendarOpen(true)
@@ -632,7 +662,14 @@ export function GPSFilters({
                           </div>
                         )}
 
-                        <div className="flex justify-end">
+                        <div className="flex justify-between">
+                          <Button
+                            onClick={cancelDateRange}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Cancel
+                          </Button>
                           <Button
                             onClick={applyDateRange}
                             disabled={!tempRange?.from || !tempRange?.to}
@@ -864,6 +901,9 @@ export function GPSFilters({
                   <p>
                     • Default range: Last year (this month last year to last
                     month)
+                  </p>
+                  <p>
+                    • Select "Custom" in Quick Time to enable date range picker
                   </p>
                 </div>
               </div>

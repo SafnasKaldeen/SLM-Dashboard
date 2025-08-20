@@ -47,7 +47,7 @@ const formatCurrency = (amount: number) =>
 // ------------------ Individual Vehicle Card ------------------
 const VehicleCard = ({ vehicle }: { vehicle: Vehicle }) => (
   <Card className="border-slate-700/50 backdrop-blur-xl hover:bg-slate-800/30 transition-all duration-200 group">
-    <CardContent className="p-6">
+    <CardContent className="py-6 px-3">
       {/* Header Section */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
@@ -84,22 +84,20 @@ const VehicleCard = ({ vehicle }: { vehicle: Vehicle }) => (
       {/* Performance Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div className="bg-slate-800/50 rounded-lg p-3">
-          <div className="text-slate-400 text-xs mb-1">Avg Monthly Swaps</div>
+          <div className="text-slate-400 text-xs mb-1">Total Swaps</div>
           <div className="text-slate-100 font-semibold">
             {formatNumber(vehicle.TOTAL_SWAPS_DAILY)}
           </div>
         </div>
 
         <div className="bg-slate-800/50 rounded-lg p-3">
-          <div className="text-slate-400 text-xs mb-1">
-            Avg Monthly Charging
-          </div>
+          <div className="text-slate-400 text-xs mb-1">Total Charging</div>
           <div className="text-slate-100 font-semibold">
             {formatNumber(vehicle.TOTAL_CHARGING_SESSIONS)}
           </div>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3">
-          <div className="text-slate-400 text-xs mb-1">Avg Distance/Day</div>
+          <div className="text-slate-400 text-xs mb-1">Total Distance</div>
           <div className="text-slate-100 font-semibold">
             {vehicle.AVG_DISTANCE_PER_DAY.toFixed(1)} km
           </div>

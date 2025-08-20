@@ -1,16 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Car,
   AlertTriangle,
@@ -25,8 +17,7 @@ import VehicleCards from "@/components/vehicles/VehicleCards";
 import KPICardsGrid from "@/components/vehicles/KPICardsGrid";
 import {
   OverviewFilter,
-  type OverviewFilter as OverviewFilterType,
-  type DisplayFilters,
+  type OverviewFilterType,
 } from "@/components/vehicles/OverviewFilter";
 
 // ============================================================================
@@ -61,70 +52,47 @@ interface FleetKPIs {
   TOTAL_DISTANCE_TRAVELLED: number;
 }
 
-interface FilterState {
-  vehicleModel: string;
-  batteryType: string;
-  region: string;
-}
-
 interface SearchFilters {
   searchTerm: string;
   customerIdSearch: string;
   statusFilter: string;
 }
 
-interface AdvancedSearchBarProps {
-  searchFilters: SearchFilters;
-  onSearchFiltersChange: (filters: SearchFilters) => void;
-  vehicleCount: number;
-  filteredCount: number;
-}
-
-interface LoadingStateProps {}
-
-interface ErrorStateProps {
-  error: string;
-  onRetry: () => void;
-}
-
-interface VehicleDisplaySectionProps {
-  searchFilters: SearchFilters;
-  onSearchFiltersChange: (filters: SearchFilters) => void;
-  vehicleCount: number;
-  filteredCount: number;
-  paginatedVehicles: Vehicle[];
-  currentPage: number;
-  totalPages: number;
-  itemsPerPage: number;
-  totalVehicles: number;
-  onPageChange: (page: number) => void;
-}
-
 // ============================================================================
 // UTILITY COMPONENTS
 // ============================================================================
 
-/**
- * Loading State Component
- * Displays a loading spinner with message while data is being fetched
- */
-const LoadingState: React.FC<LoadingStateProps> = () => (
+const LoadingState: React.FC = () => (
   <div className="min-h-screen p-6">
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-center h-64">
         <div className="flex items-center gap-2">
           <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
-          <span className="text-slate-300">Loading vehicle data...</span>
+          <span className="text-slate-300">Loading filter combinations...</span>
         </div>
       </div>
     </div>
   </div>
 );
 
-/**
- * Error State Component
- * Displays error message with retry functionality
- */
+const GraphsLoadingState: React.FC = () => (
+  <div className="space-y-6">
+    <Card className="bg-slate-800/50 border-slate-700/50">
+      <CardContent className="p-6 text-center">
+        <div className="flex items-center justify-center gap-2">
+          <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
+          <span className="text-slate-300">Loading KPIs and charts...</span>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+);
+
+interface ErrorStateProps {
+  error: string;
+  onRetry: () => void;
+}
+
 const ErrorState: React.FC<ErrorStateProps> = ({ error, onRetry }) => (
   <div className="min-h-screen p-6">
     <div className="max-w-7xl mx-auto">
@@ -148,257 +116,21 @@ const ErrorState: React.FC<ErrorStateProps> = ({ error, onRetry }) => (
 );
 
 // ============================================================================
-// METRICS SECTION COMPONENTS (AFFECTS API CALLS & KPIs)
+// MAIN PAGE COMPONENT - FIXED
 // ============================================================================
 
-/**
- * Metrics Filter Section Component
- * Contains filters that affect API calls and KPI calculations
- */
-const MetricsFilterSection: React.FC<{
-  onFiltersChange: (filters: OverviewFilterType) => void;
-  onDisplayFiltersChange: (filters: DisplayFilters) => void;
-  loading: boolean;
-  fleetKPIs: FleetKPIs | null;
-}> = ({ onFiltersChange, onDisplayFiltersChange, loading, fleetKPIs }) => (
-  <div className="space-y-6">
-    {/* Main Vehicle Filters Component (affects API and KPIs) */}
-    <OverviewFilter
-      onFiltersChange={onFiltersChange}
-      onDisplayFiltersChange={onDisplayFiltersChange}
-      loading={loading}
-    />
-
-    {/* KPI Cards Grid */}
-    {fleetKPIs && <KPICardsGrid fleetKPIs={fleetKPIs} />}
-  </div>
-);
-
-// ============================================================================
-// VEHICLE DISPLAY SECTION COMPONENTS (DISPLAY ONLY - NO API IMPACT)
-// ============================================================================
-
-/**
- * Advanced Search Bar Component
- * Provides comprehensive search functionality for vehicle filtering
- * Note: This component ONLY affects card display, NOT metrics or API calls
- */
-const AdvancedSearchBar: React.FC<AdvancedSearchBarProps> = ({
-  searchFilters,
-  onSearchFiltersChange,
-  vehicleCount,
-  filteredCount,
-}) => {
-  // Handle input changes for search fields
-  const handleInputChange = (field: keyof SearchFilters, value: string) => {
-    onSearchFiltersChange({
-      ...searchFilters,
-      [field]: value,
-    });
-  };
-
-  // Clear individual search field
-  const clearSearch = (field: keyof SearchFilters) => {
-    onSearchFiltersChange({
-      ...searchFilters,
-      [field]: field === "statusFilter" ? "all" : "",
-    });
-  };
-
-  // Clear all search fields
-  const clearAllSearches = () => {
-    onSearchFiltersChange({
-      searchTerm: "",
-      customerIdSearch: "",
-      statusFilter: "all",
-    });
-  };
-
-  // Check if any filters are active
-  const hasActiveFilters =
-    searchFilters.searchTerm ||
-    searchFilters.customerIdSearch ||
-    searchFilters.statusFilter !== "all";
-
-  return (
-    <Card className="border-amber-500/30 bg-amber-500/5">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-slate-100 flex items-center gap-2">
-              <Search className="h-5 w-5 text-amber-400" />
-              Additional Search & Filters
-            </CardTitle>
-          </div>
-          {hasActiveFilters && (
-            <Button
-              onClick={clearAllSearches}
-              variant="outline"
-              size="sm"
-              className="text-slate-400 hover:text-slate-100 border-amber-500/30 hover:border-amber-400"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Clear All
-            </Button>
-          )}
-        </div>
-        {filteredCount !== vehicleCount && (
-          <div className="flex items-center gap-2 pt-2">
-            <div className="h-2 w-2 rounded-full bg-amber-400"></div>
-            <p className="text-sm text-amber-400 font-medium">
-              Showing {filteredCount} of {vehicleCount} vehicles in cards below
-            </p>
-          </div>
-        )}
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* General Search Field */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">
-            General Search
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search across all fields..."
-              value={searchFilters.searchTerm}
-              onChange={(e) => handleInputChange("searchTerm", e.target.value)}
-              className="pl-10 bg-slate-700/50 border-slate-600/50 text-slate-100 placeholder-slate-400 focus:border-amber-400/50"
-            />
-            {searchFilters.searchTerm && (
-              <Button
-                onClick={() => clearSearch("searchTerm")}
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-600/50"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Specific Search Fields Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Customer ID Search */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-300">
-              Customer ID
-            </label>
-            <div className="relative">
-              <Input
-                placeholder="Search by Customer ID..."
-                value={searchFilters.customerIdSearch}
-                onChange={(e) =>
-                  handleInputChange("customerIdSearch", e.target.value)
-                }
-                className="bg-slate-700/50 border-slate-600/50 text-slate-100 placeholder-slate-400 focus:border-amber-400/50"
-              />
-              {searchFilters.customerIdSearch && (
-                <Button
-                  onClick={() => clearSearch("customerIdSearch")}
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-600/50"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-300">
-              Status Filter
-            </label>
-            <Select
-              value={searchFilters.statusFilter}
-              onValueChange={(value) =>
-                handleInputChange("statusFilter", value)
-              }
-            >
-              <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-slate-100">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                <SelectItem value="CHARGING">Charging</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-/**
- * Vehicle Display Section Component
- * Groups additional search and vehicle cards together to show clear relationship
- * This entire section is for display purposes only and does NOT affect metrics
- */
-const VehicleDisplaySection: React.FC<VehicleDisplaySectionProps> = ({
-  searchFilters,
-  onSearchFiltersChange,
-  vehicleCount,
-  filteredCount,
-  paginatedVehicles,
-  currentPage,
-  totalPages,
-  itemsPerPage,
-  totalVehicles,
-  onPageChange,
-}) => (
-  <div className="space-y-6">
-    {/* Section Header */}
-    {/* <div className="text-center space-y-2">
-      <p className="text-sm text-slate-400">
-        Additional search filters for vehicle cards below -{" "}
-        <span className="text-amber-400 font-medium">
-          does NOT affect metrics above
-        </span>
-      </p>
-    </div> */}
-
-    {/* Advanced Search Bar */}
-    {/* <AdvancedSearchBar
-      searchFilters={searchFilters}
-      onSearchFiltersChange={onSearchFiltersChange}
-      vehicleCount={vehicleCount}
-      filteredCount={filteredCount}
-    /> */}
-
-    {/* Vehicle Cards with visual connection indicator */}
-    <div className="relative">
-      {/* Vehicle Cards */}
-      <VehicleCards
-        vehicles={paginatedVehicles}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        itemsPerPage={itemsPerPage}
-        totalVehicles={totalVehicles}
-        onPageChange={onPageChange}
-      />
-    </div>
-  </div>
-);
-
-// ============================================================================
-// MAIN PAGE COMPONENT
-// ============================================================================
-
-/**
- * Vehicle Overview Page Component
- * Main dashboard component that orchestrates all vehicle-related data and UI
- */
 const VehicleOverviewPage: React.FC = () => {
+  // Create stable default date range
+  const defaultDateRange = useMemo(() => {
+    const today = new Date();
+    return {
+      from: new Date(today.getFullYear() - 1, today.getMonth(), 1),
+      to: new Date(today.getFullYear(), today.getMonth(), 0),
+    };
+  }, []);
+
   // ============================================================================
-  // STATE MANAGEMENT
+  // STATE MANAGEMENT - SIMPLIFIED AND STABILIZED
   // ============================================================================
 
   // Data State
@@ -408,24 +140,28 @@ const VehicleOverviewPage: React.FC = () => {
   const [chargingOverTime, setChargingOverTime] = useState<any[]>([]);
   const [batteryDistribution, setBatteryDistribution] = useState<any[]>([]);
 
+  // Filter combinations state
+  const [filterCombinations, setFilterCombinations] = useState<any[]>([]);
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
+  const [filtersError, setFiltersError] = useState<string | null>(null);
+
   // Loading and Error State
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter State - Main filters from OverviewFilter component (affects API calls)
-  const [vehicleFilters, setVehicleFilters] = useState<OverviewFilterType>({
-    selectedModels: [],
-    selectedBatteryTypes: [],
-    selectedStatuses: [],
-    customerTypes: [],
-    aggregation: "monthly",
-  });
-
-  // Display filters from OverviewFilter component (affects only card display)
-  const [displayFilters, setDisplayFilters] = useState<DisplayFilters>({
-    vehicleIdSearch: "",
-    vinSearch: "",
-  });
+  // Vehicle filters with stable initial state
+  const [vehicleFilters, setVehicleFilters] = useState<OverviewFilterType>(
+    () => ({
+      selectedModels: [],
+      selectedBatteryTypes: [],
+      selectedStatuses: [],
+      customerTypes: [],
+      aggregation: "monthly",
+      dateRange: defaultDateRange,
+      vehicleIdSearch: "",
+      chassisNumberSearch: "",
+    })
+  );
 
   // Additional Search Filter State (affects only card display)
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
@@ -434,56 +170,151 @@ const VehicleOverviewPage: React.FC = () => {
     statusFilter: "all",
   });
 
-  // Legacy API Filter State (for backward compatibility)
-  const [filters, setFilters] = useState<FilterState>({
-    vehicleModel: "all",
-    batteryType: "all",
-    region: "all",
-  });
-
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
+  // Use refs to track if initial load is complete
+  const initialLoadRef = useRef(false);
+  const filterCombinationsLoadedRef = useRef(false);
+
   // ============================================================================
-  // DATA FETCHING
+  // STABLE FILTER COMPARISON
   // ============================================================================
 
-  /**
-   * Fetch vehicle data from API
-   * Combines OverviewFilter with legacy filter system
-   * Only dateRange, selectedModels, and selectedBatteryTypes affect data fetching
-   */
-  const fetchData = useCallback(async () => {
+  // Create a stable string representation of API-affecting filters
+  const apiFiltersKey = useMemo(() => {
+    const apiFilters = {
+      dateRange: vehicleFilters.dateRange
+        ? `${vehicleFilters.dateRange.from?.getTime()}-${vehicleFilters.dateRange.to?.getTime()}`
+        : "no-date",
+      selectedModels: vehicleFilters.selectedModels.sort().join(","),
+      selectedBatteryTypes: vehicleFilters.selectedBatteryTypes
+        .sort()
+        .join(","),
+      selectedStatuses: vehicleFilters.selectedStatuses.sort().join(","),
+      customerTypes: vehicleFilters.customerTypes.sort().join(","),
+      aggregation: vehicleFilters.aggregation,
+    };
+    return JSON.stringify(apiFilters);
+  }, [
+    vehicleFilters.dateRange?.from?.getTime(),
+    vehicleFilters.dateRange?.to?.getTime(),
+    vehicleFilters.selectedModels,
+    vehicleFilters.selectedBatteryTypes,
+    vehicleFilters.selectedStatuses,
+    vehicleFilters.customerTypes,
+    vehicleFilters.aggregation,
+  ]);
+
+  // ============================================================================
+  // DATA FETCHING - FIXED
+  // ============================================================================
+
+  const fetchFilterCombinations = useCallback(async () => {
+    if (filterCombinationsLoadedRef.current) return;
+
+    setFiltersLoaded(false);
+    setFiltersError(null);
+
+    try {
+      console.log("Fetching filter combinations...");
+
+      const response = await fetch("/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sql: `
+            SELECT DISTINCT
+              vm.NAME as vehicle_model_id,
+              v.battery_type_id,
+              CASE WHEN v.ACTIVE = 1 THEN 'ACTIVE' ELSE 'INACTIVE' END as status,
+              v.VEHICLE_ID,
+              v.chassis_number
+            FROM SOURCE_DATA.MASTER_DATA.VEHICLE v
+            JOIN SOURCE_DATA.MASTER_DATA.VEHICLE_MODEL vm 
+                 ON v.VEHICLE_MODEL_ID = vm.MODEL_ID
+            WHERE v.DELETED = 0
+              AND vm.DELETED = 0
+            ORDER BY vm.NAME, v.battery_type_id, status, v.VEHICLE_ID
+          `,
+          params: [],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Filter combinations loaded:", data, "records");
+      setFilterCombinations(data);
+      setFiltersLoaded(true);
+      filterCombinationsLoadedRef.current = true;
+    } catch (error) {
+      console.error("Error fetching filter combinations:", error);
+      setFiltersError("Failed to load filter options");
+    }
+  }, []);
+
+  const fetchVehicleData = useCallback(async () => {
+    if (!filtersLoaded) return;
+
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams();
 
-      // Default date range
-      params.append("dateRange", "30");
-
-      // Map selectedModels to vehicleModel parameter (affects API)
-      if (vehicleFilters.selectedModels.length === 1) {
-        params.append("vehicleModel", vehicleFilters.selectedModels[0]);
+      // Handle date range properly
+      if (vehicleFilters.dateRange?.from && vehicleFilters.dateRange?.to) {
+        const daysDiff = Math.ceil(
+          (vehicleFilters.dateRange.to.getTime() -
+            vehicleFilters.dateRange.from.getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
+        params.append("dateRange", daysDiff.toString());
+        params.append(
+          "startDate",
+          vehicleFilters.dateRange.from.toISOString().split("T")[0]
+        );
+        params.append(
+          "endDate",
+          vehicleFilters.dateRange.to.toISOString().split("T")[0]
+        );
       } else {
-        params.append("vehicleModel", filters.vehicleModel);
+        params.append("dateRange", "365");
       }
 
-      // Map selectedBatteryTypes to batteryType parameter (affects API)
-      if (vehicleFilters.selectedBatteryTypes.length === 1) {
-        params.append("batteryType", vehicleFilters.selectedBatteryTypes[0]);
-      } else {
-        params.append("batteryType", filters.batteryType);
+      // Handle multiple selections properly (ONLY API-affecting filters)
+      if (vehicleFilters.selectedModels.length > 0) {
+        params.append("vehicleModels", vehicleFilters.selectedModels.join(","));
       }
 
-      // Use existing region filter
-      params.append("region", filters.region);
+      if (vehicleFilters.selectedBatteryTypes.length > 0) {
+        params.append(
+          "batteryTypes",
+          vehicleFilters.selectedBatteryTypes.join(",")
+        );
+      }
+
+      if (vehicleFilters.selectedStatuses.length > 0) {
+        params.append("statuses", vehicleFilters.selectedStatuses.join(","));
+      }
+
+      if (vehicleFilters.customerTypes.length > 0) {
+        params.append("customerTypes", vehicleFilters.customerTypes.join(","));
+      }
+
+      params.append("aggregation", vehicleFilters.aggregation);
+
+      // console.log("Fetching vehicles with params:", params.toString());
 
       const response = await fetch(`/api/vehicles?${params}`);
       const result = await response.json();
-
+      // console.log("Vehicle data fetched:", result);
       if (result.success) {
         setVehicles(result.data.vehicles);
         setFleetKPIs(result.data.kpis);
@@ -494,85 +325,75 @@ const VehicleOverviewPage: React.FC = () => {
         setError(result.error);
       }
     } catch (err) {
-      setError("Failed to fetch data");
+      setError("Failed to fetch vehicle data");
       console.error("Error:", err);
     } finally {
       setLoading(false);
     }
-  }, [
-    vehicleFilters.selectedModels,
-    vehicleFilters.selectedBatteryTypes,
-    vehicleFilters.aggregation,
-    filters.vehicleModel,
-    filters.batteryType,
-    filters.region,
-  ]);
+  }, [filtersLoaded, apiFiltersKey]); // Use stable key instead of individual values
 
   // ============================================================================
-  // EVENT HANDLERS
+  // EVENT HANDLERS - STABILIZED
   // ============================================================================
 
-  /**
-   * Handle changes to main vehicle filters (affects API calls)
-   * Only dateRange, selectedModels, and selectedBatteryTypes trigger API calls
-   */
-  const handleVehicleFiltersChange = (newFilters: OverviewFilterType) => {
-    setVehicleFilters(newFilters);
-  };
+  const handleVehicleFiltersChange = useCallback(
+    (newFilters: Partial<OverviewFilterType>) => {
+      // console.log("Filter change received:", newFilters);
 
-  /**
-   * Handle changes to display filters from OverviewFilter (affects only card display)
-   * vehicleIdSearch and vinSearch are display-only filters
-   */
-  const handleDisplayFiltersChange = (newFilters: DisplayFilters) => {
-    setDisplayFilters(newFilters);
-  };
+      setVehicleFilters((prevFilters) => {
+        const updatedFilters = {
+          ...prevFilters,
+          ...newFilters,
+        };
 
-  /**
-   * Handle changes to additional search filters (affects only card display)
-   */
-  const handleSearchFiltersChange = (newFilters: SearchFilters) => {
-    setSearchFilters(newFilters);
-  };
+        // Ensure dateRange is properly handled
+        if (newFilters.dateRange !== undefined) {
+          updatedFilters.dateRange = newFilters.dateRange;
+        }
+
+        console.log("Updated filters:", updatedFilters);
+        return updatedFilters;
+      });
+    },
+    []
+  );
+
+  const handleSearchFiltersChange = useCallback((newFilters: SearchFilters) => {
+    setSearchFilters((prevFilters) => ({
+      ...prevFilters,
+      ...newFilters,
+    }));
+  }, []);
 
   // ============================================================================
-  // DATA PROCESSING
+  // DATA PROCESSING - OPTIMIZED
   // ============================================================================
 
-  /**
-   * Filter vehicles based on all search criteria
-   * This filtering only affects the display of vehicle cards, not KPIs or API calls
-   */
   const filteredVehicles = useMemo(() => {
     return vehicles.filter((vehicle) => {
       // General search across multiple fields
       const matchesGeneralSearch =
         !searchFilters.searchTerm ||
-        vehicle.VEHICLE_ID.toLowerCase().includes(
-          searchFilters.searchTerm.toLowerCase()
-        ) ||
-        vehicle.VIN.toLowerCase().includes(
-          searchFilters.searchTerm.toLowerCase()
-        ) ||
-        vehicle.MODEL.toLowerCase().includes(
-          searchFilters.searchTerm.toLowerCase()
-        ) ||
-        (vehicle.CUSTOMER_ID &&
-          vehicle.CUSTOMER_ID.toLowerCase().includes(
-            searchFilters.searchTerm.toLowerCase()
-          ));
-
-      // Display filters from OverviewFilter component
-      const matchesVehicleId =
-        !displayFilters.vehicleIdSearch ||
-        vehicle.VEHICLE_ID.toLowerCase().includes(
-          displayFilters.vehicleIdSearch.toLowerCase()
+        [
+          vehicle.VEHICLE_ID,
+          vehicle.VIN,
+          vehicle.MODEL,
+          vehicle.CUSTOMER_ID || "",
+        ].some((field) =>
+          field.toLowerCase().includes(searchFilters.searchTerm.toLowerCase())
         );
 
-      const matchesVin =
-        !displayFilters.vinSearch ||
+      // Display-only filters from main filter component
+      const matchesVehicleId =
+        !vehicleFilters.vehicleIdSearch ||
+        vehicle.VEHICLE_ID.toLowerCase().includes(
+          vehicleFilters.vehicleIdSearch.toLowerCase()
+        );
+
+      const matchesChassisNumber =
+        !vehicleFilters.chassisNumberSearch ||
         vehicle.VIN.toLowerCase().includes(
-          displayFilters.vinSearch.toLowerCase()
+          vehicleFilters.chassisNumberSearch.toLowerCase()
         );
 
       // Additional search filters
@@ -588,7 +409,7 @@ const VehicleOverviewPage: React.FC = () => {
         searchFilters.statusFilter === "all" ||
         vehicle.STATUS === searchFilters.statusFilter;
 
-      // Main vehicle filters from OverviewFilter component
+      // Main vehicle filters from OverviewFilter component (these also affect API)
       const matchesModel =
         vehicleFilters.selectedModels.length === 0 ||
         vehicleFilters.selectedModels.includes(vehicle.MODEL);
@@ -604,7 +425,7 @@ const VehicleOverviewPage: React.FC = () => {
       return (
         matchesGeneralSearch &&
         matchesVehicleId &&
-        matchesVin &&
+        matchesChassisNumber &&
         matchesCustomerId &&
         matchesStatus &&
         matchesModel &&
@@ -612,51 +433,97 @@ const VehicleOverviewPage: React.FC = () => {
         matchesMainStatus
       );
     });
-  }, [vehicles, searchFilters, displayFilters, vehicleFilters]);
+  }, [vehicles, searchFilters, vehicleFilters]);
 
-  /**
-   * Get paginated vehicles for current page
-   */
   const paginatedVehicles = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredVehicles.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredVehicles, currentPage]);
 
-  // Calculate total pages
   const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
 
   // ============================================================================
-  // EFFECTS
+  // EFFECTS - FIXED TO PREVENT INFINITE LOOPS
   // ============================================================================
 
-  /**
-   * Fetch data when API-affecting filters change
-   * Only selectedModels and selectedBatteryTypes from vehicleFilters affect the API
-   */
+  // STEP 1: Load filter combinations on mount only
   useEffect(() => {
-    fetchData();
-  }, [
-    JSON.stringify(vehicleFilters.selectedModels),
-    JSON.stringify(vehicleFilters.selectedBatteryTypes),
-    vehicleFilters.aggregation,
-    filters.vehicleModel,
-    filters.batteryType,
-    filters.region,
-  ]);
+    if (!filterCombinationsLoadedRef.current) {
+      fetchFilterCombinations();
+    }
+  }, []); // Empty dependency array - run only once
 
-  /**
-   * Reset pagination when any filters change
-   */
+  // STEP 2: Fetch vehicle data when filters change (using stable key)
+  useEffect(() => {
+    if (filtersLoaded && !loading) {
+      console.log("API filters changed, fetching vehicle data...");
+      fetchVehicleData();
+    }
+  }, [filtersLoaded, apiFiltersKey]); // Use stable key instead of individual filter values
+
+  // STEP 3: Reset pagination when display filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [vehicleFilters, displayFilters, searchFilters]);
+  }, [
+    vehicleFilters.vehicleIdSearch,
+    vehicleFilters.chassisNumberSearch,
+    searchFilters.searchTerm,
+    searchFilters.customerIdSearch,
+    searchFilters.statusFilter,
+  ]);
 
   // ============================================================================
   // RENDER CONDITIONS
   // ============================================================================
 
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState error={error} onRetry={fetchData} />;
+  if (!filtersLoaded) {
+    if (filtersError) {
+      return (
+        <ErrorState error={filtersError} onRetry={fetchFilterCombinations} />
+      );
+    }
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return <ErrorState error={error} onRetry={fetchVehicleData} />;
+  }
+
+  // ============================================================================
+  // RENDER COMPONENTS
+  // ============================================================================
+
+  const MetricsFilterSection = () => (
+    <div className="space-y-6">
+      <OverviewFilter
+        onFiltersChange={handleVehicleFiltersChange}
+        loading={!filtersLoaded}
+        initialFilters={vehicleFilters}
+        filterCombinations={filterCombinations}
+      />
+
+      {loading ? (
+        <GraphsLoadingState />
+      ) : (
+        fleetKPIs && <KPICardsGrid fleetKPIs={fleetKPIs} />
+      )}
+    </div>
+  );
+
+  const VehicleDisplaySection = () => (
+    <div className="space-y-6">
+      <div className="relative">
+        <VehicleCards
+          vehicles={paginatedVehicles}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          totalVehicles={filteredVehicles.length}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+    </div>
+  );
 
   // ============================================================================
   // MAIN RENDER
@@ -681,27 +548,11 @@ const VehicleOverviewPage: React.FC = () => {
           </p>
         </div>
 
-        {/* ===== METRICS SECTION ===== */}
-        <MetricsFilterSection
-          onFiltersChange={handleVehicleFiltersChange}
-          onDisplayFiltersChange={handleDisplayFiltersChange}
-          loading={loading}
-          fleetKPIs={fleetKPIs}
-        />
+        {/* Metrics Section */}
+        <MetricsFilterSection />
 
-        {/* ===== VEHICLE DISPLAY SECTION ===== */}
-        <VehicleDisplaySection
-          searchFilters={searchFilters}
-          onSearchFiltersChange={handleSearchFiltersChange}
-          vehicleCount={vehicles.length}
-          filteredCount={filteredVehicles.length}
-          paginatedVehicles={paginatedVehicles}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          itemsPerPage={itemsPerPage}
-          totalVehicles={filteredVehicles.length}
-          onPageChange={setCurrentPage}
-        />
+        {/* Vehicle Display Section */}
+        <VehicleDisplaySection />
       </div>
     </div>
   );

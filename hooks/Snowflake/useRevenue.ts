@@ -80,6 +80,7 @@ export const useRevenue = (filters?: RevenueFilters) => {
         // The stored procedure should return an array with an object containing GET_REVENUE_METRICS_NEW
         if (Array.isArray(result) && result.length > 0 && result[0]?.GET_REVENUE_METRICS_NEW) {
           setData(result[0].GET_REVENUE_METRICS_NEW);
+          // console.log("✅ Revenue data fetched successfully:", result[0].GET_REVENUE_METRICS_NEW);
         } else {
           console.warn("⚠️ Unexpected response shape", result);
           setData(null);

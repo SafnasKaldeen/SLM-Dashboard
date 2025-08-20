@@ -53,6 +53,7 @@ export function RevenueChart({
     date: new Date(entry.PERIOD).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
+      day: "numeric",
     }),
     revenue: entry.NET_REVENUE,
   }));

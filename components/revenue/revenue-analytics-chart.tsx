@@ -425,7 +425,7 @@ export function RevenueAnalyticsChart({
                 orientation="right"
                 className="text-xs fill-muted-foreground"
                 tick={{ fontSize: 12 }}
-                domain={[90, 100]}
+                // domain={[90, 100]}
                 label={{
                   value: "Efficiency (%)",
                   angle: 90,

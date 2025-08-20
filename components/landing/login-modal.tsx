@@ -66,9 +66,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     //   setActiveTab("signin");
     // }
 
-    router.push(
-      "https://slm-dashboard-e757-o5m08sslg-safnas-kaldeens-projects-93071e55.vercel.app/realtime"
-    );
+    router.push("http://localhost:3000/realtime");
     onClose();
   };
 

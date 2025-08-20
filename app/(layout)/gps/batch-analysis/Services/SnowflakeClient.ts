@@ -2,7 +2,7 @@ import snowflake from "snowflake-sdk";
 
 // Snowflake connection config using only username/password
 const connectionConfig = {
-  account: "SEVHVJO-DW52117",
+  account: "JPCNHUS-SK19327",
   username: "USMAAN",
   password: "@Snowflake33340", // <-- replace with your actual password
   warehouse: "ETL_WH",
