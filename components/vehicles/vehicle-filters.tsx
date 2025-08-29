@@ -515,31 +515,6 @@ export function VehicleFilters({
             </Popover>
           </div>
 
-          {/* Aggregation */}
-          <div className="space-y-2">
-            <Label>Aggregation</Label>
-            <Select
-              value={filters.aggregation}
-              onValueChange={(value) =>
-                updateFilters({
-                  aggregation: value as VehicleFilters["aggregation"],
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily" disabled={isDailyDisabled}>
-                  Daily {isDailyDisabled && "(Not available for History)"}
-                </SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="quarterly">Quarterly</SelectItem>
-                <SelectItem value="annually">Annually</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Vehicle Model */}
           <div className="space-y-2">
             <Label>Vehicle Model</Label>
@@ -619,6 +594,56 @@ export function VehicleFilters({
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Vehicle ID */}
+        <div className="space-y-2">
+          <Label>Vehicle ID</Label>
+          <Select
+            value={filters.vehicleId}
+            onValueChange={(value) =>
+              updateFilters({
+                vehicleId: value as VehicleFilters["vehicleId"],
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily" disabled={isDailyDisabled}>
+                Daily {isDailyDisabled && "(Not available for History)"}
+              </SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="annually">Annually</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Chasis Number */}
+        <div className="space-y-2">
+          <Label>Chasis Number</Label>
+          <Select
+            value={filters.chasisNumber}
+            onValueChange={(value) =>
+              updateFilters({
+                chasisNumber: value as VehicleFilters["chasisNumber"],
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily" disabled={isDailyDisabled}>
+                Daily {isDailyDisabled && "(Not available for History)"}
+              </SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="annually">Annually</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {isExpanded && (

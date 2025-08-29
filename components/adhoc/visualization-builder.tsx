@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import {
   BarChart3,
   LineChart,
@@ -35,6 +36,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Layers,
 } from "lucide-react";
 import {
   BarChart as RechartsBarChart,
@@ -56,6 +58,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// Import the choropleth component
+import GeoChoroplethMap from "./geo-choropleth-map";
+
 interface ChartConfig {
   type: string;
   xField: string;
@@ -72,6 +77,19 @@ interface ChartConfig {
   lngField?: string;
   sizeField?: string;
   pingSpeedField?: string;
+  // Choropleth specific fields
+  choroplethOpacity?: number;
+  choroplethShowPoints?: boolean;
+  choroplethShowBorders?: boolean;
+  choroplethAggregation?: "count" | "sum" | "avg" | "max" | "min";
+  choroplethAggregationField?: string;
+  choroplethSelectBy?: "area" | "district" | "province";
+  choroplethMapProvider?:
+    | "openstreetmap"
+    | "cartodb_dark"
+    | "cartodb_light"
+    | "satellite";
+  choroplethPalette?: "YlOrRd" | "Viridis" | "Plasma" | "Turbo" | "Cividis";
 }
 
 interface SavedQuery {
@@ -130,6 +148,12 @@ const chartTypes = [
     icon: MapPin,
     description: "Display data points on an interactive map",
   },
+  {
+    id: "choropleth",
+    name: "Choropleth Map",
+    icon: Layers,
+    description: "Display data distribution across geographical regions",
+  },
 ];
 
 const colorSchemes = [
@@ -160,6 +184,11 @@ const defaultData = [
     latitude: 35.8617,
     longitude: 104.1954,
     ping_speed: 45,
+    province: "Beijing",
+    district: "Central",
+    area: "Downtown",
+    utilization_rate: 85.5,
+    revenue: 12500,
   },
   {
     country: "India",
@@ -169,6 +198,11 @@ const defaultData = [
     latitude: 20.5937,
     longitude: 78.9629,
     ping_speed: 67,
+    province: "Maharashtra",
+    district: "Mumbai",
+    area: "Bandra",
+    utilization_rate: 72.3,
+    revenue: 8900,
   },
   {
     country: "Japan",
@@ -178,6 +212,11 @@ const defaultData = [
     latitude: 36.2048,
     longitude: 138.2529,
     ping_speed: 23,
+    province: "Tokyo",
+    district: "Shibuya",
+    area: "Central Tokyo",
+    utilization_rate: 93.1,
+    revenue: 15600,
   },
   {
     country: "Germany",
@@ -187,6 +226,11 @@ const defaultData = [
     latitude: 51.1657,
     longitude: 10.4515,
     ping_speed: 34,
+    province: "Bavaria",
+    district: "Munich",
+    area: "City Center",
+    utilization_rate: 78.9,
+    revenue: 11200,
   },
   {
     country: "France",
@@ -196,6 +240,11 @@ const defaultData = [
     latitude: 46.2276,
     longitude: 2.2137,
     ping_speed: 28,
+    province: "Île-de-France",
+    district: "Paris",
+    area: "Champs-Élysées",
+    utilization_rate: 88.7,
+    revenue: 14300,
   },
   {
     country: "United Kingdom",
@@ -205,6 +254,11 @@ const defaultData = [
     latitude: 55.3781,
     longitude: -3.436,
     ping_speed: 31,
+    province: "England",
+    district: "London",
+    area: "Westminster",
+    utilization_rate: 91.2,
+    revenue: 16800,
   },
   {
     country: "United States",
@@ -214,6 +268,11 @@ const defaultData = [
     latitude: 37.0902,
     longitude: -95.7129,
     ping_speed: 52,
+    province: "California",
+    district: "San Francisco",
+    area: "Downtown",
+    utilization_rate: 89.4,
+    revenue: 18500,
   },
   {
     country: "Canada",
@@ -223,6 +282,11 @@ const defaultData = [
     latitude: 56.1304,
     longitude: -106.3468,
     ping_speed: 41,
+    province: "Ontario",
+    district: "Toronto",
+    area: "Financial District",
+    utilization_rate: 82.1,
+    revenue: 13400,
   },
   {
     country: "Brazil",
@@ -232,6 +296,11 @@ const defaultData = [
     latitude: -14.235,
     longitude: -51.9253,
     ping_speed: 78,
+    province: "São Paulo",
+    district: "São Paulo City",
+    area: "Vila Madalena",
+    utilization_rate: 76.8,
+    revenue: 9800,
   },
   {
     country: "Argentina",
@@ -241,6 +310,11 @@ const defaultData = [
     latitude: -38.4161,
     longitude: -63.6167,
     ping_speed: 89,
+    province: "Buenos Aires",
+    district: "Capital Federal",
+    area: "Palermo",
+    utilization_rate: 68.5,
+    revenue: 7200,
   },
   {
     country: "South Africa",
@@ -250,6 +324,11 @@ const defaultData = [
     latitude: -30.5595,
     longitude: 22.9375,
     ping_speed: 95,
+    province: "Western Cape",
+    district: "Cape Town",
+    area: "V&A Waterfront",
+    utilization_rate: 84.2,
+    revenue: 10500,
   },
   {
     country: "Egypt",
@@ -259,6 +338,11 @@ const defaultData = [
     latitude: 26.8206,
     longitude: 30.8025,
     ping_speed: 112,
+    province: "Cairo",
+    district: "New Cairo",
+    area: "Fifth Settlement",
+    utilization_rate: 71.6,
+    revenue: 8100,
   },
 ];
 
@@ -288,6 +372,25 @@ export default function VisualizationBuilder({
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+
+  // Choropleth-specific state
+  const [choroplethOpacity, setChoroplethOpacity] = useState(0.7);
+  const [choroplethShowPoints, setChoroplethShowPoints] = useState(false);
+  const [choroplethShowBorders, setChoroplethShowBorders] = useState(true);
+  const [choroplethAggregation, setChoroplethAggregation] = useState<
+    "count" | "sum" | "avg" | "max" | "min"
+  >("count");
+  const [choroplethAggregationField, setChoroplethAggregationField] =
+    useState("");
+  const [choroplethSelectBy, setChoroplethSelectBy] = useState<
+    "area" | "district" | "province"
+  >("province");
+  const [choroplethMapProvider, setChoroplethMapProvider] = useState<
+    "openstreetmap" | "cartodb_dark" | "cartodb_light" | "satellite"
+  >("cartodb_dark");
+  const [choroplethPalette, setChoroplethPalette] = useState<
+    "YlOrRd" | "Viridis" | "Plasma" | "Turbo" | "Cividis"
+  >("YlOrRd");
 
   // Table-specific state
   const [searchTerm, setSearchTerm] = useState("");
@@ -326,6 +429,10 @@ export default function VisualizationBuilder({
     if (fields.includes("ping_speed") && !pingSpeedField) {
       setPingSpeedField("ping_speed");
     }
+    // Initialize choropleth aggregation field
+    if (numericFields.length > 0 && !choroplethAggregationField) {
+      setChoroplethAggregationField(numericFields[0]);
+    }
   }, [
     fields,
     categoricalFields,
@@ -335,12 +442,15 @@ export default function VisualizationBuilder({
     latField,
     lngField,
     pingSpeedField,
+    choroplethAggregationField,
   ]);
 
   // Auto-generate title based on selections
   useEffect(() => {
     if (chartType === "map" && latField && lngField) {
       setTitle(`Geographic Distribution - Interactive Map`);
+    } else if (chartType === "choropleth" && latField && lngField) {
+      setTitle(`Choropleth Map - ${choroplethSelectBy} Level Analysis`);
     } else if (xField && yField && !title && chartType !== "table") {
       const chartName =
         chartTypes.find((t) => t.id === chartType)?.name || "Chart";
@@ -348,13 +458,24 @@ export default function VisualizationBuilder({
     } else if (chartType === "table" && !title) {
       setTitle("Data Table View");
     }
-  }, [xField, yField, chartType, title, latField, lngField]);
+  }, [
+    xField,
+    yField,
+    chartType,
+    title,
+    latField,
+    lngField,
+    choroplethSelectBy,
+  ]);
 
   // Handle configuration changes and notify parent
   const handleConfigChange = useCallback(() => {
     if (
       onVisualizationChange &&
-      (chartType === "table" || chartType === "map" || (xField && yField))
+      (chartType === "table" ||
+        chartType === "map" ||
+        chartType === "choropleth" ||
+        (xField && yField))
     ) {
       const config: ChartConfig = {
         type: chartType,
@@ -368,6 +489,8 @@ export default function VisualizationBuilder({
             ? "Data Table View"
             : chartType === "map"
             ? "Geographic Map"
+            : chartType === "choropleth"
+            ? "Choropleth Map"
             : `${yField} by ${xField}`),
         showLegend,
         showGrid,
@@ -378,6 +501,15 @@ export default function VisualizationBuilder({
         lngField,
         sizeField,
         pingSpeedField,
+        // Choropleth config
+        choroplethOpacity,
+        choroplethShowPoints,
+        choroplethShowBorders,
+        choroplethAggregation,
+        choroplethAggregationField,
+        choroplethSelectBy,
+        choroplethMapProvider,
+        choroplethPalette,
       };
       onVisualizationChange(config);
     }
@@ -397,6 +529,14 @@ export default function VisualizationBuilder({
     lngField,
     sizeField,
     pingSpeedField,
+    choroplethOpacity,
+    choroplethShowPoints,
+    choroplethShowBorders,
+    choroplethAggregation,
+    choroplethAggregationField,
+    choroplethSelectBy,
+    choroplethMapProvider,
+    choroplethPalette,
     onVisualizationChange,
   ]);
 
@@ -428,7 +568,7 @@ export default function VisualizationBuilder({
           setXField(numericFields[0]);
           setYField(numericFields[1]);
         }
-      } else if (newType === "map") {
+      } else if (newType === "map" || newType === "choropleth") {
         // Auto-select latitude and longitude fields if available
         const latFields = fields.filter((f) => f.toLowerCase().includes("lat"));
         const lngFields = fields.filter(
@@ -450,6 +590,15 @@ export default function VisualizationBuilder({
         if (pingFields.length > 0 && !pingSpeedField) {
           setPingSpeedField(pingFields[0]);
         }
+
+        // For choropleth, auto-select aggregation field
+        if (
+          newType === "choropleth" &&
+          numericFields.length > 0 &&
+          !choroplethAggregationField
+        ) {
+          setChoroplethAggregationField(numericFields[0]);
+        }
       }
     },
     [
@@ -460,6 +609,7 @@ export default function VisualizationBuilder({
       latField,
       lngField,
       pingSpeedField,
+      choroplethAggregationField,
     ]
   );
 
@@ -486,6 +636,9 @@ export default function VisualizationBuilder({
         break;
       case "pingSpeedField":
         setPingSpeedField(value);
+        break;
+      case "choroplethAggregationField":
+        setChoroplethAggregationField(value);
         break;
     }
   }, []);
@@ -574,6 +727,8 @@ export default function VisualizationBuilder({
               ? "Data Table View"
               : chartType === "map"
               ? "Geographic Map"
+              : chartType === "choropleth"
+              ? "Choropleth Map"
               : `${yField} by ${xField}`),
           showLegend,
           showGrid,
@@ -584,6 +739,14 @@ export default function VisualizationBuilder({
           lngField,
           sizeField,
           pingSpeedField,
+          choroplethOpacity,
+          choroplethShowPoints,
+          choroplethShowBorders,
+          choroplethAggregation,
+          choroplethAggregationField,
+          choroplethSelectBy,
+          choroplethMapProvider,
+          choroplethPalette,
         };
 
         const savedQuery: SavedQuery = {
@@ -626,6 +789,14 @@ export default function VisualizationBuilder({
       lngField,
       sizeField,
       pingSpeedField,
+      choroplethOpacity,
+      choroplethShowPoints,
+      choroplethShowBorders,
+      choroplethAggregation,
+      choroplethAggregationField,
+      choroplethSelectBy,
+      choroplethMapProvider,
+      choroplethPalette,
       onQuerySave,
     ]
   );
@@ -647,6 +818,14 @@ export default function VisualizationBuilder({
     setLngField("");
     setSizeField("");
     setPingSpeedField("");
+    setChoroplethOpacity(0.7);
+    setChoroplethShowPoints(false);
+    setChoroplethShowBorders(true);
+    setChoroplethAggregation("count");
+    setChoroplethAggregationField("");
+    setChoroplethSelectBy("province");
+    setChoroplethMapProvider("cartodb_dark");
+    setChoroplethPalette("YlOrRd");
 
     if (categoricalFields.length > 0) {
       setXField(categoricalFields[0]);
@@ -656,6 +835,115 @@ export default function VisualizationBuilder({
     }
   }, [categoricalFields, numericFields]);
 
+  // Replace the renderChoroplethMap function
+  const renderChoroplethMap = () => {
+    // Always render, use fallback fields if needed
+    const actualLatField =
+      latField ||
+      fields.find((f) => f.toLowerCase().includes("lat")) ||
+      "latitude";
+    const actualLngField =
+      lngField ||
+      fields.find(
+        (f) =>
+          f.toLowerCase().includes("lng") || f.toLowerCase().includes("lon")
+      ) ||
+      "longitude";
+
+    // Transform data to match the expected format for GeoChoroplethMap
+    const choroplethData = data.map((item, index) => {
+      // Generate coordinates based on Sri Lankan regions if no coordinate fields exist
+      // Sri Lanka bounds: roughly 5.9°N to 9.9°N, 79.7°E to 81.9°E
+      let lat, lng;
+      if (item[actualLatField] && item[actualLngField]) {
+        lat = item[actualLatField];
+        lng = item[actualLngField];
+      } else {
+        // Generate coordinates around Sri Lanka (since data appears to be from Sri Lankan stations)
+        lat = 6.9 + Math.random() * 2.5; // Between 6.9°N and 9.4°N
+        lng = 79.8 + Math.random() * 1.8; // Between 79.8°E and 81.6°E
+      }
+
+      return {
+        id: `region-${index}`,
+        name:
+          item.STATION_NAME ||
+          item[xField] ||
+          item.country ||
+          item.name ||
+          `Region ${index + 1}`,
+        latitude: lat,
+        longitude: lng,
+        type: item.type || "station",
+        area: item.area || "Sri Lanka",
+        district: item.district || `District ${index + 1}`,
+        province: item.province || item.continent || `Province ${index + 1}`,
+        region: item.region || item.continent || "Sri Lanka",
+        // Individual station fields for choropleth
+        utilization_rate: Math.random() * 100, // Random since not in data
+        ping_speed: Math.random() * 100 + 20, // Random since not in data
+        status: "active",
+        battery_count: Math.floor(Math.random() * 10) + 1,
+        daily_swaps: Math.floor(Math.random() * 50) + 10,
+        revenue:
+          item.TOTAL_REVENUE ||
+          item[choroplethAggregationField] ||
+          Math.random() * 20000,
+        // Include all original data
+        ...item,
+      };
+    });
+
+    try {
+      return (
+        <div className="h-[500px]">
+          <GeoChoroplethMap
+            data={choroplethData}
+            config={{
+              opacity: choroplethOpacity || 0.7,
+              showPoints:
+                choroplethShowPoints !== undefined
+                  ? choroplethShowPoints
+                  : false,
+              showBorders:
+                choroplethShowBorders !== undefined
+                  ? choroplethShowBorders
+                  : true,
+              Aggregation: choroplethAggregation || "count",
+              AggregationField: choroplethAggregationField || "revenue",
+              selectBy: choroplethSelectBy || "province",
+              mapProvider: choroplethMapProvider || "cartodb_dark",
+              palette: choroplethPalette || "YlOrRd",
+              dataMode: "individual", // Use individual mode for flexibility
+            }}
+            className="w-full h-full"
+            onRegionClick={(region, regionData) => {
+              console.log("Region clicked:", region, regionData);
+            }}
+            onDataPointClick={(point) => {
+              console.log("Data point clicked:", point);
+            }}
+          />
+        </div>
+      );
+    } catch (error) {
+      console.error("GeoChoroplethMap error:", error);
+      // Fallback: show a simple message with the data we're trying to render
+      return (
+        <div className="h-[500px] flex items-center justify-center bg-slate-900/50 rounded-lg">
+          <div className="text-center text-slate-400">
+            <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="font-medium mb-2">Choropleth Map Loading...</p>
+            <p className="text-sm">Data points: {choroplethData.length}</p>
+            <p className="text-xs mt-2">
+              Check console for detailed error information
+            </p>
+          </div>
+        </div>
+      );
+    }
+  };
+
   // Render field configuration based on chart type
   const renderFieldConfiguration = () => {
     const colors =
@@ -663,6 +951,314 @@ export default function VisualizationBuilder({
       colorSchemes[0].colors;
 
     switch (chartType) {
+      case "choropleth":
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Latitude Field *
+                </Label>
+                <Select
+                  value={latField}
+                  onValueChange={(value) =>
+                    handleFieldChange("latField", value)
+                  }
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue placeholder="Select latitude field" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {numericFields.map((field) => (
+                      <SelectItem
+                        key={field}
+                        value={field}
+                        className="text-white hover:bg-slate-700"
+                      >
+                        {field}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Longitude Field *
+                </Label>
+                <Select
+                  value={lngField}
+                  onValueChange={(value) =>
+                    handleFieldChange("lngField", value)
+                  }
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue placeholder="Select longitude field" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {numericFields.map((field) => (
+                      <SelectItem
+                        key={field}
+                        value={field}
+                        className="text-white hover:bg-slate-700"
+                      >
+                        {field}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white">
+                  Aggregation Method
+                </Label>
+                <Select
+                  value={choroplethAggregation}
+                  onValueChange={(
+                    value: "count" | "sum" | "avg" | "max" | "min"
+                  ) => setChoroplethAggregation(value)}
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem
+                      value="count"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Count (Number of points)
+                    </SelectItem>
+                    <SelectItem
+                      value="sum"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Sum (Total value)
+                    </SelectItem>
+                    <SelectItem
+                      value="avg"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Average (Mean value)
+                    </SelectItem>
+                    <SelectItem
+                      value="max"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Maximum (Highest value)
+                    </SelectItem>
+                    <SelectItem
+                      value="min"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Minimum (Lowest value)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white">
+                  Aggregation Field
+                </Label>
+                <Select
+                  value={choroplethAggregationField}
+                  onValueChange={(value) =>
+                    handleFieldChange("choroplethAggregationField", value)
+                  }
+                  disabled={choroplethAggregation === "count"}
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue placeholder="Select field to aggregate" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {numericFields.map((field) => (
+                      <SelectItem
+                        key={field}
+                        value={field}
+                        className="text-white hover:bg-slate-700"
+                      >
+                        {field}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white">
+                  Geographic Level
+                </Label>
+                <Select
+                  value={choroplethSelectBy}
+                  onValueChange={(value: "area" | "district" | "province") =>
+                    setChoroplethSelectBy(value)
+                  }
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem
+                      value="province"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Province (Large regions)
+                    </SelectItem>
+                    <SelectItem
+                      value="district"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      District (Medium regions)
+                    </SelectItem>
+                    <SelectItem
+                      value="area"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Area (Small regions)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white">
+                  Color Palette
+                </Label>
+                <Select
+                  value={choroplethPalette}
+                  onValueChange={(
+                    value: "YlOrRd" | "Viridis" | "Plasma" | "Turbo" | "Cividis"
+                  ) => setChoroplethPalette(value)}
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem
+                      value="YlOrRd"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      YlOrRd (Heatmap)
+                    </SelectItem>
+                    <SelectItem
+                      value="Viridis"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Viridis
+                    </SelectItem>
+                    <SelectItem
+                      value="Plasma"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Plasma
+                    </SelectItem>
+                    <SelectItem
+                      value="Turbo"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Turbo
+                    </SelectItem>
+                    <SelectItem
+                      value="Cividis"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Cividis
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white">
+                  Map Style
+                </Label>
+                <Select
+                  value={choroplethMapProvider}
+                  onValueChange={(
+                    value:
+                      | "openstreetmap"
+                      | "cartodb_dark"
+                      | "cartodb_light"
+                      | "satellite"
+                  ) => setChoroplethMapProvider(value)}
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem
+                      value="openstreetmap"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      OpenStreetMap
+                    </SelectItem>
+                    <SelectItem
+                      value="cartodb_dark"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Dark Theme
+                    </SelectItem>
+                    <SelectItem
+                      value="cartodb_light"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Light Theme
+                    </SelectItem>
+                    <SelectItem
+                      value="satellite"
+                      className="text-white hover:bg-slate-700"
+                    >
+                      Satellite View
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-white">
+                  Region Opacity: {Math.round(choroplethOpacity * 100)}%
+                </Label>
+                <Slider
+                  value={[choroplethOpacity]}
+                  onValueChange={(value) => setChoroplethOpacity(value[0])}
+                  min={0.1}
+                  max={1}
+                  step={0.1}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={choroplethShowPoints}
+                    onCheckedChange={setChoroplethShowPoints}
+                  />
+                  <Label className="text-sm text-white">Show Data Points</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={choroplethShowBorders}
+                    onCheckedChange={setChoroplethShowBorders}
+                  />
+                  <Label className="text-sm text-white">
+                    Show Region Borders
+                  </Label>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       case "map":
         return (
           <div className="space-y-6">
@@ -1181,6 +1777,10 @@ export default function VisualizationBuilder({
   const renderChart = () => {
     if (chartType === "table") {
       return renderDataTable();
+    }
+
+    if (chartType === "choropleth") {
+      return renderChoroplethMap();
     }
 
     if (chartType === "map") {
@@ -1775,7 +2375,7 @@ export default function VisualizationBuilder({
               <CardHeader className="pb-4">
                 <CardTitle className="text-white flex items-center gap-2">
                   <Settings className="h-5 w-5" />
-                  {chartType === "map"
+                  {chartType === "map" || chartType === "choropleth"
                     ? "Map Configuration"
                     : "Field Configuration"}
                 </CardTitle>

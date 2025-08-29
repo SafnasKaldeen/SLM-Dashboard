@@ -4,6 +4,7 @@ export interface GPSFilters {
   dateRange?: { from: Date; to: Date; extraDate?: Date };
   aggregation: "daily" | "weekly" | "monthly" | "quarterly" | "annually";
   selectedTboxes: string[];
+  selectedScooters: string[];
   selectedBmses: string[];
   selectedBatteryTypes: string[];
 }

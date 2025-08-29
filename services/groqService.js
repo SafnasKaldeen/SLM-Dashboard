@@ -27,7 +27,7 @@ export async function getGroqChatCompletion(endpoints) {
         body: JSON.stringify(groqRequestBody),
       }
     );
-    
+
     if (!groqResponse.ok) {
       throw new Error(
         `Groq API request failed with status ${groqResponse.status}`
@@ -43,7 +43,7 @@ export async function getGroqChatCompletion(endpoints) {
 
     // Attempt to parse the response as JSON
     let responseData;
-    
+
     try {
       responseData = JSON.parse(
         JSON.parse(rawResponse).choices[0].message.content

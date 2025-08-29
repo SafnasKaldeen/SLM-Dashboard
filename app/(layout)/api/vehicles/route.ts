@@ -79,10 +79,6 @@ export async function GET(request: NextRequest) {
       data: {
         vehicles: filteredVehicles,
         kpis: filteredKPIs,
-        // chargingPattern: filteredChargingPattern,
-        chargingOverTime: mockChargingOverTime,
-        batteryDistribution: filteredBatteryDistribution,
-        homeChargingIncrease: filteredHomeChargingIncrease, // Added this new data
       },
     })
   } catch (error) {

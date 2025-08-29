@@ -35,17 +35,22 @@ import {
   Calendar,
   Users,
   Settings,
+  ShoppingCartIcon,
   BatteryCharging,
   Cpu,
   LineChart,
   PieChart,
   Hexagon,
   Wrench,
+  Building2,
+  Calculator,
+  UserCheck,
   DollarSign,
   TrendingUp,
   BrainCog,
   Bike,
   Target,
+  ShoppingCart,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { act, useState } from "react";
@@ -87,6 +92,10 @@ export function MainSidebar() {
     analytics: {
       icon: <BarChart3 className="h-4 w-4" />,
       color: "text-blue-500",
+    },
+    sales: {
+      icon: <ShoppingCart className="h-4 w-4" />,
+      color: "text-orange-500",
     },
   };
 
@@ -229,10 +238,71 @@ export function MainSidebar() {
       ],
     },
     {
+      id: "sales",
+      label: "Sales Management",
+      icon: categoryIcons.sales,
+      show: true,
+      items: [
+        {
+          path: "/sales",
+          label: "Overview",
+          icon: <Activity className="h-4 w-4" />,
+        },
+        {
+          path: "/sales/regional",
+          label: "Regional Analysis",
+          icon: <MapPin className="h-4 w-4" />,
+        },
+        {
+          path: "/sales/financial",
+          label: "Financial Analysis",
+          icon: <Calculator className="h-4 w-4" />,
+        },
+        {
+          path: "/sales/dealers",
+          label: "Dealer Performance",
+          icon: <Building2 className="h-4 w-4" />,
+        },
+
+        {
+          path: "/sales/customers",
+          label: "Customer Insights",
+          icon: <UserCheck className="h-4 w-4" />,
+        },
+      ],
+    },
+    {
+      id: "fleet",
+      label: "Fleet Management",
+      icon: categoryIcons.fleet,
+      items: [
+        {
+          path: "/fleet",
+          label: "Overview",
+          icon: <Activity className="h-4 w-4" />,
+        },
+        {
+          path: "/fleet/vehicles",
+          label: "Vehicles",
+          icon: <Hexagon className="h-4 w-4" />,
+        },
+        {
+          path: "/fleet/maintenance",
+          label: "Maintenance",
+          icon: <Wrench className="h-4 w-4" />,
+        },
+        {
+          path: "/fleet/schedule",
+          label: "Schedule",
+          icon: <Calendar className="h-4 w-4" />,
+        },
+      ],
+    },
+    {
       id: "charging",
       label: "Swapping Stations",
       icon: categoryIcons.charging,
-      show: true,
+      // show: true,
       items: [
         {
           path: "/charging",

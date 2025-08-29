@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import MongoDBManager from "@/lib/mongodb";
+import MongoDBManager from "@/lib/mongodb"
 
 interface DatabaseConnection {
   id: string;

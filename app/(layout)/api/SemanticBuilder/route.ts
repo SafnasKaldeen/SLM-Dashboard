@@ -23,6 +23,8 @@ export async function POST(req: Request) {
       organizationContext
     );
 
+    // console.log("Semantic model built successfully:", semanticModel);
+
     return NextResponse.json({
       success: true,
       query,

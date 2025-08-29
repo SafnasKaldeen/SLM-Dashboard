@@ -1,4 +1,4 @@
-import { runQuery } from "../../../gps/batch-analysis/Services/SnowflakeClient";
+import { runQuery } from "../../../gps/batch-analysis/Services/SnowflakeClientWith2FA";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";

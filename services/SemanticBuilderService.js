@@ -56,7 +56,6 @@ export class SemanticBuilderService {
       relationships: filteredRelationships,
       measures: filteredMeasures,
       default_filters: default_filters,
-      accessControl: filteredAccessControl,
     };
   }
 }

@@ -40,10 +40,15 @@ export class SQLQueryService {
   }
 
   static async runPermissionCheck(semanticModel) {
+    // console.log(
+    //   "🔄 Running permission check...",
+    //   JSON.stringify(semanticModel, null, 2)
+    // );
     const prompt = permissionCheckPrompt(semanticModel);
+    // console.log("🔄 LLM Request for Permission Check:", prompt);
     const llmResponse = await this.callLLM(prompt);
     const jsonText = this.extractJSON(llmResponse);
-    console.log("🔄 LLM Response for Permission Check:", jsonText);
+    // console.log("🔄 LLM Response for Permission Check:", jsonText);
 
     try {
       return JSON.parse(jsonText);
@@ -58,9 +63,10 @@ export class SQLQueryService {
 
   static async runSQLGeneration(semanticModel, resolvedQuery = null) {
     const prompt = sqlGenerationPrompt(semanticModel, resolvedQuery);
+    console.log("🔄 LLM Request for SQL Generation:", prompt);
     const llmResponse = await this.callLLM(prompt);
     const jsonText = this.extractJSON(llmResponse);
-    console.log("🔄 LLM Response for SQL Generation:", jsonText);
+    // console.log("🔄 LLM Response for SQL Generation:", jsonText);
 
     try {
       return JSON.parse(jsonText);
@@ -76,9 +82,10 @@ export class SQLQueryService {
   static async generateQuery(semanticModel) {
     this.validateQueryParameters(semanticModel);
 
+    // console.log("🔄 Running permission check...", semanticModel);
     // Step 1: Run permission check
     const permissionResult = await this.runPermissionCheck(semanticModel);
-
+    // console.log("✅ Permission check result:", permissionResult);
     if (!permissionResult.allowed) {
       // Save failure details to MongoDB for analysis
       try {

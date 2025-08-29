@@ -32,8 +32,8 @@ CtN5P55wZfvaAUqNBem+/W4=
 -----END PRIVATE KEY-----`;
 
 const connectionConfig = {
-  account: "ANGWRUH-ZI90300",
-  username: "UsmaaN",
+  account: "JPCNHUS-SK19327",
+  username: "USMAAN",
   warehouse: "COMPUTE_WH",
   database: "REPORT_DB",
   schema: "GPS_DASHBOARD",

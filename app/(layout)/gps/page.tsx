@@ -182,7 +182,14 @@ export default function GPSPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="h-[550px]">
-                <DistanceByBatteryType filters={filters} />
+                <DistanceByBatteryType
+                  filters={{
+                    dateRange: filters.dateRange,
+                    selectedBatteryTypes: filters.selectedBatteryTypes,
+                    selectedScooters: filters.selectedTboxes, // 👈 map correctly
+                    selectedBms: filters.selectedBmses, // 👈 map correctly
+                  }}
+                />
               </CardContent>
             </Card>
           </div>

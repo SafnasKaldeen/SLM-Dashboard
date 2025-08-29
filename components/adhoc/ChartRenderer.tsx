@@ -95,6 +95,7 @@ import CustomizableMap from "./canvas-map";
 import { sub } from "date-fns";
 import RadialBarChartComponent from "./RadialBarChartComponent";
 import Heatmap from "./Heatmap";
+import GeoChoroplethMap from "./geo-choropleth-map";
 
 // Mock Map Component (since MapChart import is not available)
 const DynamicMap = ({ data, config }: any) => (
@@ -127,7 +128,8 @@ type ChartType =
   | "map"
   | "treemap"
   | "radialbar"
-  | "heatmap";
+  | "heatmap"
+  | "choropleth";
 
 interface ChartConfig {
   type: ChartType;
@@ -140,6 +142,16 @@ interface ChartConfig {
   latField?: string;
   longField?: string;
   pingSpeedField?: string;
+  // Choropleth specific fields
+  selectBy?: "area" | "district" | "province";
+  regionProperty?: string;
+  mapProvider?:
+    | "openstreetmap"
+    | "cartodb_dark"
+    | "cartodb_light"
+    | "satellite";
+  palette?: "YlOrRd" | "Viridis" | "Plasma" | "Turbo" | "Cividis";
+  dataMode?: "aggregated" | "individual" | "auto";
   title?: string;
   showLegend: boolean;
   showGrid: boolean;
@@ -205,6 +217,12 @@ const CHART_TYPES = [
     description: "Circular progress",
   },
   { id: "heatmap", name: "Heatmap", icon: Layers, description: "Data density" },
+  {
+    id: "choropleth",
+    name: "Choropleth Map",
+    icon: MapPin,
+    description: "Regional data visualization",
+  },
 ];
 
 const COLOR_SCHEMES = {
@@ -288,6 +306,456 @@ const FieldConfiguration = ({
 }: any) => {
   if (chartConfig.type === "table" || chartConfig.type === "") {
     return null;
+  }
+
+  if (chartConfig.type === "choropleth") {
+    // Determine if we're in aggregated mode
+    const detectedDataMode = useMemo(() => {
+      if (chartConfig.dataMode !== "auto") return chartConfig.dataMode;
+
+      if (!processedData || processedData.length === 0) return "individual";
+
+      // Check if data has aggregated fields
+      const hasAggregatedFields = processedData.some(
+        (point) =>
+          point.point_count !== undefined ||
+          point.avg_utilization !== undefined ||
+          point.total_revenue !== undefined
+      );
+
+      return hasAggregatedFields ? "aggregated" : "individual";
+    }, [processedData, chartConfig.dataMode]);
+
+    // Get location columns for aggregated mode
+    const locationColumns = columns.filter(
+      (col) =>
+        col.toLowerCase().includes("province") ||
+        col.toLowerCase().includes("district") ||
+        col.toLowerCase().includes("area") ||
+        col.toLowerCase().includes("region") ||
+        col.toLowerCase().includes("location") ||
+        col.toLowerCase().includes("city")
+    );
+
+    return (
+      <div className="space-y-6">
+        {detectedDataMode === "individual" ? (
+          // Individual mode - show lat/long fields
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300 text-sm flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Latitude Field *
+              </Label>
+              <Select
+                value={chartConfig.latField || "none"}
+                onValueChange={(value) =>
+                  setChartConfig({
+                    ...chartConfig,
+                    latField: value === "none" ? undefined : value,
+                  })
+                }
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Select latitude field" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  <SelectItem
+                    value="none"
+                    className="text-white hover:bg-slate-700"
+                  >
+                    Select latitude field
+                  </SelectItem>
+                  {numericColumns.map((col: string) => (
+                    <SelectItem
+                      key={col}
+                      value={col}
+                      className="text-white hover:bg-slate-700"
+                    >
+                      {col}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300 text-sm flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Longitude Field *
+              </Label>
+              <Select
+                value={chartConfig.longField || "none"}
+                onValueChange={(value) =>
+                  setChartConfig({
+                    ...chartConfig,
+                    longField: value === "none" ? undefined : value,
+                  })
+                }
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Select longitude field" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  <SelectItem
+                    value="none"
+                    className="text-white hover:bg-slate-700"
+                  >
+                    Select longitude field
+                  </SelectItem>
+                  {numericColumns.map((col: string) => (
+                    <SelectItem
+                      key={col}
+                      value={col}
+                      className="text-white hover:bg-slate-700"
+                    >
+                      {col}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ) : (
+          // Aggregated mode - show location and value fields
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300 text-sm flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Location Field *
+              </Label>
+              <Select
+                value={chartConfig.xAxis || "none"}
+                onValueChange={(value) =>
+                  setChartConfig({
+                    ...chartConfig,
+                    xAxis: value === "none" ? undefined : value,
+                  })
+                }
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Select location field" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  <SelectItem
+                    value="none"
+                    className="text-white hover:bg-slate-700"
+                  >
+                    Select location field
+                  </SelectItem>
+                  {[...locationColumns, ...categoricalColumns]
+                    .filter((col, index, arr) => arr.indexOf(col) === index)
+                    .map((col: string) => (
+                      <SelectItem
+                        key={col}
+                        value={col}
+                        className="text-white hover:bg-slate-700"
+                      >
+                        {col}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300 text-sm">
+                Aggregation Value Field
+              </Label>
+              <Select
+                value={chartConfig.yAxis || "none"}
+                onValueChange={(value) =>
+                  setChartConfig({
+                    ...chartConfig,
+                    yAxis: value === "none" ? undefined : value,
+                  })
+                }
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Select value field" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  <SelectItem
+                    value="none"
+                    className="text-white hover:bg-slate-700"
+                  >
+                    Count Only
+                  </SelectItem>
+                  {numericColumns.map((col: string) => (
+                    <SelectItem
+                      key={col}
+                      value={col}
+                      className="text-white hover:bg-slate-700"
+                    >
+                      {col}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">
+              {detectedDataMode === "individual"
+                ? "Aggregation Level"
+                : "Geographic Level"}
+            </Label>
+            <Select
+              value={chartConfig.selectBy || "province"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  selectBy: value as "area" | "district" | "province",
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select level" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="province"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Province
+                </SelectItem>
+                <SelectItem
+                  value="district"
+                  className="text-white hover:bg-slate-700"
+                >
+                  District
+                </SelectItem>
+                <SelectItem
+                  value="area"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Area
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">
+              {detectedDataMode === "individual"
+                ? "Aggregation Type"
+                : "Data Aggregation"}
+            </Label>
+            <Select
+              value={chartConfig.aggregation || "sum"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  aggregation: value as "sum" | "avg" | "count" | "max" | "min",
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select aggregation" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="count"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Count
+                </SelectItem>
+                <SelectItem
+                  value="sum"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Sum
+                </SelectItem>
+                <SelectItem
+                  value="avg"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Average
+                </SelectItem>
+                <SelectItem
+                  value="max"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Maximum
+                </SelectItem>
+                <SelectItem
+                  value="min"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Minimum
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Data Mode</Label>
+            <Select
+              value={chartConfig.dataMode || "auto"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  dataMode: value as "aggregated" | "individual" | "auto",
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select data mode" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="auto"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Auto Detect
+                </SelectItem>
+                <SelectItem
+                  value="individual"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Individual Points
+                </SelectItem>
+                <SelectItem
+                  value="aggregated"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Aggregated Data
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Map Provider</Label>
+            <Select
+              value={chartConfig.mapProvider || "cartodb_dark"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  mapProvider: value as
+                    | "openstreetmap"
+                    | "cartodb_dark"
+                    | "cartodb_light"
+                    | "satellite",
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select map provider" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="cartodb_dark"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Dark Theme
+                </SelectItem>
+                <SelectItem
+                  value="cartodb_light"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Light Theme
+                </SelectItem>
+                <SelectItem
+                  value="openstreetmap"
+                  className="text-white hover:bg-slate-700"
+                >
+                  OpenStreetMap
+                </SelectItem>
+                <SelectItem
+                  value="satellite"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Satellite
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-300 text-sm">Color Palette</Label>
+            <Select
+              value={chartConfig.palette || "YlOrRd"}
+              onValueChange={(value) =>
+                setChartConfig({
+                  ...chartConfig,
+                  palette: value as
+                    | "YlOrRd"
+                    | "Viridis"
+                    | "Plasma"
+                    | "Turbo"
+                    | "Cividis",
+                })
+              }
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select color palette" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-600">
+                <SelectItem
+                  value="YlOrRd"
+                  className="text-white hover:bg-slate-700"
+                >
+                  YlOrRd (Heatmap)
+                </SelectItem>
+                <SelectItem
+                  value="Viridis"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Viridis
+                </SelectItem>
+                <SelectItem
+                  value="Plasma"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Plasma
+                </SelectItem>
+                <SelectItem
+                  value="Turbo"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Turbo
+                </SelectItem>
+                <SelectItem
+                  value="Cividis"
+                  className="text-white hover:bg-slate-700"
+                >
+                  Cividis
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Data Mode Indicator */}
+        <div className="bg-slate-700/50 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                detectedDataMode === "aggregated"
+                  ? "bg-cyan-400"
+                  : "bg-green-400"
+              }`}
+            />
+            <span className="text-sm font-medium text-white">
+              {detectedDataMode === "aggregated"
+                ? "Aggregated Data Mode"
+                : "Individual Points Mode"}
+            </span>
+          </div>
+          <p className="text-xs text-slate-300">
+            {detectedDataMode === "aggregated"
+              ? "Data is pre-aggregated by location. Select the location field and value field to color regions."
+              : "Individual data points will be aggregated by geographic regions based on latitude/longitude coordinates."}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (chartConfig.type === "map") {
@@ -910,28 +1378,6 @@ const FieldConfiguration = ({
             />
           </div>
         )}
-
-        {/* Display Options - Toggle Switches */}
-        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
-          {[
-            { label: "Show Trend", key: "showTrend" },
-            { label: "Show Icon", key: "showIcon" },
-            { label: "Show Details", key: "showDetails" },
-          ].map(({ label, key }) => (
-            <div
-              key={key}
-              className="flex items-center justify-between px-4 py-2 border rounded-lg bg-slate-900"
-            >
-              <Label className="text-slate-300 text-sm">{label}</Label>
-              <Switch
-                checked={chartConfig[key]}
-                onCheckedChange={(checked) =>
-                  setChartConfig({ ...chartConfig, [key]: checked })
-                }
-              />
-            </div>
-          ))}
-        </div> */}
       </div>
     );
   }
@@ -941,7 +1387,8 @@ const ChartOptions = ({ chartConfig, setChartConfig }: any) => {
   if (
     chartConfig.type === "table" ||
     chartConfig.type === "map" ||
-    chartConfig.type === "kpi"
+    chartConfig.type === "kpi" ||
+    chartConfig.type === "choropleth"
   )
     return null;
 
@@ -1024,19 +1471,6 @@ const ChartOptions = ({ chartConfig, setChartConfig }: any) => {
             }
           />
         </div>
-
-        {/* Additional for Map Type */}
-        {chartConfig.type === "map" && (
-          <div className="flex items-center justify-between">
-            <Label className="text-slate-300 text-sm">Show Legend</Label>
-            <Switch
-              checked={chartConfig.showLegend}
-              onCheckedChange={(checked) =>
-                setChartConfig({ ...chartConfig, showLegend: checked })
-              }
-            />
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -1150,7 +1584,7 @@ export default function ChartRenderer({
           col.toLowerCase().includes("latitude")
       )
     ) {
-      suggestions.push("map");
+      suggestions.push("map", "choropleth");
     }
     if (categoricalColumns.length >= 1 && numericColumns.length >= 1) {
       suggestions.push("treemap", "heatmap");
@@ -1162,7 +1596,7 @@ export default function ChartRenderer({
   // Auto-initialize map fields
   useMemo(() => {
     if (
-      chartConfig.type === "map" &&
+      (chartConfig.type === "map" || chartConfig.type === "choropleth") &&
       !chartConfig.latField &&
       !chartConfig.longField
     ) {
@@ -1233,6 +1667,22 @@ export default function ChartRenderer({
 
   // Prepare chart data with aggregation
   const chartData = useMemo(() => {
+    if (chartConfig.type === "choropleth") {
+      if (!chartConfig.latField || !chartConfig.longField) return [];
+
+      return processedData.map((item, index) => ({
+        id: `point-${index}`,
+        name: item[chartConfig.xAxis || "name"] || `Point ${index + 1}`,
+        latitude: Number(item[chartConfig.latField]) || 0,
+        longitude: Number(item[chartConfig.longField]) || 0,
+        value: chartConfig.yAxis ? Number(item[chartConfig.yAxis]) || 0 : 1,
+        category: chartConfig.colorBy
+          ? String(item[chartConfig.colorBy])
+          : "default",
+        ...item,
+      }));
+    }
+
     if (chartConfig.type === "map") {
       if (!chartConfig.latField || !chartConfig.longField) return [];
 
@@ -1383,6 +1833,40 @@ export default function ChartRenderer({
       COLOR_SCHEMES.default;
 
     switch (chartConfig.type) {
+      case "choropleth":
+        if (!chartConfig.latField || !chartConfig.longField) {
+          return (
+            <div className="flex items-center justify-center h-64 text-slate-400">
+              <div className="text-center">
+                <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>
+                  Configure latitude and longitude fields to display choropleth
+                  map
+                </p>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="h-[500px]">
+            <GeoChoroplethMap
+              data={chartData}
+              config={{
+                opacity: 0.7,
+                showPoints: true,
+                showBorders: true,
+                selectBy: chartConfig.selectBy || "province",
+                Aggregation: chartConfig.yAxis ? "sum" : "count",
+                AggregationField: chartConfig.yAxis,
+                mapProvider: chartConfig.mapProvider || "cartodb_dark",
+                palette: chartConfig.palette || "YlOrRd",
+                dataMode: chartConfig.dataMode || "auto",
+              }}
+              className="w-full h-full"
+            />
+          </div>
+        );
+
       case "map":
         if (!chartConfig.latField || !chartConfig.longField) {
           return (

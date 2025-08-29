@@ -5,7 +5,7 @@ const connectionConfig = {
   account: "JPCNHUS-SK19327",
   username: "USMAAN",
   password: "@Snowflake33340", // <-- replace with your actual password
-  warehouse: "ETL_WH",
+  warehouse: "COMPUTE_WH",
   database: "REPORT_DB",
   schema: "GPS_DASHBOARD",
   role: "SYSADMIN",

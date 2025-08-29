@@ -8,7 +8,8 @@ export class SQLPromptFormatters {
 
         return `Table: ${tableName}\nDescription: ${
           tableData.description || "N/A"
-        }\nColumns:\n${columns}`;
+        }\nfullName: ${tableData.fullName || "PUBLIC"}\nColumns:\n${columns}
+        `;
       })
       .join("\n\n");
   }

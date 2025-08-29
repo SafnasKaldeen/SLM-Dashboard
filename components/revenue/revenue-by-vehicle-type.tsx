@@ -145,21 +145,21 @@ export function RevenueByArea({
     );
   }
 
-  // Apply aggregation multiplier
-  if (filters?.aggregation) {
-    const multiplierMap: Record<string, number> = {
-      daily: 1 / 30,
-      monthly: 1,
-      quarterly: 3,
-      annually: 12,
-    };
-    const multiplier = multiplierMap[filters.aggregation] || 1;
+  // // Apply aggregation multiplier
+  // if (filters?.aggregation) {
+  //   const multiplierMap: Record<string, number> = {
+  //     daily: 1 / 30,
+  //     monthly: 1,
+  //     quarterly: 3,
+  //     annually: 12,
+  //   };
+  //   const multiplier = multiplierMap[filters.aggregation] || 1;
 
-    chartData = chartData.map((item) => ({
-      ...item,
-      revenue: Math.round(item.revenue * multiplier),
-    }));
-  }
+  //   chartData = chartData.map((item) => ({
+  //     ...item,
+  //     revenue: Math.round(item.revenue * multiplier),
+  //   }));
+  // }
 
   return (
     <ResponsiveContainer width="100%" height={550}>

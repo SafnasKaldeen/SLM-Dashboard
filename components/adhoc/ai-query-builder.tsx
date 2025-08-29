@@ -15,6 +15,8 @@ import {
   Zap,
   Clock,
   Lightbulb,
+  BarChart,
+  User,
   Star,
   AlertCircle,
   DollarSign,
@@ -23,8 +25,17 @@ import {
   MapPin,
   Battery,
   TrendingUp,
+  Copy,
+  Check,
+  Edit3,
+  Save,
+  X,
+  Users,
+  Activity,
+  Truck,
 } from "lucide-react";
 import { useGenerateSQL } from "@/hooks/useGenerateSQL";
+import { ca } from "date-fns/locale";
 
 interface DatabaseConnection {
   id: string;
@@ -43,6 +54,12 @@ interface QueryResult {
   rowCount: number;
 }
 
+interface QueryError {
+  message: string;
+  code?: string;
+  details?: string;
+}
+
 interface AIQueryBuilderProps {
   connection: DatabaseConnection;
   onQueryExecute: (query: string, result: QueryResult) => void;
@@ -50,70 +67,176 @@ interface AIQueryBuilderProps {
 
 const VERIFIED_QUERIES = [
   {
-    category: "E-Commerce Insights",
-    icon: ShoppingCart,
-    color: "text-orange-400",
-    bgColor: "bg-orange-500/10 border-orange-500/20",
-    queries: [
-      {
-        text: "List top 10 customers by total spend",
-        description: "Summarizes total revenue per customer and ranks them",
-      },
-      {
-        text: "Get total products sold per category",
-        description: "Aggregates quantity sold grouped by product category",
-      },
-      {
-        text: "Calculate monthly payroll cost by department",
-        description: "Summarizes net pay across departments per month",
-      },
-      {
-        text: "Compare sales to targets per region and category",
-        description: "Shows sales performance vs targets per region/category",
-      },
-      {
-        text: "Daily revenue and traffic correlation",
-        description: "Joins orders with website analytics to compare metrics",
-      },
-      {
-        text: "Support tickets by priority and status",
-        description: "Counts support tickets grouped by severity and state",
-      },
-      {
-        text: "Supplier performance – active products count",
-        description: "Counts how many active products each supplier has",
-      },
-      {
-        text: "Campaign ROI summary",
-        description: "Summarizes cost, revenue, and ROI per marketing campaign",
-      },
-      {
-        text: "Return rate per product",
-        description: "Calculates product return percentage from orders",
-      },
-      {
-        text: "Average working hours per employee per week",
-        description: "Analyzes employee attendance trends weekly",
-      },
-    ],
-  },
-  {
     category: "Revenue Analysis",
     icon: DollarSign,
     color: "text-emerald-400",
     bgColor: "bg-emerald-500/10 border-emerald-500/20",
     queries: [
       {
-        text: "Show me the top 5 stations by revenue this month",
-        description: "Identifies highest performing stations by revenue",
+        text: "Show me the top 10 stations by total revenue this month",
+        description:
+          "Ranks stations by swap transaction revenue using FACT_PAYMENT and DIM_SWAPPING_STATION",
       },
       {
-        text: "What's the revenue trend over the last 6 months?",
-        description: "Shows monthly revenue trends",
+        text: "What is the monthly revenue trend for the last 6 months?",
+        description: "Time series analysis of payment transactions by month",
       },
       {
-        text: "Compare revenue by area for this quarter",
-        description: "Area-wise revenue comparison",
+        text: "Compare revenue by dealer region for this quarter",
+        description: "Regional revenue analysis using DIM_DEALER location data",
+      },
+      {
+        text: "Calculate net profit per station after operational expenses",
+        description:
+          "Revenue from FACT_PAYMENT minus expenses from FACT_EXPENSES by station",
+      },
+      {
+        text: "Show payment success rate and refund percentage by payment method",
+        description:
+          "Transaction success metrics grouped by payment method type",
+      },
+    ],
+  },
+  {
+    category: "Expense Insights",
+    icon: Edit3,
+    color: "text-red-400",
+    bgColor: "bg-red-500/10 border-red-500/20",
+    queries: [
+      {
+        text: "Show total expenses by category for this month",
+        description: "Expense analysis using FACT_EXPENSES data",
+      },
+      {
+        text: "Which vendors have the highest expenses?",
+        description: "Vendor analysis based on expense data",
+      },
+      {
+        text: "Analyze expense trends over the last 6 months",
+        description: "Time series analysis of expenses by month",
+      },
+      {
+        text: "Show top expense categories and their contributions",
+        description: "Category performance analysis using FACT_EXPENSES data",
+      },
+      {
+        text: "What is the average expense per transaction?",
+        description: "Expense analysis using transaction data",
+      },
+    ],
+  },
+  {
+    category: "Sales Insights",
+    icon: ShoppingCart,
+    color: "text-orange-400",
+    bgColor: "bg-orange-500/10 border-orange-500/20",
+    queries: [
+      {
+        text: "Show total sales by product category for this month",
+        description: "Sales performance analysis using FACT_SALES data",
+      },
+      {
+        text: "Which customers have the highest lifetime value?",
+        description: "Customer segmentation based on purchase history",
+      },
+      {
+        text: "Analyze sales conversion rates by channel",
+        description: "Marketing effectiveness analysis using DIM_CHANNEL data",
+      },
+      {
+        text: "Show top-selling products and their revenue contribution",
+        description: "Product performance analysis using FACT_SALES data",
+      },
+      {
+        text: "What is the average order value by customer segment?",
+        description: "Revenue analysis using customer segmentation data",
+      },
+    ],
+  },
+  {
+    category: "Dealer Insights",
+    icon: User,
+    color: "text-indigo-400",
+    bgColor: "bg-indigo-500/10 border-indigo-500/20",
+    queries: [
+      {
+        text: "Show dealer performance metrics for this month",
+        description: "Performance analysis using FACT_DEALER data",
+      },
+      {
+        text: "Which dealers have the highest customer satisfaction ratings?",
+        description: "Customer feedback analysis using DIM_CUSTOMER data",
+      },
+      {
+        text: "Analyze dealer sales trends over the last 6 months",
+        description: "Time series analysis of dealer sales data",
+      },
+      {
+        text: "Show top-performing dealers by region",
+        description: "Regional performance analysis using DIM_DEALER data",
+      },
+      {
+        text: "What is the average deal size by dealer?",
+        description: "Revenue analysis using FACT_DEAL data",
+      },
+    ],
+  },
+  {
+    category: "Marketing Insights",
+    icon: BarChart,
+    color: "text-green-400",
+    bgColor: "bg-green-500/10 border-green-500/20",
+    queries: [
+      {
+        text: "Show campaign performance metrics for this month",
+        description: "Marketing analysis using FACT_MARKETING data",
+      },
+      {
+        text: "Which channels have the highest conversion rates?",
+        description: "Channel performance analysis using DIM_CHANNEL data",
+      },
+      {
+        text: "Analyze customer engagement trends over the last 6 months",
+        description: "Time series analysis of customer interactions",
+      },
+      {
+        text: "Show top-performing campaigns by ROI",
+        description:
+          "Campaign effectiveness analysis using FACT_MARKETING data",
+      },
+      {
+        text: "What is the average customer acquisition cost by channel?",
+        description:
+          "Cost analysis using marketing spend and new customer data",
+      },
+    ],
+  },
+  {
+    category: "GPS Insights",
+    icon: Clock,
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/10 border-purple-500/20",
+    queries: [
+      {
+        text: "Show GPS coordinates for all active stations",
+        description: "Location data from DIM_SWAPPING_STATION",
+      },
+      {
+        text: "What is the average distance between swaps?",
+        description: "Distance analysis using FACT_VEHICLE_DISTANCE data",
+      },
+      {
+        text: "Show heatmap of swap activity by location",
+        description: "Geospatial analysis using swap transaction data",
+      },
+      {
+        text: "Which routes have the highest swap frequency?",
+        description: "Route optimization using GPS tracking data",
+      },
+      {
+        text: "Analyze time spent at each station by vehicle",
+        description:
+          "Station utilization analysis using FACT_VEHICLE_TELEMETRY",
       },
     ],
   },
@@ -124,16 +247,27 @@ const VERIFIED_QUERIES = [
     bgColor: "bg-blue-500/10 border-blue-500/20",
     queries: [
       {
-        text: "Which stations have the highest utilization rates?",
-        description: "Ranks stations by efficiency",
+        text: "Which stations have the highest battery swap frequency?",
+        description: "Station utilization based on swap transaction count",
       },
       {
-        text: "Show me stations with declining performance",
-        description: "Identifies underperforming stations",
+        text: "Show stations with declining performance over time",
+        description:
+          "Identifies stations with decreasing swap volumes or revenue trends",
       },
       {
-        text: "What's the average swap time by station?",
-        description: "Station efficiency metrics",
+        text: "What are the operational costs per swap by station?",
+        description:
+          "Cost efficiency analysis using FACT_EXPENSES divided by swap count",
+      },
+      {
+        text: "List stations requiring maintenance based on expense patterns",
+        description:
+          "Stations with above-average maintenance costs from FACT_EXPENSES",
+      },
+      {
+        text: "Show electricity consumption efficiency by station location",
+        description: "Units consumed vs revenue generated analysis",
       },
     ],
   },
@@ -144,28 +278,120 @@ const VERIFIED_QUERIES = [
     bgColor: "bg-amber-500/10 border-amber-500/20",
     queries: [
       {
-        text: "Show battery health distribution across stations",
-        description: "Battery condition analysis",
+        text: "Show battery health distribution across all active batteries",
+        description:
+          "Battery SOH analysis from DIM_BATTERY and FACT_VEHICLE_TELEMETRY",
       },
       {
-        text: "Which batteries need replacement soon?",
-        description: "Maintenance planning",
+        text: "Which batteries need replacement based on cycle count and SOH?",
+        description: "Maintenance planning using battery degradation metrics",
+      },
+      {
+        text: "Compare battery performance by type and manufacturer",
+        description:
+          "Battery type analysis using DIM_BATTERY_TYPE and performance data",
+      },
+      {
+        text: "Show temperature and voltage patterns for battery health monitoring",
+        description: "Telemetry analysis for battery condition monitoring",
+      },
+      {
+        text: "Calculate average battery lifespan by usage patterns",
+        description:
+          "Battery lifecycle analysis based on charge cycles and SOH degradation",
+      },
+    ],
+  },
+  {
+    category: "Vehicle Operations",
+    icon: Truck,
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/10 border-purple-500/20",
+    queries: [
+      {
+        text: "Show total distance traveled by vehicle this month",
+        description: "Vehicle utilization from FACT_VEHICLE_DISTANCE data",
+      },
+      {
+        text: "Which vehicles have the highest mileage and swap frequency?",
+        description:
+          "Heavy usage vehicle identification using distance and payment data",
+      },
+      {
+        text: "Analyze GPS tracking patterns for route optimization",
+        description: "Location analysis using FACT-TBOX-GPS for common routes",
+      },
+      {
+        text: "Show vehicle telemetry anomalies and error patterns",
+        description:
+          "Error detection from FACT_VEHICLE_TELEMETRY diagnostic data",
+      },
+      {
+        text: "Calculate average session duration and distance per trip",
+        description: "Trip analysis using session data and distance metrics",
+      },
+    ],
+  },
+  {
+    category: "Customer Analytics",
+    icon: Users,
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-500/10 border-cyan-500/20",
+    queries: [
+      {
+        text: "Show top 20 customers by total spending and swap frequency",
+        description:
+          "Customer value analysis using FACT_PAYMENT and LOOKUP_VIEW",
+      },
+      {
+        text: "Which customers have multiple vehicles and their usage patterns?",
+        description:
+          "Multi-vehicle ownership analysis using FACT_VEHICLE_OWNER",
+      },
+      {
+        text: "Calculate customer wallet usage vs card payment preferences",
+        description: "Payment method analysis by customer segment",
+      },
+      {
+        text: "Show customer geographic distribution by city and region",
+        description: "Demographics analysis using DIM_CUSTOMERS location data",
+      },
+      {
+        text: "Identify inactive customers and their last activity date",
+        description:
+          "Customer retention analysis based on payment and usage history",
       },
     ],
   },
   {
     category: "Operational Insights",
-    icon: TrendingUp,
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/10 border-purple-500/20",
+    icon: Activity,
+    color: "text-rose-400",
+    bgColor: "bg-rose-500/10 border-rose-500/20",
     queries: [
       {
-        text: "What are the peak hours for battery swaps?",
-        description: "Identifies busy periods",
+        text: "What are the peak hours for battery swaps across all stations?",
+        description:
+          "Time-based analysis of swap transactions for demand planning",
       },
       {
-        text: "Show me the busiest days of the week",
-        description: "Weekly pattern analysis",
+        text: "Show busiest days of the week and seasonal patterns",
+        description: "Temporal analysis of swap frequency and revenue patterns",
+      },
+      {
+        text: "Calculate dealer network performance by region and partner",
+        description:
+          "Dealer effectiveness analysis using DIM_DEALER and transaction data",
+      },
+      {
+        text: "Show correlation between weather/time and vehicle usage",
+        description:
+          "External factor analysis using telemetry and session timing",
+      },
+      {
+        text: "Identify bottlenecks in the battery swapping process",
+        description:
+          "Operational efficiency analysis using session duration and error rates",
       },
     ],
   },
@@ -178,7 +404,13 @@ export default function AIQueryBuilder({
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [queryResult, setQueryResult] = useState<QueryResult | null>(null); // <-- NEW STATE
+  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
+  const [queryError, setQueryError] = useState<QueryError | null>(null);
+
+  // New states for copy and edit functionality
+  const [isCopied, setIsCopied] = useState(false);
+  const [isEditingSQL, setIsEditingSQL] = useState(false);
+  const [editedSQL, setEditedSQL] = useState("");
 
   const {
     sql: generatedSQL,
@@ -186,6 +418,7 @@ export default function AIQueryBuilder({
     error,
     explanation,
     generate,
+    setSql, // Assuming this exists in your hook to update the SQL
   } = useGenerateSQL();
 
   const getCategoryFromPrompt = (prompt: string): string => {
@@ -204,7 +437,8 @@ export default function AIQueryBuilder({
     prompt: string,
     sql: string,
     explanation?: string,
-    result?: QueryResult
+    result?: QueryResult,
+    error?: QueryError
   ) => {
     try {
       const document = {
@@ -219,6 +453,7 @@ export default function AIQueryBuilder({
           : "N/A",
         sql,
         explanation,
+        error: error ? error.message : null,
         timestamp: new Date().toISOString(),
       };
 
@@ -232,84 +467,58 @@ export default function AIQueryBuilder({
     }
   };
 
-  const generateMockData = (sqlQuery: string): QueryResult => {
-    const q = sqlQuery.toLowerCase();
-    if (q.includes("revenue")) {
-      return {
-        columns: [
-          "station_name",
-          "total_revenue",
-          "swap_count",
-          "lat",
-          "long",
-          "Area",
-        ],
-        data: [
-          ["Station Alpha", 12450, 156, 7.123456, 80.123456, "Ampara"],
-          ["Station Beta", 9800, 124, 7.120498, 79.983923, "Kalmunai"],
-        ],
-        executionTime: 0.15,
-        rowCount: 2,
-      };
-    } else if (q.includes("utilization") || q.includes("performance")) {
-      return {
-        columns: [
-          "station_name",
-          "utilization_rate",
-          "avg_swap_time",
-          "capacity",
-        ],
-        data: [
-          ["Station Alpha", 87.5, 14.2, 50],
-          ["Station Beta", 82.1, 15.8, 45],
-        ],
-        executionTime: 0.12,
-        rowCount: 2,
-      };
-    } else if (q.includes("battery") || q.includes("health")) {
-      return {
-        columns: [
-          "station_name",
-          "avg_health",
-          "batteries_below_85",
-          "total_batteries",
-        ],
-        data: [
-          ["Station Alpha", 92.3, 2, 25],
-          ["Station Beta", 89.7, 3, 22],
-        ],
-        executionTime: 0.18,
-        rowCount: 2,
-      };
-    } else {
-      return {
-        columns: ["id", "name", "value", "category"],
-        data: [
-          [1, "Item A", 150, "Category 1"],
-          [2, "Item B", 230, "Category 2"],
-        ],
-        executionTime: 0.08,
-        rowCount: 2,
-      };
+  // Copy SQL to clipboard
+  const handleCopySQL = async () => {
+    if (!generatedSQL) return;
+
+    try {
+      await navigator.clipboard.writeText(generatedSQL);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy SQL:", err);
     }
   };
 
+  // Start editing SQL
+  const handleEditSQL = () => {
+    setEditedSQL(generatedSQL || "");
+    setIsEditingSQL(true);
+  };
+
+  // Save edited SQL
+  const handleSaveSQL = () => {
+    if (setSql) {
+      setSql(editedSQL);
+    }
+    setIsEditingSQL(false);
+  };
+
+  // Cancel editing SQL
+  const handleCancelEdit = () => {
+    setEditedSQL("");
+    setIsEditingSQL(false);
+  };
+
   const handleExecuteQuery = async () => {
-    if (!generatedSQL) return;
+    const sqlToExecute = isEditingSQL ? editedSQL : generatedSQL;
+    if (!sqlToExecute) return;
+
     setIsExecuting(true);
+    setQueryResult(null);
+    setQueryError(null);
+
     try {
       const res = await fetch("/api/RunSQLQuery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sql: generatedSQL,
+          sql: sqlToExecute,
           connectionId: "snowflake_1751620346752",
         }),
       });
 
       const data = await res.json();
-
-      let resultData: QueryResult;
 
       if (
         data.success &&
@@ -324,31 +533,58 @@ export default function AIQueryBuilder({
           columns.map((col: string) => row[col])
         );
 
-        resultData = {
+        const resultData: QueryResult = {
           columns,
           data: dataRows,
           executionTime,
           rowCount,
         };
+
+        console.log("Query executed successfully:", data);
+
+        await saveQueryToMongo(query, sqlToExecute, explanation, resultData);
+
+        setQueryResult(resultData);
+        onQueryExecute(sqlToExecute, resultData);
       } else {
-        // fallback mock data
-        resultData = generateMockData(generatedSQL);
+        // Handle API error response
+        const errorInfo: QueryError = {
+          message: data.error || "Unknown error occurred",
+          code: data.code || "UNKNOWN_ERROR",
+          details: data.details || "No additional details available",
+        };
+
+        console.error("Query execution failed:", data);
+
+        await saveQueryToMongo(
+          query,
+          sqlToExecute,
+          explanation,
+          undefined,
+          errorInfo
+        );
+
+        setQueryError(errorInfo);
       }
-
-      console.log("Query executed successfully:", data);
-
-      await saveQueryToMongo(query, generatedSQL, explanation, resultData);
-
-      setQueryResult(resultData); // <-- Store result to local state here
-      onQueryExecute(generatedSQL, resultData);
     } catch (e) {
-      console.warn("Falling back to mock data due to error:", e);
-      const fallback = generateMockData(generatedSQL);
+      // Handle network or other errors
+      const errorInfo: QueryError = {
+        message: e instanceof Error ? e.message : "Network or connection error",
+        code: "CONNECTION_ERROR",
+        details: e instanceof Error ? e.stack : String(e),
+      };
 
-      await saveQueryToMongo(query, generatedSQL, explanation, fallback);
+      console.error("Query execution error:", e);
 
-      setQueryResult(fallback); // <-- Store fallback result
-      onQueryExecute(generatedSQL, fallback);
+      await saveQueryToMongo(
+        query,
+        sqlToExecute,
+        explanation,
+        undefined,
+        errorInfo
+      );
+
+      setQueryError(errorInfo);
     } finally {
       setIsExecuting(false);
     }
@@ -461,30 +697,144 @@ export default function AIQueryBuilder({
                       Generated SQL
                       <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
                     </h4>
-                    <Button
-                      onClick={handleExecuteQuery}
-                      disabled={isExecuting}
-                      size="sm"
-                      className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md transition-all duration-200"
-                    >
-                      {isExecuting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Executing...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4 mr-2" />
-                          Run Query
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {/* Copy Button */}
+                      <Button
+                        onClick={handleCopySQL}
+                        size="sm"
+                        variant="outline"
+                        className="border-slate-600/50 bg-slate-700/50 hover:bg-slate-600/60 text-slate-300 hover:text-white transition-all duration-200"
+                      >
+                        {isCopied ? (
+                          <>
+                            <Check className="h-4 w-4 mr-2 text-emerald-400" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Execute Button */}
+                      <Button
+                        onClick={handleExecuteQuery}
+                        disabled={isExecuting}
+                        size="sm"
+                        className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md transition-all duration-200"
+                      >
+                        {isExecuting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Executing...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Run Query
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="bg-slate-900/70 border border-slate-600/50 rounded-lg p-4 backdrop-blur-sm">
-                    <pre className="text-sm text-emerald-300 font-mono whitespace-pre-wrap overflow-x-auto">
-                      {generatedSQL}
-                    </pre>
+                    {isEditingSQL ? (
+                      <Textarea
+                        value={editedSQL}
+                        onChange={(e) => setEditedSQL(e.target.value)}
+                        className="bg-transparent border-none text-emerald-300 font-mono text-sm resize-none focus:ring-0 focus:outline-none p-0 w-full"
+                        style={{
+                          minHeight: "120px",
+                          height: "auto",
+                        }}
+                        rows={Math.max(6, editedSQL.split("\n").length)}
+                        placeholder="Edit your SQL query..."
+                      />
+                    ) : (
+                      <pre
+                        className="text-sm text-emerald-300 font-mono whitespace-pre-wrap overflow-x-auto cursor-pointer hover:bg-slate-800/50 rounded p-2 transition-colors duration-200"
+                        onDoubleClick={handleEditSQL}
+                        title="Double-click to edit"
+                      >
+                        {generatedSQL}
+                      </pre>
+                    )}
+                  </div>
+
+                  {!isEditingSQL && (
+                    <p className="text-xs text-slate-400 italic">
+                      💡 Double-click on the SQL query above to edit it
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* SQL Generation Error */}
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 backdrop-blur-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h5 className="text-sm font-medium text-red-200 mb-1">
+                        SQL Generation Error
+                      </h5>
+                      <p className="text-sm text-red-100/90 whitespace-pre-wrap leading-relaxed">
+                        {error}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Query Execution Error */}
+              {queryError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 backdrop-blur-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="w-full">
+                      <h5 className="text-sm font-medium text-red-200 mb-2">
+                        Query Execution Error
+                      </h5>
+                      <div className="space-y-2">
+                        <div>
+                          <span className="text-xs text-red-300 font-medium">
+                            Message:
+                          </span>
+                          <p className="text-sm text-red-100/90 mt-1">
+                            {queryError.message}
+                          </p>
+                        </div>
+                        {queryError.code && (
+                          <div>
+                            <span className="text-xs text-red-300 font-medium">
+                              Error Code:
+                            </span>
+                            <p className="text-sm text-red-100/90 font-mono mt-1">
+                              {queryError.code}
+                            </p>
+                          </div>
+                        )}
+                        {queryError.details && (
+                          <div>
+                            <span className="text-xs text-red-300 font-medium">
+                              Details:
+                            </span>
+                            <pre className="text-xs text-red-100/80 mt-1 bg-red-900/20 rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                              {queryError.details}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-red-500/30">
+                        <p className="text-xs text-red-200/80">
+                          💡 You can edit the SQL query above and try running it
+                          again
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -506,61 +856,50 @@ export default function AIQueryBuilder({
                 </div>
               )}
 
-              {/* Error */}
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 backdrop-blur-sm">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h5 className="text-sm font-medium text-red-200 mb-1">
-                        Error
-                      </h5>
-                      <p className="text-sm text-red-100/90 whitespace-pre-wrap leading-relaxed">
-                        {error}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* QUERY RESULT TABLE - NEW */}
+              {/* QUERY RESULT TABLE */}
               {queryResult && (
-                <div className="overflow-auto max-h-72 bg-slate-900/70 border border-slate-600/50 rounded-lg p-4 text-white">
-                  <table className="w-full table-auto border-collapse border border-slate-700">
-                    <thead>
-                      <tr>
-                        {queryResult.columns.map((col) => (
-                          <th
-                            key={col}
-                            className="border border-slate-700 px-2 py-1 text-left"
-                          >
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {queryResult.data.map((row, idx) => (
-                        <tr
-                          key={idx}
-                          className={idx % 2 === 0 ? "bg-slate-800" : ""}
-                        >
-                          {row.map((cell, cidx) => (
-                            <td
-                              key={cidx}
-                              className="border border-slate-700 px-2 py-1"
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-emerald-400" />
+                    Query Results
+                  </h4>
+                  <div className="overflow-auto max-h-72 bg-slate-900/70 border border-slate-600/50 rounded-lg p-4 text-white">
+                    <table className="w-full table-auto border-collapse border border-slate-700">
+                      <thead>
+                        <tr>
+                          {queryResult.columns.map((col) => (
+                            <th
+                              key={col}
+                              className="border border-slate-700 px-2 py-1 text-left"
                             >
-                              {cell}
-                            </td>
+                              {col}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p className="mt-2 text-xs text-slate-400">
-                    Rows: {queryResult.rowCount} — Execution time:{" "}
-                    {queryResult.executionTime.toFixed(2)}s
-                  </p>
+                      </thead>
+                      <tbody>
+                        {queryResult.data.map((row, idx) => (
+                          <tr
+                            key={idx}
+                            className={idx % 2 === 0 ? "bg-slate-800" : ""}
+                          >
+                            {row.map((cell, cidx) => (
+                              <td
+                                key={cidx}
+                                className="border border-slate-700 px-2 py-1"
+                              >
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="mt-2 text-xs text-slate-400">
+                      Rows: {queryResult.rowCount} — Execution time:{" "}
+                      {queryResult.executionTime.toFixed(2)}s
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -578,7 +917,7 @@ export default function AIQueryBuilder({
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Category Filters */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-4">
             {VERIFIED_QUERIES.map((cat) => (
               <Button
                 key={cat.category}
@@ -595,7 +934,7 @@ export default function AIQueryBuilder({
                 variant="outline"
                 size="sm"
               >
-                <cat.icon className={`h-4 w-4 mr-2 ${cat.color}`} />
+                <cat.icon className={`h-4 w-4 ${cat.color}`} />
                 {cat.category}
               </Button>
             ))}

@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    
     // Hardcoded Snowflake config
     const config = {
       account: process.env.SNOWFLAKE_ACCOUNT,

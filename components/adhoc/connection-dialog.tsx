@@ -32,15 +32,15 @@ import {
 } from "lucide-react";
 
 interface ConnectionDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConnectionAdd: (connection: any) => void;
+  open: boolean; // ✅ Fixed prop name
+  onOpenChange: (open: boolean) => void; // ✅ Fixed prop name
+  onConnectionAdded: () => Promise<void>; // ✅ Fixed prop name
 }
 
 export function ConnectionDialog({
-  isOpen,
-  onClose,
-  onConnectionAdd,
+  open, // ✅ Updated to match
+  onOpenChange, // ✅ Updated to match
+  onConnectionAdded, // ✅ Updated to match
 }: ConnectionDialogProps) {
   const [activeTab, setActiveTab] = useState("snowflake");
   const [isConnecting, setIsConnecting] = useState(false);
@@ -95,9 +95,20 @@ export function ConnectionDialog({
       };
 
       setConnectionStatus("success");
-      setTimeout(() => {
-        onConnectionAdd(newConnection);
-        onClose();
+      setTimeout(async () => {
+        // Save the connection to your backend/storage
+        try {
+          await fetch("/api/connections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newConnection),
+          });
+        } catch (err) {
+          console.error("Failed to save connection:", err);
+        }
+
+        await onConnectionAdded(); // ✅ Call the callback
+        onOpenChange(false); // ✅ Close dialog
         resetForm();
       }, 1000);
     } catch (error: any) {
@@ -134,9 +145,20 @@ export function ConnectionDialog({
       };
 
       setConnectionStatus("success");
-      setTimeout(() => {
-        onConnectionAdd(newConnection);
-        onClose();
+      setTimeout(async () => {
+        // Save the connection to your backend/storage
+        try {
+          await fetch("/api/connections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newConnection),
+          });
+        } catch (err) {
+          console.error("Failed to save connection:", err);
+        }
+
+        await onConnectionAdded(); // ✅ Call the callback
+        onOpenChange(false); // ✅ Close dialog
         resetForm();
       }, 1000);
     } catch (error) {
@@ -167,13 +189,15 @@ export function ConnectionDialog({
 
   const handleClose = () => {
     if (!isConnecting) {
-      onClose();
+      onOpenChange(false); // ✅ Use the correct prop
       resetForm();
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {" "}
+      {/* ✅ Fixed props */}
       <DialogContent className="max-w-2xl bg-slate-900 border-slate-700 text-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

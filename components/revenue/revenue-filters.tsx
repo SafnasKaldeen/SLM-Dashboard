@@ -253,6 +253,11 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
         newFrom = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         newTo = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
+      case "this_month":
+        // This month: first day of this month to today
+        newFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+        newTo = today;
+        break;
       case "last_3_months":
         // Last 3 months: first day of 3 months ago to last day of last month
         newFrom = new Date(today.getFullYear(), today.getMonth() - 3, 1);
@@ -464,6 +469,7 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                 <SelectItem value="last_month">Last Month</SelectItem>
                 <SelectItem value="last_3_months">Last 3 Months</SelectItem>
                 <SelectItem value="last_year">Last Year</SelectItem>
+                <SelectItem value="this_month">This Month</SelectItem>
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>

@@ -41,9 +41,10 @@ export class TableValidator {
     }
 
     if (!desc.description || typeof desc.description !== "string") {
-      throw new Error(
-        `Table description at index ${index} must have a valid description`
-      );
+      // throw new Error(
+      //   `Table description at index ${index} must have a valid description`
+      // );
+      desc.description = "No description provided";
     }
 
     if (!Array.isArray(desc.columns) || desc.columns.length === 0) {

@@ -138,6 +138,10 @@ export function GPSFilters({
           newFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
           newTo = new Date(today.getFullYear(), today.getMonth(), 0);
           break;
+        case "this_month": // <-- NEW CASE
+          newFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+          newTo = today;
+          break;
         default:
           return;
       }
@@ -149,15 +153,12 @@ export function GPSFilters({
         dateRange: range,
       });
     } else {
-      // When switching to custom, preserve current date range or use existing one
       const currentRange = filters.dateRange || getDefaultDateRange();
       setTempRange(currentRange);
       updateFilters({
         quickTime: value,
-        // Keep the existing date range when switching to custom
         dateRange: currentRange,
       });
-      // Automatically open the calendar when switching to custom
       setIsCalendarOpen(true);
     }
   };
@@ -492,6 +493,8 @@ export function GPSFilters({
                 <SelectItem value="last_month">Last Month</SelectItem>
                 <SelectItem value="last_3_months">Last 3 Months</SelectItem>
                 <SelectItem value="last_year">Last Year (Default)</SelectItem>
+                <SelectItem value="this_month">This Month</SelectItem>{" "}
+                {/* <-- NEW */}
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>

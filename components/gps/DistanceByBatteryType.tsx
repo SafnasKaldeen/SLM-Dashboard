@@ -26,11 +26,12 @@ const batteryTypeColors: Record<string, string> = {
 };
 
 const allowedBatteryTypes = ["GREEN", "BLUE", "ORANGE"];
-
 function buildBatteryDistanceQuery(
   startDate: string,
   endDate: string,
-  batteryTypes: string[] = []
+  batteryTypes: string[] = [],
+  selectedScooters: string[] = [],
+  selectedBms: string[] = []
 ) {
   const typesToFilter =
     batteryTypes.length > 0 ? batteryTypes : allowedBatteryTypes;
@@ -38,6 +39,20 @@ function buildBatteryDistanceQuery(
   const batteryFilter = `AND BATTERY_NAME IN (${typesToFilter
     .map((t) => `'${t}'`)
     .join(", ")})`;
+
+  const scooterFilter =
+    selectedScooters.length > 0
+      ? `AND UPPER(TBOXID) IN (${selectedScooters
+          .map((s) => `'${s.toUpperCase()}'`)
+          .join(", ")})`
+      : "";
+
+  const bmsFilter =
+    selectedBms.length > 0
+      ? `AND UPPER(BMSID) IN (${selectedBms
+          .map((b) => `'${b.toUpperCase()}'`)
+          .join(", ")})`
+      : "";
 
   return `
     SELECT 
@@ -48,6 +63,9 @@ function buildBatteryDistanceQuery(
     WHERE GPS_DATE BETWEEN '${startDate}' AND '${endDate}'
       AND TBOXID IS NOT NULL
       AND DISTANCE_KM > 0
+      ${batteryFilter}
+      ${scooterFilter}
+      ${bmsFilter}
     GROUP BY BATTERY_NAME
     ORDER BY TOTAL_DISTANCE DESC
     LIMIT 50;
@@ -72,12 +90,15 @@ export default function DistanceByBatteryType({
     const query = buildBatteryDistanceQuery(
       startDate,
       endDate,
-      filters.selectedBatteryTypes || []
+      filters.selectedBatteryTypes || [],
+      filters.selectedScooters || [],
+      filters.selectedBmses || []
     );
 
     const fetchData = async () => {
       try {
         setLoading(true);
+        console.log("Fetching battery data with query:", query);
         const response = await axios.post("/api/snowflake/query", { query });
         setData(response.data);
       } catch (error) {
