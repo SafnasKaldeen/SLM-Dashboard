@@ -13,6 +13,7 @@ import {
   Activity,
   MapPin,
   Zap,
+  Bike,
   User,
   Building2,
   Hash,
@@ -23,6 +24,11 @@ import {
   AlertCircle,
   Wrench,
   Minus,
+  CheckCircle,
+  Package,
+  Clock,
+  Store,
+  HelpCircle,
 } from "lucide-react";
 
 // ============================================================================
@@ -35,24 +41,14 @@ interface Vehicle {
   TBOX_ID?: string;
   TBOX_IMEI_NO?: string;
   BATTERY_TYPE_ID: string;
+  BATTERY_TYPE_NAME?: string; // Added for display
   CUSTOMER_ID?: string;
+  CUSTOMER_NAME?: string; // Added for display
   DEALER_ID?: string;
+  DEALER_NAME?: string; // Added for display
   MODEL?: string;
-  STATUS: "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "CHARGING";
+  STATUS: string; // Original status field (kept for compatibility)
   REGION?: string;
-
-  // Performance metrics
-  TOTAL_SWAPS_DAILY: number;
-  TOTAL_SWAPS_MONTHLY: number;
-  TOTAL_SWAPS_LIFETIME: number;
-  TOTAL_CHARGING_SESSIONS: number;
-  AVG_DISTANCE_PER_DAY: number;
-  TOTAL_DISTANCE: number;
-
-  // Revenue metrics
-  SWAPPING_REVENUE: number;
-  CHARGING_REVENUE: number;
-  TOTAL_REVENUE: number;
 
   // Timestamps
   CREATED_DATE?: Date;
@@ -61,6 +57,7 @@ interface Vehicle {
 
 interface VehicleCardsProps {
   vehicles: Vehicle[];
+  allVehicles: Vehicle[]; // full dataset
   currentPage: number;
   totalPages: number;
   itemsPerPage: number;
@@ -70,59 +67,78 @@ interface VehicleCardsProps {
 }
 
 // ============================================================================
-// UTILITY FUNCTIONS
+// BUSINESS LOGIC FUNCTIONS
 // ============================================================================
 
-const getStatusColor = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "bg-green-500/10 text-green-400 border-green-500/20";
-    case "inactive":
-      return "bg-red-500/10 text-red-400 border-red-500/20";
-    case "maintenance":
-      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-    case "charging":
-      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+// Derive actual vehicle status based on customer and dealer assignment
+const deriveVehicleStatus = (
+  customerId?: string,
+  dealerId?: string
+): string => {
+  const hasCustomer = customerId && customerId.trim() !== "";
+  const hasDealer = dealerId && dealerId.trim() !== "";
+
+  if (hasCustomer && hasDealer) {
+    return "SOLD";
+  } else if (!hasCustomer && !hasDealer) {
+    return "FACTORY_INSTOCK";
+  } else if (hasCustomer && !hasDealer) {
+    return "CUSTOMER_RESERVED";
+  } else if (!hasCustomer && hasDealer) {
+    return "DEALER_INSTOCK";
+  }
+
+  return "UNKNOWN";
+};
+
+// Get status display properties
+const getStatusDisplayInfo = (status: string) => {
+  switch (status) {
+    case "SOLD":
+      return {
+        label: "Sold",
+        color: "bg-green-500/10 text-green-400 border-green-500/20",
+        Icon: CheckCircle,
+        description: "Vehicle sold to customer",
+      };
+    case "FACTORY_INSTOCK":
+      return {
+        label: "Factory Instock",
+        color: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+        Icon: Package,
+        description: "Available at factory",
+      };
+    case "CUSTOMER_RESERVED":
+      return {
+        label: "Customer Reserved",
+        color: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        Icon: Clock,
+        description: "Reserved by customer, awaiting dealer assignment",
+      };
+    case "DEALER_INSTOCK":
+      return {
+        label: "Dealer Instock",
+        color: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+        Icon: Store,
+        description: "Available at dealer",
+      };
     default:
-      return "bg-slate-500/10 text-slate-400 border-slate-500/20";
+      return {
+        label: "Unknown",
+        color: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+        Icon: HelpCircle,
+        description: "Status could not be determined",
+      };
   }
 };
 
-const getStatusIcon = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return Activity;
-    case "inactive":
-      return AlertCircle;
-    case "maintenance":
-      return Wrench;
-    case "charging":
-      return Zap;
-    default:
-      return Car;
-  }
-};
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
 const formatNumber = (num: number | null | undefined) => {
   if (num === null || num === undefined || isNaN(num)) return "N/A";
   return num.toLocaleString("en-US", { maximumFractionDigits: 0 });
-};
-
-const formatCurrency = (amount: number | null | undefined) => {
-  if (amount === null || amount === undefined || isNaN(amount)) return "N/A";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-};
-
-const formatDistance = (distance: number | null | undefined) => {
-  if (distance === null || distance === undefined || isNaN(distance))
-    return "N/A";
-  if (distance >= 1000) {
-    return `${(distance / 1000).toFixed(1)}k km`;
-  }
-  return `${distance.toFixed(0)} km`;
 };
 
 // Helper function to display null/empty values appropriately
@@ -141,21 +157,47 @@ const displayValue = (
   return String(value);
 };
 
+// Helper function to display ID with name
+const displayIdWithName = (
+  id: string | null | undefined,
+  name: string | null | undefined,
+  fallback: string = "Unassigned"
+) => {
+  const hasId = id && id.trim() !== "";
+  const hasName = name && name.trim() !== "";
+
+  if (!hasId) {
+    return fallback;
+  }
+
+  if (hasName) {
+    return `${name} (${id})`;
+  }
+
+  return id;
+};
+
 // ============================================================================
 // INDIVIDUAL VEHICLE CARD COMPONENT
 // ============================================================================
 
 const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
-  const StatusIcon = getStatusIcon(vehicle.STATUS);
+  // Derive the actual status based on business logic
+  const derivedStatus = deriveVehicleStatus(
+    vehicle.CUSTOMER_ID,
+    vehicle.DEALER_ID
+  );
+  const statusInfo = getStatusDisplayInfo(derivedStatus);
+  const { Icon: StatusIcon } = statusInfo;
 
   return (
-    <Card className="bg-slate-900/50 border-slate-800 hover:border-slate-700 transition-all duration-200 group">
+    <Card className="border-slate-800 hover:border-slate-700 transition-all duration-200 group">
       <CardContent className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="p-2 bg-slate-800 rounded-lg flex-shrink-0">
-              <Car className="h-4 w-4 text-slate-400" />
+              <Bike className="h-4 w-4 text-slate-400" />
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="text-slate-200 font-semibold text-lg break-all">
@@ -167,39 +209,68 @@ const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
             </div>
           </div>
           <Badge
-            className={`${getStatusColor(
-              vehicle.STATUS || "unknown"
-            )} flex items-center gap-1.5 px-2.5 py-1 flex-shrink-0 ml-2`}
+            className={`${statusInfo.color} flex items-center gap-1.5 px-2.5 py-1 flex-shrink-0 ml-2`}
+            title={statusInfo.description}
           >
             <StatusIcon className="h-3 w-3" />
-            {vehicle.STATUS || "Unknown"}
+            {statusInfo.label}
           </Badge>
         </div>
 
         {/* Key Details */}
         <div className="space-y-3 mb-6">
+          {/* Assignment Status Summary */}
+          <div className="bg-slate-800/30 rounded-lg p-3 space-y-2">
+            <div className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+              Assignment Status
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Customer:</span>
+                <span
+                  className={
+                    vehicle.CUSTOMER_ID ? "text-green-400" : "text-slate-500"
+                  }
+                >
+                  {displayValue(vehicle.CUSTOMER_NAME, "Unassigned")}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Dealer:</span>
+                <span
+                  className={
+                    vehicle.DEALER_ID ? "text-green-400" : "text-slate-500"
+                  }
+                >
+                  {displayValue(vehicle.DEALER_NAME, "Unassigned")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Battery Type - Only show name */}
           <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
             <div className="flex items-center gap-2 flex-shrink-0">
               <Battery className="h-4 w-4 text-emerald-400" />
               <span className="text-slate-300 text-sm">Battery Type</span>
             </div>
             <div className="flex items-center gap-2 text-right">
-              {!vehicle.BATTERY_TYPE_ID && (
+              {!vehicle.BATTERY_TYPE_NAME && (
                 <Minus className="h-3 w-3 text-slate-500" />
               )}
               <span
                 className={`font-medium text-sm break-all ${
-                  vehicle.BATTERY_TYPE_ID
+                  vehicle.BATTERY_TYPE_NAME
                     ? "text-slate-200"
                     : "text-slate-500 italic"
                 }`}
               >
-                {displayValue(vehicle.BATTERY_TYPE_ID, "No battery type")}
+                {displayValue(vehicle.BATTERY_TYPE_NAME, "No battery type")}
               </span>
             </div>
           </div>
 
-          {/* Always show model field, even if null */}
+          {/* Model field */}
           <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
             <div className="flex items-center gap-2 flex-shrink-0">
               <Hash className="h-4 w-4 text-purple-400" />
@@ -217,11 +288,11 @@ const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
             </div>
           </div>
 
-          {/* Always show customer field */}
+          {/* Customer ID field */}
           <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
             <div className="flex items-center gap-2 flex-shrink-0">
               <User className="h-4 w-4 text-blue-400" />
-              <span className="text-slate-300 text-sm">Customer</span>
+              <span className="text-slate-300 text-sm">Customer ID</span>
             </div>
             <div className="flex items-center gap-2 text-right">
               {!vehicle.CUSTOMER_ID && (
@@ -239,11 +310,11 @@ const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
             </div>
           </div>
 
-          {/* Always show dealer field */}
+          {/* Dealer ID field */}
           <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
             <div className="flex items-center gap-2 flex-shrink-0">
               <Building2 className="h-4 w-4 text-orange-400" />
-              <span className="text-slate-300 text-sm">Dealer</span>
+              <span className="text-slate-300 text-sm">Dealer ID</span>
             </div>
             <div className="flex items-center gap-2 text-right">
               {!vehicle.DEALER_ID && (
@@ -259,18 +330,23 @@ const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
             </div>
           </div>
 
-          {/* Show T-Box information if available */}
-          {vehicle.TBOX_ID && (
-            <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Zap className="h-4 w-4 text-cyan-400" />
-                <span className="text-slate-300 text-sm">T-Box ID</span>
-              </div>
-              <span className="text-slate-200 font-medium text-sm break-all text-right">
-                {vehicle.TBOX_ID}
+          {/* Show T-Box information - always visible */}
+          <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Zap className="h-4 w-4 text-cyan-400" />
+              <span className="text-slate-300 text-sm">T-Box ID</span>
+            </div>
+            <div className="flex items-center gap-2 text-right">
+              {!vehicle.TBOX_ID && <Minus className="h-3 w-3 text-slate-500" />}
+              <span
+                className={`font-medium text-sm break-all ${
+                  vehicle.TBOX_ID ? "text-slate-200" : "text-slate-500 italic"
+                }`}
+              >
+                {displayValue(vehicle.TBOX_ID, "Not assigned")}
               </span>
             </div>
-          )}
+          </div>
 
           {/* Show region if available */}
           {vehicle.REGION && (
@@ -401,9 +477,9 @@ const Pagination: React.FC<{
 // ============================================================================
 // MAIN VEHICLE GRID COMPONENT
 // ============================================================================
-
 export function VehicleGrid({
   vehicles,
+  allVehicles,
   currentPage,
   totalPages,
   itemsPerPage,
@@ -411,48 +487,66 @@ export function VehicleGrid({
   onPageChange,
   loading = false,
 }: VehicleCardsProps) {
-  // Export functionality with proper null handling
+  // Remove duplicates based on VEHICLE_ID
+  const uniqueVehicles = React.useMemo(() => {
+    const seen = new Set<string>();
+    return vehicles.filter((v) => {
+      const key = JSON.stringify(v);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [vehicles]);
+
+  const uniqueAllVehicles = React.useMemo(() => {
+    const seen = new Set<string>();
+    return allVehicles.filter((v) => {
+      const key = JSON.stringify(v);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [allVehicles]);
+
   const handleExport = () => {
     const headers = [
       "Vehicle ID",
       "Chassis Number",
       "T-Box ID",
-      "Battery Type",
-      "Status",
+      "Battery Type ID",
+      "Battery Type Name",
+      "Derived Status",
       "Customer ID",
+      "Customer Name",
       "Dealer ID",
+      "Dealer Name",
       "Model",
       "Region",
-      "Daily Swaps",
-      "Monthly Swaps",
-      "Lifetime Swaps",
-      "Charging Sessions",
-      "Avg Distance/Day",
-      "Total Distance",
-      "Swapping Revenue",
-      "Charging Revenue",
-      "Total Revenue",
     ];
 
-    const rows = vehicles.map((v) => [
+    const seen = new Set<string>();
+    const uniqueExport = allVehicles.filter((v) => {
+      const key = `${v.VEHICLE_ID || ""}-${v.CHASSIS_NUMBER || ""}-${
+        v.TBOX_ID || ""
+      }`.trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const rows = uniqueExport.map((v) => [
       displayValue(v.VEHICLE_ID, ""),
       displayValue(v.CHASSIS_NUMBER, ""),
       displayValue(v.TBOX_ID, ""),
       displayValue(v.BATTERY_TYPE_ID, ""),
-      displayValue(v.STATUS, ""),
+      displayValue(v.BATTERY_TYPE_NAME, ""),
+      deriveVehicleStatus(v.CUSTOMER_ID, v.DEALER_ID),
       displayValue(v.CUSTOMER_ID, ""),
+      displayValue(v.CUSTOMER_NAME, ""),
       displayValue(v.DEALER_ID, ""),
+      displayValue(v.DEALER_NAME, ""),
       displayValue(v.MODEL, ""),
       displayValue(v.REGION, ""),
-      formatNumber(v.TOTAL_SWAPS_DAILY),
-      formatNumber(v.TOTAL_SWAPS_MONTHLY),
-      formatNumber(v.TOTAL_SWAPS_LIFETIME),
-      formatNumber(v.TOTAL_CHARGING_SESSIONS),
-      formatNumber(v.AVG_DISTANCE_PER_DAY),
-      formatNumber(v.TOTAL_DISTANCE),
-      formatNumber(v.SWAPPING_REVENUE),
-      formatNumber(v.CHARGING_REVENUE),
-      formatNumber(v.TOTAL_REVENUE),
     ]);
 
     const csvContent = [headers, ...rows]
@@ -472,6 +566,18 @@ export function VehicleGrid({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  if (uniqueVehicles.length === 0 && !loading) {
+    return (
+      <div className="text-center py-12 bg-slate-900/50 rounded-lg border border-slate-800">
+        <Car className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+        <h3 className="text-slate-300 text-xl font-semibold mb-2">
+          No vehicles match the current filters
+        </h3>
+        <p className="text-slate-400">Try adjusting your filter settings</p>
+      </div>
+    );
+  }
 
   if (vehicles.length === 0 && !loading) {
     return (
@@ -530,7 +636,9 @@ export function VehicleGrid({
             Vehicle Status Grid
           </h2>
           <p className="text-slate-400 text-sm">
-            Showing {vehicles.length} vehicle{vehicles.length !== 1 ? "s" : ""}
+            Showing {uniqueVehicles.length} vehicle
+            {uniqueVehicles.length !== 1 ? "s" : ""} with status derived from
+            assignments
           </p>
         </div>
 
@@ -549,7 +657,7 @@ export function VehicleGrid({
 
       {/* Vehicle Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-        {vehicles.map((vehicle) => (
+        {uniqueVehicles.map((vehicle) => (
           <VehicleCard
             key={vehicle.VEHICLE_ID || `vehicle-${Math.random()}`}
             vehicle={vehicle}

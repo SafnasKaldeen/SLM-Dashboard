@@ -1,57 +1,63 @@
 "use client";
 
-import { Car, Activity, DollarSign, Zap, Battery, Route } from "lucide-react";
+import { Car, Users, ShoppingCart, Package } from "lucide-react";
 import KPICard from "@/components/vehicles/KPICard";
 
 // Utility functions
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-};
-
 const formatNumber = (num: number) => {
   return new Intl.NumberFormat("en-US").format(num);
 };
 
-// Types
+// Updated Types to match your requirements
 interface FleetKPIs {
   TOTAL_VEHICLES: number;
-  TOTAL_CHARGING_SESSIONS: number;
-  TOTAL_CHARGING_REVENUE: number;
-  TOTAL_CO2_SAVED: number;
+  TOTAL_DEALERS: number;
+  TOTAL_SOLD_VEHICLES: number;
+  TOTAL_INSTOCK_VEHICLES: number;
 }
 
-const KPICardsGrid = ({ fleetKPIs }: { fleetKPIs: FleetKPIs }) => {
+interface KPICardsGridProps {
+  fleetKPIs: FleetKPIs;
+  loading?: boolean;
+}
+
+const KPICardsGrid = ({ fleetKPIs, loading = false }: KPICardsGridProps) => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <KPICard
         icon={Car}
         label="Total Vehicles"
         value={fleetKPIs.TOTAL_VEHICLES}
         color="text-blue-400"
+        formatter={formatNumber}
+        loading={loading}
       />
 
       <KPICard
-        icon={Battery}
-        label="Total Revenue"
-        value={fleetKPIs.TOTAL_CHARGING_REVENUE}
+        icon={Users}
+        label="Total Dealers"
+        value={fleetKPIs.TOTAL_DEALERS}
         color="text-cyan-400"
-        // formatter={formatCurrency}
+        formatter={formatNumber}
+        loading={loading}
       />
+
       <KPICard
-        icon={Activity}
-        label="Distance travelled"
-        value={fleetKPIs.TOTAL_CHARGING_SESSIONS}
+        icon={ShoppingCart}
+        label="Total Sold Vehicles"
+        value={fleetKPIs.TOTAL_SOLD_VEHICLES}
         color="text-green-400"
+        formatter={formatNumber}
+        loading={loading}
       />
+
       <KPICard
-        icon={Route}
-        label="CO₂ Saved"
-        value={Math.round(fleetKPIs.TOTAL_CO2_SAVED)}
+        icon={Package}
+        label="Total In-Stock Vehicles"
+        value={fleetKPIs.TOTAL_INSTOCK_VEHICLES}
         color="text-orange-400"
-        formatter={(val) => `${formatNumber(val)} kg`}
+        formatter={formatNumber}
+        loading={loading}
       />
     </div>
   );

@@ -861,7 +861,7 @@ export function ExpenseAnalysis({ filters }: ExpenseAnalysisProps) {
       data?.data?.reduce((acc, station) => {
         return (
           acc +
-          (Number(station.TOTAL_ELCTRICITY_BILL) || 0) +
+          (Number(station.TOTAL_ELECTRICITY_BILL) || 0) +
           (Number(station.TOTAL_DIRECTPAY_COMMISSION) || 0) +
           (Number(station.TOTAL_STATION_RENT) || 0)
         );
@@ -876,9 +876,9 @@ export function ExpenseAnalysis({ filters }: ExpenseAnalysisProps) {
   // Calculate overall trend
   const totalTrend = calculateTrend(totalExpenses, prevTotalExpenses);
 
-  const electricityAmount = Number(data?.OVERALL_ELCTRICITY_BILL ?? 0);
+  const electricityAmount = Number(data?.OVERALL_ELECTRICITY_BILL ?? 0);
   const prevElectricityAmount = Number(
-    data?.["previous segment OVERALL_ELCTRICITY_BILL"] ?? 0
+    data?.["previous segment OVERALL_ELECTRICITY_BILL"] ?? 0
   );
 
   const directPayAmount = Number(data?.OVERALL_DIRECTPAY_COMMISSION ?? 0);
@@ -932,11 +932,11 @@ export function ExpenseAnalysis({ filters }: ExpenseAnalysisProps) {
 
     return data.data.map((station) => ({
       name: station.STATIONNAME,
-      electricity: Number(station.TOTAL_ELCTRICITY_BILL) || 0,
+      electricity: Number(station.TOTAL_ELECTRICITY_BILL) || 0,
       directPay: Number(station.TOTAL_DIRECTPAY_COMMISSION) || 0,
       rent: Number(station.TOTAL_STATION_RENT) || 0,
       total:
-        (Number(station.TOTAL_ELCTRICITY_BILL) || 0) +
+        (Number(station.TOTAL_ELECTRICITY_BILL) || 0) +
         (Number(station.TOTAL_DIRECTPAY_COMMISSION) || 0) +
         (Number(station.TOTAL_STATION_RENT) || 0),
     }));
