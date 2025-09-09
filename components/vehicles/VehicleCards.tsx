@@ -17,6 +17,7 @@ import {
   User,
   Building2,
   Hash,
+  Smartphone,
   Calendar,
   TrendingUp,
   DollarSign,
@@ -110,7 +111,7 @@ const getStatusDisplayInfo = (status: string) => {
       };
     case "CUSTOMER_RESERVED":
       return {
-        label: "Customer Reserved",
+        label: "Reserved",
         color: "bg-amber-500/10 text-amber-400 border-amber-500/20",
         Icon: Clock,
         description: "Reserved by customer, awaiting dealer assignment",
@@ -333,7 +334,7 @@ const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
           {/* Show T-Box information - always visible */}
           <div className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Zap className="h-4 w-4 text-cyan-400" />
+              <Zap className="h-4 w-4 text-cyan-400" /> {/* cyan accent */}
               <span className="text-slate-300 text-sm">T-Box ID</span>
             </div>
             <div className="flex items-center gap-2 text-right">
@@ -344,6 +345,29 @@ const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
                 }`}
               >
                 {displayValue(vehicle.TBOX_ID, "Not assigned")}
+              </span>
+            </div>
+          </div>
+
+          {/* Show IMEI information - always visible */}
+          <div className="flex items-center justify-between py-2 px-3 bg-slate-800/70 rounded-lg border">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Smartphone className="h-4 w-4 text-yellow-400" />
+              {/* different icon + purple accent */}
+              <span className="text-slate-300 text-sm">IMEI No</span>
+            </div>
+            <div className="flex items-center gap-2 text-right">
+              {!vehicle.TBOX_IMEI_NO && (
+                <Minus className="h-3 w-3 text-slate-500" />
+              )}
+              <span
+                className={`font-medium text-sm break-all ${
+                  vehicle.TBOX_IMEI_NO
+                    ? "text-slate-200"
+                    : "text-slate-500 italic"
+                }`}
+              >
+                {displayValue(vehicle.TBOX_IMEI_NO, "Not assigned")}
               </span>
             </div>
           </div>
@@ -363,7 +387,12 @@ const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
         </div>
 
         {/* Action Button */}
-        <Link href={`/vehicles/${vehicle.VEHICLE_ID || "unknown"}`}>
+        <Link
+          href={`/vehicles/${vehicle.VEHICLE_ID || "unknown"}`}
+          target="_blank"
+          rel="noopener noreferrer" // ✅ security best practice
+        >
+          {" "}
           <Button
             variant="ghost"
             size="sm"

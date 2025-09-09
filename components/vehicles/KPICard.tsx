@@ -12,6 +12,7 @@ interface KPICardProps {
   label: string;
   value: number;
   prevValue?: number;
+  description: string;
   formatter?: (val: number) => string;
 }
 
@@ -20,6 +21,7 @@ const KPICard = ({
   label,
   value,
   prevValue,
+  description,
   formatter = (val: number) => formatNumber(val),
 }: KPICardProps) => {
   const trend =
@@ -40,21 +42,7 @@ const KPICard = ({
       <CardContent>
         <div className="text-2xl font-bold">{formatter(value)}</div>
         <div className="mt-3 flex justify-between items-center text-xs text-muted-foreground">
-          {prevValue !== undefined && <div>Prev: {formatter(prevValue)}</div>}
-          {trend === null ? (
-            <span className="text-muted-foreground">N/A</span>
-          ) : (
-            <div className="flex items-center">
-              {isIncrease ? (
-                <ArrowUpIcon className="mr-1 h-3 w-3 text-green-500" />
-              ) : (
-                <ArrowDownIcon className="mr-1 h-3 w-3 text-red-500" />
-              )}
-              <span className={isIncrease ? "text-green-500" : "text-red-500"}>
-                {formatPercent(trend)}
-              </span>
-            </div>
-          )}
+          {description}
         </div>
       </CardContent>
     </Card>

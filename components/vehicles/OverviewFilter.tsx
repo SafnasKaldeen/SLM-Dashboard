@@ -71,6 +71,7 @@ export interface SimpleOverviewFilterType {
   chassisNumberSearch: string;
   tboxIdSearch: string;
   dealerIdSearch: string; // New: dealer ID search field
+  IMEISearch: string; // New: IMEI search field
 }
 
 interface FilterCombination {
@@ -247,6 +248,7 @@ export const SimpleOverviewFilter: React.FC<SimpleOverviewFilterProps> = ({
       chassisNumberSearch: "",
       tboxIdSearch: "",
       dealerIdSearch: "",
+      IMEISearch: "",
     };
 
     setFilters(cleared);
@@ -335,6 +337,7 @@ export const SimpleOverviewFilter: React.FC<SimpleOverviewFilterProps> = ({
     if (filters.chassisNumberSearch) count++;
     if (filters.tboxIdSearch) count++;
     if (filters.dealerIdSearch) count++;
+    if (filters.IMEISearch) count++;
     return count;
   }, [filters]);
 
@@ -809,7 +812,7 @@ export const SimpleOverviewFilter: React.FC<SimpleOverviewFilterProps> = ({
           </div>
 
           {/* Dealer ID Search */}
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <Label>Dealer ID Search</Label>
             <Input
               value={filters.dealerIdSearch}
@@ -817,6 +820,15 @@ export const SimpleOverviewFilter: React.FC<SimpleOverviewFilterProps> = ({
                 updateFilters({ dealerIdSearch: e.target.value })
               }
               placeholder="Enter dealer ID..."
+            />
+          </div> */}
+
+          <div className="space-y-2">
+            <Label>IMEI Search</Label>
+            <Input
+              value={filters.IMEISearch}
+              onChange={(e) => updateFilters({ IMEISearch: e.target.value })}
+              placeholder="Enter IMEI..."
             />
           </div>
         </div>
@@ -828,11 +840,11 @@ export const SimpleOverviewFilter: React.FC<SimpleOverviewFilterProps> = ({
             {availableOptions.customerIds.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-1 gap-4 pt-4 border-t">
                 <div className="space-y-2">
-                  <Label>Customer Types</Label>
+                  <Label>Customer ID</Label>
                   {renderFilterSelect(
                     availableOptions.customerIds,
                     filters.customerTypes,
-                    "Select customer types",
+                    "Select customers",
                     (item, checked) =>
                       handleArrayFilterChange("customerTypes", item, checked),
                     "customerIds"

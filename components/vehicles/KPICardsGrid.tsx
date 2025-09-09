@@ -27,6 +27,7 @@ const KPICardsGrid = ({ fleetKPIs, loading = false }: KPICardsGridProps) => {
       <KPICard
         icon={Car}
         label="Total Vehicles"
+        description="All vehicles in the fleet"
         value={fleetKPIs.TOTAL_VEHICLES}
         color="text-blue-400"
         formatter={formatNumber}
@@ -36,6 +37,7 @@ const KPICardsGrid = ({ fleetKPIs, loading = false }: KPICardsGridProps) => {
       <KPICard
         icon={Users}
         label="Total Dealers"
+        description="All dealers in the fleet"
         value={fleetKPIs.TOTAL_DEALERS}
         color="text-cyan-400"
         formatter={formatNumber}
@@ -45,6 +47,7 @@ const KPICardsGrid = ({ fleetKPIs, loading = false }: KPICardsGridProps) => {
       <KPICard
         icon={ShoppingCart}
         label="Total Sold Vehicles"
+        description="All sold vehicles in the fleet"
         value={fleetKPIs.TOTAL_SOLD_VEHICLES}
         color="text-green-400"
         formatter={formatNumber}
@@ -54,6 +57,7 @@ const KPICardsGrid = ({ fleetKPIs, loading = false }: KPICardsGridProps) => {
       <KPICard
         icon={Package}
         label="Total In-Stock Vehicles"
+        description="All dealer and factory in-stock vehicles"
         value={fleetKPIs.TOTAL_INSTOCK_VEHICLES}
         color="text-orange-400"
         formatter={formatNumber}

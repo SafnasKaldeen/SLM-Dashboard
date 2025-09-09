@@ -28,7 +28,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 // Commented out Cognito auth import
-// import { useAuth } from "@/hooks/use-auth";
+// import { useAuth } from "@/hooks/use-auth.tsx";
 
 interface LoginModalProps {
   isOpen: boolean;

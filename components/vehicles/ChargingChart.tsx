@@ -9,40 +9,74 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { Activity } from "lucide-react";
+import { Activity, Home, Zap } from "lucide-react";
 
-interface ChargingData {
+interface HomeChargingData {
   CHARGING_DATE: string;
   SESSION_COUNT: number;
-  AVG_DURATION: number;
-  TOTAL_ENERGY: number;
+  AVG_DURATION?: number;
+  TOTAL_ENERGY?: number;
+  TOTAL_AMOUNT?: number;
 }
 
-interface ChargingChartProps {
-  data: ChargingData[];
+interface HomeChargingChartProps {
+  data: HomeChargingData[];
+  loading?: boolean;
+  title?: string;
+  showAmount?: boolean;
 }
 
-export default function ChargingChart({ data }: ChargingChartProps) {
+export default function HomeChargingChart({
+  data,
+  loading = false,
+  title = "Home Charging Sessions Overview",
+  showAmount = false,
+}: HomeChargingChartProps) {
+  // Loading state
+  if (loading) {
+    return (
+      <div className="border border-slate-700/50 rounded-xl p-8">
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-400"></div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
+              {title}
+            </h2>
+          </div>
+          <p className="font-medium text-slate-400">
+            Track home charging patterns and usage trends
+          </p>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center gap-2">
+            <Activity className="w-6 h-6 animate-pulse text-green-400" />
+            <span className="text-slate-300">Loading charging data...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // No data message
   if (!data || data.length === 0) {
     return (
       <div className="border border-slate-700/50 rounded-xl p-8">
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 to-blue-400"></div>
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-400"></div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-              Charging Sessions Overview
+              {title}
             </h2>
           </div>
-          <p className="font-medium">
-            Track charging patterns and energy consumption over time
+          <p className="font-medium text-slate-400">
+            Track home charging patterns and usage trends
           </p>
         </div>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Activity className="h-12 w-12 text-slate-500 mx-auto mb-3" />
+            <Home className="h-12 w-12 text-slate-500 mx-auto mb-3" />
             <p className="text-lg font-semibold text-slate-300 mb-1">
-              No charging data available
+              No home charging data available
             </p>
             <p className="text-sm text-slate-400">
               Check back later for updates
@@ -54,29 +88,54 @@ export default function ChargingChart({ data }: ChargingChartProps) {
   }
 
   // Transform the data to format dates nicely for display
-  const chartData = data.map((item) => ({
-    date: new Date(item.CHARGING_DATE).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }),
-    sessions: item.SESSION_COUNT,
-    avgDuration: item.AVG_DURATION,
-    totalEnergy: item.TOTAL_ENERGY,
-  }));
+  const chartData = data.map((item) => {
+    // Handle different date formats (daily, weekly, monthly)
+    let displayDate: string;
+
+    if (item.CHARGING_DATE.includes("W")) {
+      // Weekly format: 2024-W12
+      const [year, week] = item.CHARGING_DATE.split("-W");
+      displayDate = `${year} Week ${week}`;
+    } else if (item.CHARGING_DATE.length === 7) {
+      // Monthly format: 2024-03
+      const [year, month] = item.CHARGING_DATE.split("-");
+      displayDate = new Date(
+        parseInt(year),
+        parseInt(month) - 1
+      ).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+      });
+    } else {
+      // Daily format: 2024-03-15
+      displayDate = new Date(item.CHARGING_DATE).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    }
+
+    return {
+      date: displayDate,
+      sessions: item.SESSION_COUNT,
+      avgDuration: item.AVG_DURATION || 0,
+      totalEnergy: item.TOTAL_ENERGY || 0,
+      totalAmount: item.TOTAL_AMOUNT || 0,
+    };
+  });
 
   return (
     <div className="border border-slate-700/50 rounded-xl p-6">
       {/* Header Section */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-r from-cyan-400 to-blue-400"></div>
+          <div className="w-3 h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-400"></div>
           <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-            Charging Sessions Overview
+            {title}
           </h2>
         </div>
         <p className="text-slate-400 font-medium">
-          Track charging patterns and energy consumption over time
+          Track home charging patterns and usage trends
         </p>
       </div>
 
@@ -93,6 +152,9 @@ export default function ChargingChart({ data }: ChargingChartProps) {
             tick={{ fill: "#94a3b8", fontSize: 12, fontWeight: 500 }}
             axisLine={{ stroke: "#64748b", strokeWidth: 1 }}
             tickLine={{ stroke: "#64748b" }}
+            angle={-45}
+            textAnchor="end"
+            height={80}
           />
           <YAxis
             yAxisId="left"
@@ -107,7 +169,9 @@ export default function ChargingChart({ data }: ChargingChartProps) {
             tick={{ fill: "#94a3b8", fontSize: 12, fontWeight: 500 }}
             axisLine={{ stroke: "#64748b", strokeWidth: 1 }}
             tickLine={{ stroke: "#64748b" }}
-            tickFormatter={(value) => `${value} kWh`}
+            tickFormatter={(value) =>
+              showAmount ? `$${value}` : `${value} kWh`
+            }
           />
           <Tooltip
             content={({ active, payload, label }) => {
@@ -116,7 +180,7 @@ export default function ChargingChart({ data }: ChargingChartProps) {
                   <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-xl p-4 shadow-2xl">
                     <div className="grid gap-2">
                       <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
-                        Date
+                        Period
                       </div>
                       <div className="text-sm font-semibold text-slate-100 mb-2">
                         {label}
@@ -134,9 +198,11 @@ export default function ChargingChart({ data }: ChargingChartProps) {
                               {entry.name === "Sessions" &&
                                 `${entry.value} sessions`}
                               {entry.name === "Avg Duration" &&
-                                `${entry.value} min`}
+                                `${Math.round(Number(entry.value))}%`}
                               {entry.name === "Total Energy" &&
-                                `${entry.value?.toLocaleString()} kWh`}
+                                `${Math.round(Number(entry.value))} kWh`}
+                              {entry.name === "Total Amount" &&
+                                `$${Number(entry.value).toFixed(2)}`}
                             </div>
                           </div>
                         ))}
@@ -157,16 +223,18 @@ export default function ChargingChart({ data }: ChargingChartProps) {
               </span>
             )}
           />
+
+          {/* Sessions Line */}
           <Line
             yAxisId="left"
             type="monotone"
             dataKey="sessions"
             strokeWidth={3}
-            stroke="#06d6a0"
-            dot={{ fill: "#06d6a0", strokeWidth: 2, r: 5 }}
+            stroke="#10b981"
+            dot={{ fill: "#10b981", strokeWidth: 2, r: 5 }}
             activeDot={{
               r: 7,
-              fill: "#06d6a0",
+              fill: "#10b981",
               stroke: "#ffffff",
               strokeWidth: 2,
             }}
@@ -175,16 +243,18 @@ export default function ChargingChart({ data }: ChargingChartProps) {
               filter: "drop-shadow(0 2px 4px rgb(0 0 0 / 0.1))",
             }}
           />
+
+          {/* Average Duration Line */}
           <Line
             yAxisId="left"
             type="monotone"
             dataKey="avgDuration"
             strokeWidth={3}
-            stroke="#118ab2"
-            dot={{ fill: "#118ab2", strokeWidth: 2, r: 5 }}
+            stroke="#06b6d4"
+            dot={{ fill: "#06b6d4", strokeWidth: 2, r: 5 }}
             activeDot={{
               r: 7,
-              fill: "#118ab2",
+              fill: "#06b6d4",
               stroke: "#ffffff",
               strokeWidth: 2,
             }}
@@ -193,20 +263,26 @@ export default function ChargingChart({ data }: ChargingChartProps) {
               filter: "drop-shadow(0 2px 4px rgb(0 0 0 / 0.1))",
             }}
           />
+
+          {/* Conditional third line - either Energy or Amount */}
           <Line
             yAxisId="right"
             type="monotone"
-            dataKey="totalEnergy"
+            dataKey={showAmount ? "totalAmount" : "totalEnergy"}
             strokeWidth={3}
-            stroke="#ffd166"
-            dot={{ fill: "#ffd166", strokeWidth: 2, r: 5 }}
+            stroke={showAmount ? "#f59e0b" : "#8b5cf6"}
+            dot={{
+              fill: showAmount ? "#f59e0b" : "#8b5cf6",
+              strokeWidth: 2,
+              r: 5,
+            }}
             activeDot={{
               r: 7,
-              fill: "#ffd166",
+              fill: showAmount ? "#f59e0b" : "#8b5cf6",
               stroke: "#ffffff",
               strokeWidth: 2,
             }}
-            name="Total Energy"
+            name={showAmount ? "Total Amount" : "Total Energy"}
             style={{
               filter: "drop-shadow(0 2px 4px rgb(0 0 0 / 0.1))",
             }}

@@ -5,7 +5,7 @@ export interface ExpenseMetrics {
   LOCATION: string;
   STATIONNAME: string;
   TOTAL_DIRECTPAY_COMMISSION: number;
-  TOTAL_ELCTRICITY_BILL: number;
+  TOTAL_ELECTRICITY_BILL: number;
   TOTAL_MAINTANANCE_COST: number;
   TOTAL_STATION_RENT: number;
 }
@@ -13,13 +13,13 @@ export interface ExpenseMetrics {
 export interface ExpensesApiResponse {
   OVERALL_EXPENSES: number;
   OVERALL_DIRECTPAY_COMMISSION: number;
-  OVERALL_ELCTRICITY_BILL: number;
+  OVERALL_ELECTRICITY_BILL: number;
   OVERALL_MAINTANANCE_COST: number;
   OVERALL_STATION_RENT: number;
 
   "previous segment OVERALL_EXPENSES": number;
   "previous segment OVERALL_DIRECTPAY_COMMISSION": number;
-  "previous segment OVERALL_ELCTRICITY_BILL": number;
+  "previous segment OVERALL_ELECTRICITY_BILL": number;
   "previous segment OVERALL_MAINTANANCE_COST": number;
   "previous segment OVERALL_STATION_RENT": number;
 

@@ -317,7 +317,7 @@ export class SemanticBuilderUtils {
           "location",
           "stationname",
           "electricity_consumed_in_units",
-          "elctricity_bill",
+          "electricity_bill",
           "station_rent",
           "maintanance_cost"
         ],
@@ -733,13 +733,13 @@ export class SemanticBuilderUtils {
         baseTable: "swap_summary",
       },
       total_expenses: {
-        expression: "SUM(my_expensessummary.elctricity_bill + my_expensessummary.station_rent + my_expensessummary.maintanance_cost)",
+        expression: "SUM(my_expensessummary.electricity_bill + my_expensessummary.station_rent + my_expensessummary.maintanance_cost)",
         description: "Total operational expenses including electricity, rent, and maintenance",
         requiredJoins: [],
         baseTable: "my_expensessummary",
       },
       profit_margin: {
-        expression: "(SUM(my_revenuesummary.total_revenue) - SUM(my_expensessummary.elctricity_bill + my_expensessummary.station_rent + my_expensessummary.maintanance_cost)) / SUM(my_revenuesummary.total_revenue) * 100",
+        expression: "(SUM(my_revenuesummary.total_revenue) - SUM(my_expensessummary.electricity_bill + my_expensessummary.station_rent + my_expensessummary.maintanance_cost)) / SUM(my_revenuesummary.total_revenue) * 100",
         description: "Profit margin percentage calculated from revenue minus expenses",
         requiredJoins: [
           {
@@ -846,7 +846,7 @@ export class SemanticBuilderUtils {
         read: ["admin", "finance", "manager"],
         write: ["admin", "finance"],
         columnConstraints: {
-          elctricity_bill: ["admin", "finance"],
+          electricity_bill: ["admin", "finance"],
           station_rent: ["admin", "finance"],
           maintanance_cost: ["admin", "finance"],
         },

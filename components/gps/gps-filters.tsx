@@ -716,13 +716,13 @@ export function GPSFilters({
             </Select>
           </div>
 
-          {/* TBOX IDs */}
+          {/* IMEI No */}
           <div className="space-y-2">
-            <Label>TBOX IDs</Label>
+            <Label>IMEI No</Label>
             {renderFilterSelect(
               tboxes,
               filters.selectedTboxes,
-              "Select TBOX IDs",
+              "Select IMEI No",
               (item, checked) =>
                 handleFilterArrayChange("selectedTboxes", item, checked),
               "tboxes"

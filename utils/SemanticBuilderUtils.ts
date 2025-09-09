@@ -77,7 +77,7 @@ export class SemanticBuilderUtils {
     const columnSynonyms: Record<string, string[]> = {
       // Payment & Financial
       amount: ["cost", "expense", "charge", "payment", "bill", "price"],
-      elctricity_bill: ["electricity_cost", "power_bill", "electricity_expense"],
+      electricity_bill: ["electricity_cost", "power_bill", "electricity_expense"],
       station_rent: ["rent_cost", "station_cost", "rental_expense"],
       maintanance_cost: ["maintenance_expense", "upkeep_cost", "repair_cost"],
       refund_amount: ["refund", "returned_amount", "reimbursement"],
@@ -152,7 +152,7 @@ export class SemanticBuilderUtils {
       { 
         name: "FACT_EXPENSES", 
         description: "Station-level expenses including electricity, rent, and maintenance costs by date and location", 
-        columns: ["DATE", "LOCATION", "STATIONNAME", "ELECTRICITY_CONSUMED_IN_UNITS", "ELCTRICITY_BILL", "STATION_RENT", "MAINTANANCE_COST"] 
+        columns: ["DATE", "LOCATION", "STATIONNAME", "ELECTRICITY_CONSUMED_IN_UNITS", "ELECTRICITY_BILL", "STATION_RENT", "MAINTANANCE_COST"] 
       },
       { 
         name: "DIM_BATTERY", 
@@ -304,12 +304,12 @@ export class SemanticBuilderUtils {
       },
       TOTAL_EXPENSES: { 
         name: "TOTAL_EXPENSES", 
-        expression: "SUM(ELCTRICITY_BILL + STATION_RENT + MAINTANANCE_COST)", 
+        expression: "SUM(ELECTRICITY_BILL + STATION_RENT + MAINTANANCE_COST)", 
         description: "Sum of all station operational expenses" 
       },
       NET_PROFIT: { 
         name: "NET_PROFIT", 
-        expression: "SUM(AMOUNT) - SUM(ELCTRICITY_BILL + STATION_RENT + MAINTANANCE_COST)", 
+        expression: "SUM(AMOUNT) - SUM(ELECTRICITY_BILL + STATION_RENT + MAINTANANCE_COST)", 
         description: "Net profit after expenses" 
       },
       TOTAL_DISTANCE: { 
