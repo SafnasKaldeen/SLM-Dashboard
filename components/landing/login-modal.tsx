@@ -66,7 +66,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     //   setActiveTab("signin");
     // }
 
-    router.push("http://localhost:3000/realtime");
+    router.push(process.env.NEXT_PUBLIC_DASHBOARD_URL || "/dashboard");
     onClose();
   };
 
