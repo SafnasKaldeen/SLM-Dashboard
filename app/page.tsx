@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,6 @@ import {
   X,
 } from "lucide-react";
 import ScooterModel3D from "@/components/landing/scooter-model-3d";
-import { LoginModal } from "@/components/landing/login-modal";
 
 // Video Modal Component
 function VideoModal({
@@ -139,7 +139,11 @@ function VideoModal({
 
 export default function LandingPage() {
   const [isVideoOpen, setIsVideoOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const router = useRouter();
+
+  const handleSignIn = () => {
+    router.push("/auth/sign-in");
+  };
 
   const features = [
     {
@@ -212,7 +216,7 @@ export default function LandingPage() {
               <Button
                 variant="outline"
                 className="border-white/20 text-white hover:bg-white hover:text-black bg-transparent"
-                onClick={() => setIsLoginOpen(true)}
+                onClick={handleSignIn}
               >
                 Employee Login
               </Button>
@@ -262,7 +266,7 @@ export default function LandingPage() {
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white px-8 py-6 text-lg group"
-                  onClick={() => setIsLoginOpen(true)}
+                  onClick={handleSignIn}
                 >
                   Access Portal
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -436,7 +440,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 group px-8 py-6 text-lg shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-all duration-300"
-                onClick={() => setIsLoginOpen(true)}
+                onClick={handleSignIn}
               >
                 Access Dashboard
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -631,7 +635,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 px-12 py-6 text-lg group"
-              onClick={() => setIsLoginOpen(true)}
+              onClick={handleSignIn}
             >
               Employee Login
               <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-1 transition-transform" />
@@ -658,9 +662,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-
-      {/* Login Modal */}
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
 
       {/* Video Modal */}
       <VideoModal isOpen={isVideoOpen} onClose={() => setIsVideoOpen(false)} />

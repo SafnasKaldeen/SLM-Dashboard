@@ -1,8 +1,11 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
 import { cookies } from "next/headers";
 
 import DashboardLayout from "@/components/dashboard-layout";
+import AuthHeader from "@/components/AuthHeader";
+import { Providers } from "@/components/providers/session-provider";
 
 export const metadata: Metadata = {
   title: "SL-Mobility",
@@ -28,7 +31,9 @@ export default function RootLayout({
       style={isDarkMode ? { colorScheme: "dark" } : {}}
     >
       <body>
-        <DashboardLayout>{children}</DashboardLayout>
+        <Providers>
+          <DashboardLayout>{children}</DashboardLayout>
+        </Providers>
       </body>
     </html>
   );

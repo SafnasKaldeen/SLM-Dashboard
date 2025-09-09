@@ -1,10 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Search, Moon, Sun, Download, RefreshCw } from "lucide-react";
+import {
+  Bell,
+  Search,
+  Moon,
+  Sun,
+  Download,
+  RefreshCw,
+  User,
+  LogOut,
+  Settings,
+  Shield,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
@@ -17,22 +29,21 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import { useSession, signOut } from "next-auth/react";
 
 export function Header() {
   const { theme, setTheme } = useTheme();
+  const { data: session, status } = useSession();
   const [currentTime, setCurrentTime] = useState(new Date());
-  // Add a state to track if we're on the client
   const [isClient, setIsClient] = useState(false);
-  // Use a state to store the theme icon to render
-  const [themeIcon, setThemeIcon] = useState<"dark" | "light">("dark");
 
   // Set isClient to true once component mounts on client
   useEffect(() => {
     setIsClient(true);
-    // Update theme icon based on actual theme
-    setThemeIcon((theme as "dark" | "light") || "dark");
-  }, [theme]);
+  }, []);
 
   // Update time every second
   useEffect(() => {
@@ -62,6 +73,24 @@ export function Header() {
     });
   };
 
+  const handleSignOut = async () => {
+    await signOut({
+      callbackUrl: "/auth/sign-in", // redirect to sign-in page
+      redirect: true, // ensure cookie is cleared and page reloads
+    });
+  };
+
+  // Get user initials for avatar fallback
+  const getUserInitials = (name?: string | null) => {
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <header className="h-20 border-b border-slate-800 bg-black/20 backdrop-blur-sm flex items-center justify-between px-6">
       <div className="flex items-center space-x-4">
@@ -77,7 +106,6 @@ export function Header() {
       <div className="flex items-center space-x-6">
         <div className="hidden md:flex items-center space-x-4">
           <div className="text-right">
-            {/* Only render time when on client */}
             <div className="text-sm font-mono text-cyan-400">
               {isClient ? formatTime(currentTime) : "00:00:00"}
             </div>
@@ -123,6 +151,7 @@ export function Header() {
           </TooltipProvider>
         </div>
 
+        {/* Notifications */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -141,6 +170,7 @@ export function Header() {
           </Tooltip>
         </TooltipProvider>
 
+        {/* Theme Toggle */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -148,7 +178,6 @@ export function Header() {
               size="icon"
               className="border-slate-700 bg-slate-900/50"
             >
-              {/* Only render theme-sensitive content client-side */}
               {isClient ? (
                 theme === "dark" ? (
                   <Moon className="h-4 w-4 text-slate-400" />
@@ -156,7 +185,6 @@ export function Header() {
                   <Sun className="h-4 w-4 text-slate-400" />
                 )
               ) : (
-                // Default to Moon icon on server
                 <Moon className="h-4 w-4 text-slate-400" />
               )}
             </Button>
@@ -173,6 +201,73 @@ export function Header() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* User Profile Dropdown */}
+        {isClient && status === "authenticated" && session?.user ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="relative h-10 w-10 rounded-full"
+              >
+                <Avatar className="h-10 w-10">
+                  <AvatarImage
+                    src={session.user.image || undefined}
+                    alt={session.user.name || "User"}
+                  />
+                  <AvatarFallback className="bg-slate-700 text-slate-200">
+                    {getUserInitials(session.user.name)}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {session.user.name || "User"}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {session.user.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Shield className="mr-2 h-4 w-4" />
+                <span>Security</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600"
+                onClick={handleSignOut}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : status === "loading" ? (
+          // Loading state
+          <div className="h-10 w-10 rounded-full bg-slate-700 animate-pulse" />
+        ) : (
+          // Not authenticated - show sign in button
+          <Button
+            variant="outline"
+            className="border-slate-700 bg-slate-900/50"
+            onClick={() => (window.location.href = "/auth/signin")}
+          >
+            Sign In
+          </Button>
+        )}
       </div>
     </header>
   );
