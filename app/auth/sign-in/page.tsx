@@ -208,7 +208,7 @@ export default function SignIn() {
                   </div>
 
                   {/* Error Display */}
-                  {error && (
+                  {/* {error && (
                     <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4">
                       <div className="flex items-start space-x-3">
                         <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
@@ -220,7 +220,7 @@ export default function SignIn() {
                         </div>
                       </div>
                     </div>
-                  )}
+                  )} */}
 
                   {/* Sign In Options */}
                   <div className="space-y-4">
