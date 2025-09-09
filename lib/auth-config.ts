@@ -11,7 +11,7 @@ export const authConfig = {
   oauth: {
     domain: process.env.NEXT_PUBLIC_COGNITO_DOMAIN || "",
     scope: ["email", "openid", "profile"],
-    redirectSignIn: process.env.NEXT_PUBLIC_REDIRECT_SIGN_IN || "http://localhost:3000/dashboard",
+    redirectSignIn: process.env.NEXT_PUBLIC_REDIRECT_SIGN_IN || "http://localhost:3000/",
     redirectSignOut: process.env.NEXT_PUBLIC_REDIRECT_SIGN_OUT || "http://localhost:3000/landing",
     responseType: "code" as const,
   },
