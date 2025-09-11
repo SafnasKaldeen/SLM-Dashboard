@@ -241,7 +241,7 @@ export function MainSidebar() {
       id: "sales",
       label: "Sales Management",
       icon: categoryIcons.sales,
-      show: true,
+      // show: true,
       items: [
         {
           path: "/sales",
@@ -429,7 +429,11 @@ export function MainSidebar() {
                     : "hover:bg-slate-800"
                 }`}
               >
-                <Link href="/realtime" className="flex items-center space-x-3">
+                <Link
+                  hidden
+                  href="/realtime"
+                  className="flex items-center space-x-3"
+                >
                   <div
                     className={`flex items-center justify-center h-6 w-6 rounded-md ${
                       isActive("/realtime")
@@ -482,6 +486,7 @@ export function MainSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={isActive("/predictive")}
+                hidden
                 className={`w-full px-3 py-2 rounded-md transition-colors ${
                   isActive("/predictive")
                     ? "bg-gradient-to-r from-blue-500/15 to-blue-600/10 border border-blue-500/20"
