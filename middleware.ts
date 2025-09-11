@@ -13,19 +13,19 @@ export default withAuth(
         const isAuthenticated = !!token;
         
         // Check if trying to access protected routes
-        const isProtectedRoute = req.nextUrl.pathname.startsWith('/(protected)') ||
-                                req.nextUrl.pathname.startsWith('/analytics') ||
-                                req.nextUrl.pathname.startsWith('/battery') ||
-                                req.nextUrl.pathname.startsWith('/charging') ||
-                                req.nextUrl.pathname.startsWith('/complaints') ||
-                                req.nextUrl.pathname.startsWith('/fleet') ||
-                                req.nextUrl.pathname.startsWith('/gps') ||
-                                req.nextUrl.pathname.startsWith('/motor') ||
-                                req.nextUrl.pathname.startsWith('/predictive') ||
-                                req.nextUrl.pathname.startsWith('/realtime') ||
-                                req.nextUrl.pathname.startsWith('/revenue') ||
-                                req.nextUrl.pathname.startsWith('/sales') ||
-                                req.nextUrl.pathname.startsWith('/vehicles');
+        // const isProtectedRoute = req.nextUrl.pathname.startsWith('/(protected)') ||
+        //                         req.nextUrl.pathname.startsWith('/analytics') ||
+        //                         req.nextUrl.pathname.startsWith('/battery') ||
+        //                         req.nextUrl.pathname.startsWith('/charging') ||
+        //                         req.nextUrl.pathname.startsWith('/complaints') ||
+        //                         req.nextUrl.pathname.startsWith('/fleet') ||
+        //                         req.nextUrl.pathname.startsWith('/gps') ||
+        //                         req.nextUrl.pathname.startsWith('/motor') ||
+        //                         req.nextUrl.pathname.startsWith('/predictive') ||
+        //                         req.nextUrl.pathname.startsWith('/realtime') ||
+        //                         req.nextUrl.pathname.startsWith('/revenue') ||
+        //                         req.nextUrl.pathname.startsWith('/sales') ||
+        //                         req.nextUrl.pathname.startsWith('/vehicles');
         
         // Allow access to auth pages and API routes
         if (req.nextUrl.pathname.startsWith('/auth') || 
