@@ -69,7 +69,7 @@ interface DatabaseConnectorProps {
   selectedConnection: DatabaseConnection | null;
 }
 
-// Cache manager class
+// Enhanced Cache manager class with unified caching
 class CacheManager {
   private cache = new Map<string, CacheEntry>();
   private readonly ONE_DAY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -94,6 +94,33 @@ class CacheManager {
     }
 
     return entry.data;
+  }
+
+  // Get full connection data with tables
+  getConnectionWithTables(connectionId: string): DatabaseConnection | null {
+    return this.get(`connection_full_${connectionId}`);
+  }
+
+  // Set full connection data with tables
+  setConnectionWithTables(
+    connectionId: string,
+    connection: DatabaseConnection,
+    ttlMs: number = this.ONE_DAY_MS
+  ): void {
+    this.set(`connection_full_${connectionId}`, connection, ttlMs);
+  }
+
+  // Get all connections metadata (without full table data)
+  getConnectionsMetadata(): DatabaseConnection[] | null {
+    return this.get("connections_metadata");
+  }
+
+  // Set all connections metadata
+  setConnectionsMetadata(
+    connections: DatabaseConnection[],
+    ttlMs: number = this.ONE_DAY_MS
+  ): void {
+    this.set("connections_metadata", connections, ttlMs);
   }
 
   has(key: string): boolean {
@@ -125,6 +152,13 @@ class CacheManager {
         this.cache.delete(key);
       }
     }
+  }
+
+  // Invalidate specific connection
+  invalidateConnection(connectionId: string): void {
+    this.invalidate(`connection_full_${connectionId}`);
+    // Also invalidate connections metadata since it contains this connection
+    this.invalidate("connections_metadata");
   }
 
   getStats(): {
@@ -275,171 +309,20 @@ export function DatabaseConnector({
     }
   }, [searchQuery, filteredTables, searchType]);
 
-  // Fetch table columns from the custom metadata table with caching
-  const fetchTableColumns = async (
-    conn: DatabaseConnection,
-    table: TableInfo
-  ): Promise<ColumnInfo[]> => {
-    if (conn.type !== "snowflake") return [];
-
-    const cacheKey = `columns_${table.database}_${table.schema}_${table.name}`;
-
-    // Check cache first
-    const cachedColumns = cacheManager.get(cacheKey);
-    if (cachedColumns) {
-      console.log(`Using cached columns for ${table.name}`);
-      return cachedColumns;
-    }
-
-    // Query the custom metadata table for column information
-    const sql = `
-      SELECT COLUMNS
-      FROM ADHOC.METADATA.META_DATA
-      WHERE DATABASE_NAME = '${table.database.toUpperCase()}'
-        AND SCHEMA_NAME = '${table.schema.toUpperCase()}'
-        AND TABLE_NAME = '${table.name.toUpperCase()}'
-    `;
-
-    try {
-      const response = await fetch("/api/RunSQLQuery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch columns: ${response.statusText}`);
-      }
-
-      const json = await response.json();
-
-      if (!json.success || !json.result || !Array.isArray(json.result.rows)) {
-        throw new Error("Invalid response structure");
-      }
-
-      // Parse the COLUMNS field - assuming it's JSON or structured data
-      const columnsData = json.result.rows[0]?.COLUMNS;
-      let columns: ColumnInfo[] = [];
-
-      if (columnsData) {
-        try {
-          // If COLUMNS is a JSON string, parse it
-          const parsedColumns =
-            typeof columnsData === "string"
-              ? JSON.parse(columnsData)
-              : columnsData;
-
-          // Convert to ColumnInfo format
-          columns = parsedColumns.map((col: any) => ({
-            name: col.name || col.COLUMN_NAME,
-            type: col.type || col.DATA_TYPE,
-            nullable: col.nullable !== false && col.IS_NULLABLE !== "NO",
-            default: col.default || col.COLUMN_DEFAULT,
-          }));
-        } catch (parseError) {
-          console.error("Error parsing columns data:", parseError);
-          // Fallback: try to get columns from INFORMATION_SCHEMA for this specific table
-          columns = await fetchColumnsFromInformationSchema(table);
-        }
-      }
-
-      // Cache the result
-      cacheManager.set(cacheKey, columns);
-      console.log(
-        `Cached columns for ${table.name} (${columns.length} columns)`
-      );
-
-      return columns;
-    } catch (err) {
-      console.error("Error fetching columns for table", table.name, err);
-      // Fallback: try to get columns from INFORMATION_SCHEMA
-      return await fetchColumnsFromInformationSchema(table);
-    }
-  };
-
-  // Fallback method to get columns from INFORMATION_SCHEMA with caching
-  const fetchColumnsFromInformationSchema = async (
-    table: TableInfo
-  ): Promise<ColumnInfo[]> => {
-    const cacheKey = `columns_fallback_${table.database}_${table.schema}_${table.name}`;
-
-    // Check cache first
-    const cachedColumns = cacheManager.get(cacheKey);
-    if (cachedColumns) {
-      console.log(`Using cached fallback columns for ${table.name}`);
-      return cachedColumns;
-    }
-
-    const sql = `
-      SELECT 
-        COLUMN_NAME,
-        DATA_TYPE,
-        IS_NULLABLE,
-        COLUMN_DEFAULT,
-        COMMENT
-      FROM ${table.database}.INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_SCHEMA = '${table.schema.toUpperCase()}' 
-        AND TABLE_NAME = '${table.name.toUpperCase()}'
-        AND TABLE_CATALOG = '${table.database.toUpperCase()}'
-      ORDER BY ORDINAL_POSITION
-    `;
-
-    try {
-      const response = await fetch("/api/RunSQLQuery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql }),
-      });
-
-      if (!response.ok) {
-        return [];
-      }
-
-      const json = await response.json();
-
-      if (!json.success || !json.result || !Array.isArray(json.result.rows)) {
-        return [];
-      }
-
-      const columns = json.result.rows.map((row: any) => ({
-        name: row.COLUMN_NAME,
-        type: row.DATA_TYPE,
-        nullable: row.IS_NULLABLE === "YES",
-        default: row.COLUMN_DEFAULT,
-      }));
-
-      // Cache the result
-      cacheManager.set(cacheKey, columns);
-      console.log(
-        `Cached fallback columns for ${table.name} (${columns.length} columns)`
-      );
-
-      return columns;
-    } catch (err) {
-      console.error("Error fetching columns from INFORMATION_SCHEMA:", err);
-      return [];
-    }
-  };
-
-  // Fetch tables from your custom metadata table with caching
-  const fetchTablesForConnection = async (
+  // Unified function to fetch complete connection data with tables and columns
+  const fetchCompleteConnectionData = async (
     conn: DatabaseConnection
-  ): Promise<TableInfo[]> => {
-    if (conn.type !== "snowflake") return [];
-
-    const cacheKey = `tables_${conn.id}`;
+  ): Promise<DatabaseConnection> => {
+    if (conn.type !== "snowflake") return conn;
 
     // Check cache first
-    const cachedTables = cacheManager.get(cacheKey);
-    if (cachedTables) {
-      console.log(`Using cached tables for connection ${conn.name}`);
-      setLastCacheRefresh(
-        new Date(cacheManager.cache.get(cacheKey)?.timestamp || Date.now())
-      );
-      return cachedTables;
+    const cachedConnection = cacheManager.getConnectionWithTables(conn.id);
+    if (cachedConnection) {
+      console.log(`Using cached complete data for connection ${conn.name}`);
+      return cachedConnection;
     }
 
-    // Query your custom metadata table - replace 'ADHOC.METADATA.META_DATA' with actual table name
+    // Query your custom metadata table for all data in one request
     const sql = `
       SELECT 
         DATABASE_NAME,
@@ -453,7 +336,7 @@ export function DatabaseConnector({
     `;
 
     try {
-      console.log(`Fetching fresh tables data for connection ${conn.name}`);
+      console.log(`Fetching complete data for connection ${conn.name}`);
       const response = await fetch("/api/RunSQLQuery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -461,7 +344,9 @@ export function DatabaseConnector({
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch tables: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch complete data: ${response.statusText}`
+        );
       }
 
       const json = await response.json();
@@ -501,33 +386,31 @@ export function DatabaseConnector({
           tableType: row.TABLE_TYPE,
           comment: row.COMMENT,
           rows: 0,
-          columns: columns, // Pre-loaded columns or empty array
+          columns: columns, // Pre-loaded columns
         };
       });
 
-      // Cache the result for 1 day
-      cacheManager.set(cacheKey, tables);
-      setLastCacheRefresh(new Date());
-      console.log(`Cached ${tables.length} tables for connection ${conn.name}`);
+      const completeConnection: DatabaseConnection = {
+        ...conn,
+        tables,
+        lastConnected: new Date(),
+      };
 
-      return tables;
+      // Cache the complete connection data
+      cacheManager.setConnectionWithTables(conn.id, completeConnection);
+      setLastCacheRefresh(new Date());
+      console.log(
+        `Cached complete data for connection ${conn.name} with ${tables.length} tables`
+      );
+
+      return completeConnection;
     } catch (err) {
-      console.error("Error fetching tables from metadata table:", err);
+      console.error("Error fetching complete connection data:", err);
 
       // Fallback: try to get tables from a specific database/schema using INFORMATION_SCHEMA
       try {
         const schema = conn.config.schema || "PUBLIC";
         const database = conn.config.database || "ADHOC";
-        const fallbackCacheKey = `tables_fallback_${conn.id}_${database}_${schema}`;
-
-        // Check fallback cache
-        const cachedFallbackTables = cacheManager.get(fallbackCacheKey);
-        if (cachedFallbackTables) {
-          console.log(
-            `Using cached fallback tables for connection ${conn.name}`
-          );
-          return cachedFallbackTables;
-        }
 
         const fallbackSql = `
           SELECT 
@@ -556,22 +439,87 @@ export function DatabaseConnector({
               rows: 0,
               tableType: row.TABLE_TYPE || "TABLE",
               comment: row.COMMENT,
-              columns: [],
+              columns: [], // Will be fetched on demand
             }));
 
-            // Cache fallback result
-            cacheManager.set(fallbackCacheKey, fallbackTables);
+            const fallbackConnection: DatabaseConnection = {
+              ...conn,
+              tables: fallbackTables,
+              lastConnected: new Date(),
+            };
+
+            // Cache fallback data
+            cacheManager.setConnectionWithTables(conn.id, fallbackConnection);
             console.log(
-              `Cached fallback ${fallbackTables.length} tables for connection ${conn.name}`
+              `Cached fallback data for connection ${conn.name} with ${fallbackTables.length} tables`
             );
 
-            return fallbackTables;
+            return fallbackConnection;
           }
         }
       } catch (fallbackErr) {
         console.error("Fallback query also failed:", fallbackErr);
       }
 
+      return { ...conn, tables: [], lastConnected: new Date() };
+    }
+  };
+
+  // Fetch table columns on demand if they weren't pre-loaded
+  const fetchTableColumnsOnDemand = async (
+    conn: DatabaseConnection,
+    table: TableInfo
+  ): Promise<ColumnInfo[]> => {
+    if (
+      conn.type !== "snowflake" ||
+      !table.columns ||
+      table.columns.length > 0
+    ) {
+      return table.columns || [];
+    }
+
+    // Fallback method to get columns from INFORMATION_SCHEMA
+    const sql = `
+      SELECT 
+        COLUMN_NAME,
+        DATA_TYPE,
+        IS_NULLABLE,
+        COLUMN_DEFAULT,
+        COMMENT
+      FROM ${table.database}.INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = '${table.schema.toUpperCase()}' 
+        AND TABLE_NAME = '${table.name.toUpperCase()}'
+        AND TABLE_CATALOG = '${table.database.toUpperCase()}'
+      ORDER BY ORDINAL_POSITION
+    `;
+
+    try {
+      const response = await fetch("/api/RunSQLQuery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql }),
+      });
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const json = await response.json();
+
+      if (!json.success || !json.result || !Array.isArray(json.result.rows)) {
+        return [];
+      }
+
+      const columns = json.result.rows.map((row: any) => ({
+        name: row.COLUMN_NAME,
+        type: row.DATA_TYPE,
+        nullable: row.IS_NULLABLE === "YES",
+        default: row.COLUMN_DEFAULT,
+      }));
+
+      return columns;
+    } catch (err) {
+      console.error("Error fetching columns on demand:", err);
       return [];
     }
   };
@@ -587,58 +535,70 @@ export function DatabaseConnector({
         console.log("Cache cleared due to force refresh");
       }
 
-      const response = await fetch("/api/connections");
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Try to get connections metadata from cache first
+      let connectionsMetadata = cacheManager.getConnectionsMetadata();
 
-      const data = await response.json();
-      const connectionsArray: DatabaseConnection[] = Array.isArray(data)
-        ? data
-        : [];
+      if (!connectionsMetadata || forceRefresh) {
+        // Fetch fresh connections metadata from API
+        const response = await fetch("/api/connections");
+        if (!response.ok)
+          throw new Error(`HTTP error! status: ${response.status}`);
 
-      // Enrich Snowflake connections with real tables
-      const enrichedConnections = await Promise.all(
-        connectionsArray.map(async (conn) => {
-          if (conn.type === "snowflake") {
-            const tables = await fetchTablesForConnection(conn);
-            return {
-              ...conn,
-              tables,
-              lastConnected: new Date(conn.lastConnected),
-            };
-          }
-          return {
-            ...conn,
-            lastConnected: new Date(conn.lastConnected),
-          };
-        })
-      );
+        const data = await response.json();
+        connectionsMetadata = Array.isArray(data) ? data : [];
 
-      // Add default Snowflake connection if missing, fetch tables for it
-      const hasDefault = enrichedConnections.some(
+        // Cache the connections metadata
+        cacheManager.setConnectionsMetadata(connectionsMetadata);
+        console.log(
+          `Cached ${connectionsMetadata.length} connections metadata`
+        );
+      } else {
+        console.log("Using cached connections metadata");
+      }
+
+      // Add default Snowflake connection if missing
+      const hasDefault = connectionsMetadata.some(
         (c) => c.id === defaultSnowflakeConnection.id
       );
       if (!hasDefault) {
-        const defaultTables = await fetchTablesForConnection(
-          defaultSnowflakeConnection
-        );
-        enrichedConnections.unshift({
-          ...defaultSnowflakeConnection,
-          tables: defaultTables,
-          lastConnected: new Date(),
-        });
+        connectionsMetadata.unshift(defaultSnowflakeConnection);
       }
+
+      // For each connection, get complete data (either from cache or fetch fresh)
+      const enrichedConnections = await Promise.all(
+        connectionsMetadata.map(async (conn) => {
+          const connectionWithDate = {
+            ...conn,
+            lastConnected: new Date(conn.lastConnected),
+          };
+
+          // Get complete connection data with tables
+          if (conn.type === "snowflake") {
+            return await fetchCompleteConnectionData(connectionWithDate);
+          }
+
+          return connectionWithDate;
+        })
+      );
 
       setConnections(enrichedConnections);
 
-      if (!selectedConnection && enrichedConnections.length > 0) {
+      // If we have a selected connection, update it with fresh data
+      if (selectedConnection) {
+        const updatedSelected = enrichedConnections.find(
+          (conn) => conn.id === selectedConnection.id
+        );
+        if (updatedSelected) {
+          onConnectionSelect(updatedSelected);
+        }
+      } else if (enrichedConnections.length > 0) {
         onConnectionSelect(enrichedConnections[0]);
       }
     } catch (error) {
       console.error("Error loading connections:", error);
       setError("Failed to load connections. Please try again.");
 
-      // Fallback mock with default snowflake
+      // Fallback to default snowflake without tables
       setConnections([defaultSnowflakeConnection]);
       if (!selectedConnection) {
         onConnectionSelect(defaultSnowflakeConnection);
@@ -691,7 +651,7 @@ export function DatabaseConnector({
     setExpandedSchemas(newExpanded);
   };
 
-  // Load table columns when a table is expanded
+  // Load table columns when a table is expanded (only if not already loaded)
   const handleTableExpand = async (tableKey: string) => {
     const newExpanded = new Set(expandedTables);
 
@@ -700,31 +660,42 @@ export function DatabaseConnector({
     } else {
       newExpanded.add(tableKey);
 
-      // Load columns if not already loaded
+      // Load columns on demand if not already loaded
       if (selectedConnection && selectedConnection.type === "snowflake") {
         const tableIndex = selectedConnection.tables.findIndex(
           (t) => `${t.database}.${t.schema}.${t.name}` === tableKey
         );
         if (
           tableIndex !== -1 &&
-          selectedConnection.tables[tableIndex].columns?.length === 0
+          (!selectedConnection.tables[tableIndex].columns ||
+            selectedConnection.tables[tableIndex].columns?.length === 0)
         ) {
           const table = selectedConnection.tables[tableIndex];
-          const columns = await fetchTableColumns(selectedConnection, table);
+          const columns = await fetchTableColumnsOnDemand(
+            selectedConnection,
+            table
+          );
 
-          // Update the connection with the new column data
-          const updatedTables = [...selectedConnection.tables];
-          updatedTables[tableIndex] = {
-            ...updatedTables[tableIndex],
-            columns,
-          };
+          if (columns.length > 0) {
+            // Update the connection with the new column data
+            const updatedTables = [...selectedConnection.tables];
+            updatedTables[tableIndex] = {
+              ...updatedTables[tableIndex],
+              columns,
+            };
 
-          const updatedConnection = {
-            ...selectedConnection,
-            tables: updatedTables,
-          };
+            const updatedConnection = {
+              ...selectedConnection,
+              tables: updatedTables,
+            };
 
-          onConnectionSelect(updatedConnection);
+            // Update cache with new column data
+            cacheManager.setConnectionWithTables(
+              selectedConnection.id,
+              updatedConnection
+            );
+            onConnectionSelect(updatedConnection);
+          }
         }
       }
     }
@@ -768,8 +739,8 @@ export function DatabaseConnector({
         method: "DELETE",
       });
 
-      // Invalidate cache for this connection
-      cacheManager.invalidate(connectionId);
+      // Invalidate cache for this specific connection
+      cacheManager.invalidateConnection(connectionId);
     } catch (error) {
       console.error("Error deleting connection:", error);
     }
@@ -919,8 +890,8 @@ export function DatabaseConnector({
           <Alert className="border-blue-500/50 bg-blue-500/10">
             <Info className="h-4 w-4 text-blue-400" />
             <AlertDescription className="text-blue-400">
-              Cache active: {stats.size} entries stored. Data will be refreshed
-              automatically after 24 hours or when manually refreshed.
+              Cache active: {stats.size} entries stored. Complete connection
+              data cached for improved performance.
             </AlertDescription>
           </Alert>
         ) : null;

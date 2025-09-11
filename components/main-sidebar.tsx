@@ -417,7 +417,7 @@ export function MainSidebar() {
         {/* Dashboard */}
 
         {/* Real-Time Analytics Section */}
-        <SidebarGroup className="px-2 py-1">
+        {/* <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -429,11 +429,7 @@ export function MainSidebar() {
                     : "hover:bg-slate-800"
                 }`}
               >
-                <Link
-                  hidden
-                  href="/realtime"
-                  className="flex items-center space-x-3"
-                >
+                <Link href="/realtime" className="flex items-center space-x-3">
                   <div
                     className={`flex items-center justify-center h-6 w-6 rounded-md ${
                       isActive("/realtime")
@@ -448,7 +444,7 @@ export function MainSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroup>
+        </SidebarGroup> */}
 
         {/* Adhoc Section */}
         <SidebarGroup className="px-2 py-1">
@@ -480,13 +476,12 @@ export function MainSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup className="px-2 py-1">
+        {/* <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
                 isActive={isActive("/predictive")}
-                hidden
                 className={`w-full px-3 py-2 rounded-md transition-colors ${
                   isActive("/predictive")
                     ? "bg-gradient-to-r from-blue-500/15 to-blue-600/10 border border-blue-500/20"
@@ -511,7 +506,7 @@ export function MainSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroup>
+        </SidebarGroup> */}
 
         {visibleCategories.length > 0 && (
           <SidebarSeparator className="my-1 bg-slate-800" />

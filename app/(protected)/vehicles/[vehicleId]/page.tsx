@@ -57,6 +57,7 @@ import BatterySessionHistory from "@/components/vehicles/BatterySessionHistory";
 import BatterySwapHistory from "@/components/vehicles/BatterySwapHistory";
 import HomeChargingHistory from "@/components/vehicles/HomeChargingHistory";
 import GPSHistory from "@/components/vehicles/GPSHistory";
+import Factory30DayDiagnosticDashboard from "@/components/diagnostics/FactoryDiagnosticDashboard";
 
 // Skeleton Components with consistent dark theme styling
 const ChartSkeleton = () => (
@@ -107,7 +108,7 @@ export default function VehicleDetailPage() {
   const params = useParams();
   const vehicleId = params.vehicleId as string; // ✅ dynamic from URL
 
-  const [activeTab, setActiveTab] = useState("gps");
+  const [activeTab, setActiveTab] = useState("motor");
   const [vehicleData, setVehicleData] = useState<VehicleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -448,7 +449,7 @@ export default function VehicleDetailPage() {
 
         {/* Main Analytics Tabs */}
         <Tabs
-          defaultValue="gps"
+          defaultValue="motor"
           className="space-y-6 mb-8"
           onValueChange={(val) => setActiveTab(val)}
         >
@@ -815,6 +816,33 @@ export default function VehicleDetailPage() {
           {activeTab === "gps" && (
             <TabsContent value="gps" className="space-y-6">
               <GPSHistory IMEI={vehicleData.TBOX_IMEI_NO} />
+            </TabsContent>
+          )}
+
+          {/* Motor Tab */}
+          {activeTab === "motor" && (
+            <TabsContent value="motor" className="space-y-6">
+              <Factory30DayDiagnosticDashboard
+                tboxId={vehicleData.TBOX_IMEI_NO}
+              />
+            </TabsContent>
+          )}
+
+          {/* Battery Tab */}
+          {activeTab === "battery" && (
+            <TabsContent value="battery" className="space-y-6">
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Battery className="w-8 h-8 text-slate-300" />
+                </div>
+                <h3 className="text-lg font-medium mb-2 text-slate-100">
+                  Battery Analytics Coming Soon
+                </h3>
+                <p className="text-slate-400 max-w-md mx-auto">
+                  Detailed battery performance and health analytics will be
+                  available in future updates
+                </p>
+              </div>
             </TabsContent>
           )}
 
