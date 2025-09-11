@@ -31,7 +31,7 @@ export class TableSelectorUtils {
     }
 
     const json = await response.json();
-    // console.log("Metadata response:", json);
+    console.log("Metadata response:", json);
 
     // ❌ Adjusted: use result.rows instead of json.rows
     if (!json?.result?.rows) {
