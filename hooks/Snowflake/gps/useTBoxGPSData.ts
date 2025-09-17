@@ -134,7 +134,7 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
   }, []);
 
   const buildGPSDataQuery = useCallback((filters: TBoxGPSFilters): string => {
-    let query = `
+    let sql = `
       SELECT 
         TBOXID as tbox_id,
         CONCAT('TBox-', TBOXID) as name,
@@ -149,26 +149,26 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
     `;
 
     // Add date range condition
-    query += buildDateRangeCondition(filters);
+    sql += buildDateRangeCondition(filters);
 
     // Add geographical conditions
-    query += buildGeographicalCondition(filters);
+    sql += buildGeographicalCondition(filters);
 
     // Add TBox filter ONLY if specific TBoxes are selected
     if (filters.selectedTboxes.length > 0) {
       const tboxes = filters.selectedTboxes.join(',');
-      query += ` AND TBOXID IN (${tboxes})`;
+      sql += ` AND TBOXID IN (${tboxes})`;
     }
 
-    query += ` ORDER BY TBOXID, MEAN_TIMESTAMP`;
-    
+    sql += ` ORDER BY TBOXID, MEAN_TIMESTAMP`;
+
     // Apply limit of 1000 GPS points when no specific TBoxes are selected
     // This is the key change - always apply the limit when no specific TBoxes are selected
     // if (filters.selectedTboxes.length === 0) {
-      query += ` LIMIT 1000`;
+      sql += ` LIMIT 1000`;
     // }
 
-    return query;
+    return sql;
   }, [buildDateRangeCondition, buildGeographicalCondition]);
 
   const fetchGeographicalData = useCallback(async () => {
@@ -176,7 +176,7 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
     
     try {
       // Fetch all combinations in a single query
-      const geoQuery = `
+      const sql = `
         SELECT DISTINCT 
           PROVINCE, 
           DISTRICT, 
@@ -188,18 +188,18 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
         ORDER BY PROVINCE, DISTRICT, AREA
       `;
 
-      const response = await fetch('/api/snowflake/query', {
+      const response = await fetch('/api/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: geoQuery }),
+        body: JSON.stringify({ sql }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status} body: ${await response.text()}`); // Log response body for debugging
       }
 
       const result = await response.json();
-
+      console.log('Fetched geographical data:', result);
       if (result.error) {
         throw new Error(result.error);
       }
@@ -265,26 +265,26 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
     setLoadingTboxes(true);
     
     try {
-      let query = `
+      let sql = `
         SELECT DISTINCT TBOXID 
         FROM REPORT_DB.GPS_DASHBOARD.TBOX_GPS_ENRICHED 
         WHERE 1=1
       `;
 
       // Add date range condition to get TBoxes available for selected period
-      query += buildDateRangeCondition(filters);
+      sql += buildDateRangeCondition(filters);
 
       // Add geographical conditions
-      query += buildGeographicalCondition(filters);
+      sql += buildGeographicalCondition(filters);
 
-      query += ` ORDER BY TBOXID LIMIT 1000`;
+      sql += ` ORDER BY TBOXID LIMIT 1000`;
 
-      const response = await fetch('/api/snowflake/query', {
+      const response = await fetch('/api/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ sql }),
       });
 
       if (response.ok) {
@@ -314,16 +314,16 @@ export const useTBoxGPSData = (filters: TBoxGPSFilters & { shouldFetchData?: boo
     setError(null);
 
     try {
-      const query = buildGPSDataQuery(filters);
-      const response = await fetch('/api/snowflake/query', {
+      const sql = buildGPSDataQuery(filters);
+      const response = await fetch('/api/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ sql }),
       });
 
-      console.log('Fetching GPS data with query:', query);
+      console.log('Fetching GPS data with query:', sql);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

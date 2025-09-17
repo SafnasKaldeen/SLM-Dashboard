@@ -99,7 +99,7 @@ export default function DistanceByBatteryType({
       try {
         setLoading(true);
         console.log("Fetching battery data with query:", query);
-        const response = await axios.post("/api/snowflake/query", { query });
+        const response = await axios.post("/api/query", { sql: query });
         setData(response.data);
       } catch (error) {
         console.error("Error fetching battery data:", error);

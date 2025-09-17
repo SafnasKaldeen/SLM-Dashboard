@@ -206,20 +206,32 @@ export function MainSidebar() {
     },
     {
       id: "Vehicles",
-      label: "Vehicle Analytics",
+      label: "360 Analytics",
       icon: categoryIcons.motor,
       show: true,
       items: [
         {
           path: "/vehicles",
-          label: "Overview",
+          label: "Vehicle Overview",
           icon: <Activity className="h-4 w-4" />,
         },
         {
-          path: "/vehicles/proximity",
-          label: "Proximity",
-          icon: <Cpu className="h-4 w-4" />,
+          path: "/batteries",
+          label: "Battery Overview",
+          icon: <Battery className="h-4 w-4" />,
         },
+        {
+          path: "/stations",
+          label: "BSS Overview",
+          icon: <Zap className="h-4 w-4" />,
+        },
+
+        // {
+        // {
+        //   path: "/vehicles/proximity",
+        //   label: "Proximity",
+        //   icon: <Cpu className="h-4 w-4" />,
+        // },
         // {
         //   path: "/vehicles/360",
         //   label: "Vehicle 360 view",
@@ -230,18 +242,18 @@ export function MainSidebar() {
         //   label: "Maintenance",
         //   icon: <Wrench className="h-4 w-4" />,
         // },
-        {
-          path: "/vehicles/charging",
-          label: "Home Charging",
-          icon: <Zap className="h-4 w-4" />,
-        },
+        // {
+        //   path: "/vehicles/charging",
+        //   label: "Home Charging",
+        //   icon: <Zap className="h-4 w-4" />,
+        // },
       ],
     },
     {
       id: "sales",
       label: "Sales Management",
       icon: categoryIcons.sales,
-      // show: true,
+      show: true,
       items: [
         {
           path: "/sales",
@@ -417,7 +429,7 @@ export function MainSidebar() {
         {/* Dashboard */}
 
         {/* Real-Time Analytics Section */}
-        {/* <SidebarGroup className="px-2 py-1">
+        <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -444,7 +456,7 @@ export function MainSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroup> */}
+        </SidebarGroup>
 
         {/* Adhoc Section */}
         <SidebarGroup className="px-2 py-1">
@@ -476,7 +488,7 @@ export function MainSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* <SidebarGroup className="px-2 py-1">
+        <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -506,7 +518,7 @@ export function MainSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroup> */}
+        </SidebarGroup>
 
         {visibleCategories.length > 0 && (
           <SidebarSeparator className="my-1 bg-slate-800" />

@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // console.log("Executing SQL:", sql);
     
     // Hardcoded Snowflake config
     const config = {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       warehouse: "SNOWFLAKE_LEARNING_WH",
       database: "ADHOC",
       schema: "PUBLIC",
-      role: "SYSADMIN",
+      role: "ACCOUNTADMIN",
       authenticator: "SNOWFLAKE_JWT",
     };
 

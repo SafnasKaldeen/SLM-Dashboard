@@ -845,13 +845,16 @@ export default function BatterySwapAnalytics({ IMEI }: { IMEI: string }) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/snowflake/query", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query: `
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL}/api/query`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              sql: `
               WITH ordered AS (
                 SELECT 
                     SESSION_ID,
@@ -940,8 +943,9 @@ export default function BatterySwapAnalytics({ IMEI }: { IMEI: string }) {
             ORDER BY START_TIME
             LIMIT 1000
             `,
-          }),
-        });
+            }),
+          }
+        );
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

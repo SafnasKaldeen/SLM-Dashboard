@@ -57,7 +57,9 @@ import BatterySessionHistory from "@/components/vehicles/BatterySessionHistory";
 import BatterySwapHistory from "@/components/vehicles/BatterySwapHistory";
 import HomeChargingHistory from "@/components/vehicles/HomeChargingHistory";
 import GPSHistory from "@/components/vehicles/GPSHistory";
-import Factory30DayDiagnosticDashboard from "@/components/diagnostics/FactoryDiagnosticDashboard";
+import MotorHistory from "@/components/vehicles/MotorHistory";
+import BatteryHistory from "@/components/vehicles/BatteryHistory";
+import MaintenanceHistory from "@/components/vehicles/MaintenanceHistory";
 
 // Skeleton Components with consistent dark theme styling
 const ChartSkeleton = () => (
@@ -108,7 +110,7 @@ export default function VehicleDetailPage() {
   const params = useParams();
   const vehicleId = params.vehicleId as string; // ✅ dynamic from URL
 
-  const [activeTab, setActiveTab] = useState("motor");
+  const [activeTab, setActiveTab] = useState("overview");
   const [vehicleData, setVehicleData] = useState<VehicleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -219,18 +221,20 @@ export default function VehicleDetailPage() {
       setLoading(true);
       setError(null);
 
-      const query = `CALL REPORT_DB.GPS_DASHBOARD.GET_VEHICLE_SUMMARY_SQL('${vehicleId}')`;
+      const sql = `CALL REPORT_DB.GPS_DASHBOARD.GET_VEHICLE_SUMMARY_SQL('${vehicleId}')`;
 
-      const response = await fetch("/api/snowflake/query", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/query`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ sql }),
+        }
+      );
 
-      console.log("Fetching vehicle data with ID:", vehicleId);
-      console.log("Query:", query);
+      // console.log("Fetching vehicle data with ID:", vehicleId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -238,7 +242,7 @@ export default function VehicleDetailPage() {
 
       const results = await response.json();
 
-      // console.log("Fetched vehicle data:", results[0]);
+      console.log("Fetched vehicle data:", results[0]);
 
       if (results && results.length > 0) {
         setVehicleData(results[0].GET_VEHICLE_SUMMARY_SQL);
@@ -254,6 +258,38 @@ export default function VehicleDetailPage() {
       setLoading(false);
     }
   };
+
+  // setVehicleData({
+  //   BATTERY_DETAILS: {
+  //     BATTERY_CAPACITY: "2.5 kWh",
+  //     BATTERY_NAME: "EcoPower 48V",
+  //   },
+  //   CHASSIS_NUMBER: "CHS123456789",
+  //   CUSTOMER_DETAILS: {
+  //     EMAIL: "customer@example.com",
+  //     FULL_NAME: "John Doe",
+  //     MOBILE: 1234567890,
+  //     NIC: "123456789V",
+  //   },
+  //   CUSTOMER_ID: "CUST001",
+  //   SELLING_PRICE: 3500000,
+  //   TBOX_IMEI_NO: 862487061363046,
+  //   TOTAL_BATTERY_SWAPS: 15,
+  //   TOTAL_DISTANCE: 12500,
+  //   TOTAL_HOME_CHARGINGS: 40,
+  //   TOTAL_REVENUE: 45000,
+  //   TOTAL_SESSIONS: 55,
+  //   VEHICLE_ID: vehicleId,
+  // });
+  //   } catch (err) {
+  //     console.error("Error fetching vehicle data:", err);
+  //     setError(
+  //       err instanceof Error ? err.message : "Failed to fetch vehicle data"
+  //     );
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   useEffect(() => {
     fetchVehicleData();
@@ -449,12 +485,12 @@ export default function VehicleDetailPage() {
 
         {/* Main Analytics Tabs */}
         <Tabs
-          defaultValue="motor"
+          defaultValue="overview"
           className="space-y-6 mb-8"
           onValueChange={(val) => setActiveTab(val)}
         >
           <div className="flex items-center justify-center">
-            <TabsList className="grid w-full max-w-6xl grid-cols-8 bg-slate-900/50 border border-slate-700 rounded-lg">
+            <TabsList className="grid w-full max-w-6xl grid-cols-7 bg-slate-900/50 border border-slate-700 rounded-lg">
               <TabsTrigger
                 value="overview"
                 className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400"
@@ -479,12 +515,12 @@ export default function VehicleDetailPage() {
               >
                 Home Charging
               </TabsTrigger>
-              <TabsTrigger
+              {/* <TabsTrigger
                 value="gps"
                 className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 disable"
               >
                 GPS Analytics
-              </TabsTrigger>
+              </TabsTrigger> */}
               <TabsTrigger
                 value="motor"
                 className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400 disable"
@@ -822,176 +858,25 @@ export default function VehicleDetailPage() {
           {/* Motor Tab */}
           {activeTab === "motor" && (
             <TabsContent value="motor" className="space-y-6">
-              <Factory30DayDiagnosticDashboard
-                tboxId={vehicleData.TBOX_IMEI_NO}
-              />
+              <MotorHistory IMEI={vehicleData.TBOX_IMEI_NO} />
             </TabsContent>
           )}
 
           {/* Battery Tab */}
           {activeTab === "battery" && (
             <TabsContent value="battery" className="space-y-6">
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Battery className="w-8 h-8 text-slate-300" />
-                </div>
-                <h3 className="text-lg font-medium mb-2 text-slate-100">
-                  Battery Analytics Coming Soon
-                </h3>
-                <p className="text-slate-400 max-w-md mx-auto">
-                  Detailed battery performance and health analytics will be
-                  available in future updates
-                </p>
-              </div>
+              <BatteryHistory IMEI={vehicleData.TBOX_IMEI_NO} />
             </TabsContent>
           )}
 
           {/* Maintenance Tab */}
           {activeTab === "maintenance" && (
             <TabsContent value="maintenance" className="space-y-6">
-              <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-slate-100">
-                    <Settings className="w-5 h-5 text-cyan-400" /> Vehicle
-                    Maintenance Status
-                  </CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Maintenance scheduling and service history
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <CheckCircle className="w-16 h-16 mx-auto text-green-400 mb-4" />
-                    <h3 className="text-lg font-medium mb-2 text-slate-100">
-                      Maintenance System Integration
-                    </h3>
-                    <p className="text-slate-400 mb-4">
-                      Vehicle maintenance tracking and scheduling will be
-                      integrated with the service management system.
-                    </p>
-                    <div className="grid gap-4 md:grid-cols-2 max-w-md mx-auto">
-                      <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                        <div className="text-sm text-slate-400">
-                          Battery Swaps
-                        </div>
-                        <div className="text-lg font-semibold text-green-400">
-                          {vehicleData.TOTAL_BATTERY_SWAPS}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                        <div className="text-sm text-slate-400">
-                          Service Status
-                        </div>
-                        <div className="text-lg font-semibold text-cyan-400">
-                          Active
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="mt-4 border-slate-700 text-slate-300 hover:bg-slate-800"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Schedule Maintenance
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Battery Health Summary */}
-              <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-slate-100">
-                    <Battery className="w-5 h-5 text-cyan-400" /> Battery Health
-                    Summary
-                  </CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Current battery performance and swap history
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-slate-400">
-                          Estimated Battery Health
-                        </span>
-                        <span className="font-medium text-green-400">
-                          {vehicleData.TOTAL_BATTERY_SWAPS > 0 ? "92%" : "N/A"}
-                        </span>
-                      </div>
-                      {vehicleData.TOTAL_BATTERY_SWAPS > 0 && (
-                        <Progress value={92} className="h-2 bg-slate-800" />
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
-                      <div>
-                        <div className="text-sm text-slate-400">
-                          Total Swaps
-                        </div>
-                        <div className="text-2xl font-semibold text-slate-100">
-                          {vehicleData.TOTAL_BATTERY_SWAPS}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-slate-400">
-                          Battery Type
-                        </div>
-                        <div className="text-lg font-semibold text-slate-100">
-                          {vehicleData.BATTERY_DETAILS.BATTERY_NAME}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800">
-                      <div className="text-sm text-slate-400">Capacity</div>
-                      <div className="font-medium text-slate-100">
-                        {vehicleData.BATTERY_DETAILS.BATTERY_CAPACITY}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Maintenance Recommendations */}
-              <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-slate-100">
-                    <Target className="w-5 h-5 text-cyan-400" /> AI Maintenance
-                    Insights
-                  </CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Intelligent recommendations based on vehicle usage
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <CheckCircle className="w-6 h-6 text-green-400 mb-2" />
-                      <h4 className="text-green-400 font-medium mb-1">
-                        Battery Performance
-                      </h4>
-                      <p className="text-sm text-slate-400">
-                        Battery swap frequency indicates healthy usage patterns
-                        with {vehicleData.TOTAL_BATTERY_SWAPS} swaps completed.
-                      </p>
-                    </div>
-
-                    <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                      <Activity className="w-6 h-6 text-cyan-400 mb-2" />
-                      <h4 className="text-cyan-400 font-medium mb-1">
-                        Usage Analysis
-                      </h4>
-                      <p className="text-sm text-slate-400">
-                        {formatDistance(vehicleData.TOTAL_DISTANCE)} km traveled
-                        across {vehicleData.TOTAL_SESSIONS} sessions shows
-                        consistent usage.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <MaintenanceHistory
+                IMEI={vehicleData.TBOX_IMEI_NO}
+                VehicleId={vehicleData.VEHICLE_ID}
+                CustomerId={vehicleData.CUSTOMER_ID}
+              />
             </TabsContent>
           )}
         </Tabs>

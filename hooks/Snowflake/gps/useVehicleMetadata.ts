@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
 import { format, subYears } from "date-fns";
 
 interface VehicleMetadata {
@@ -120,11 +119,18 @@ const useVehicleMetadata = (filters: Filters) => {
   const fetchAggregatedData = async (currentFilters: Filters) => {
     try {
       setLoading(true);
-      const query = buildAggregationQuery(currentFilters);
       
-      const response = await axios.post("/api/snowflake/query", { query });
-      const data = response.data || [];
+      const sql = buildAggregationQuery(currentFilters);
       
+      const response = await fetch("/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sql }),
+      });
+      const data = await response.json();
+      console.log("Fetched aggregated data:", data);
       const processedData = data.map((row: any) => ({
         ...row,
         period_start: row.period_start || row.PERIOD_START,
@@ -151,7 +157,7 @@ const useVehicleMetadata = (filters: Filters) => {
       setLoading(true);
       setError(null);
 
-      const query = `
+      const sql = `
         SELECT 
           TBOXID,
           BMSID,
@@ -169,9 +175,18 @@ const useVehicleMetadata = (filters: Filters) => {
         ORDER BY GPS_DATE DESC
         LIMIT 100000;
       `;
+      
+      const response = await fetch("/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sql }),
+      });
+      const data = await response.json();
+      console.log("Fetched all vehicle data:", data);
+      setAllData(data || []);
 
-      const response = await axios.post("/api/snowflake/query", { query });
-      setAllData(response.data || []);
     } catch (err) {
       console.error("Failed to load vehicle data", err);
       setError(`Could not load vehicle data: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -195,6 +210,7 @@ const useVehicleMetadata = (filters: Filters) => {
       
       const aggregated = await fetchAggregatedData(initialFilters);
       setAggregatedData(aggregated);
+      console.log("Initial aggregated data:", aggregated);
     };
 
     loadData();

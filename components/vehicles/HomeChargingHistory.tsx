@@ -540,21 +540,24 @@ export default function HomeChargingHistory({
       setRefreshing(true);
       setError(null);
 
-      const response = await fetch("/api/snowflake/query", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: `
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/query`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sql: `
             SELECT *
               FROM SOURCE_DATA.DYNAMO_DB.FACT_PAYMENT
               WHERE CUSTOMER_ID = '${CustomerID}'
                 AND PAYMENT_TYPE in ('HOME_CHARGING')
               ORDER BY PAID_AT DESC;
             `,
-        }),
-      });
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(

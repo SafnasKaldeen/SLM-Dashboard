@@ -1,4 +1,5 @@
 // hooks/useGPSData.ts
+import { sq } from 'date-fns/locale';
 import { useState, useEffect, useCallback } from 'react';
 
 export interface GPSStation {
@@ -187,7 +188,7 @@ export const useGPSData = (filters: GPSFilters): UseGPSDataReturn => {
     setFiltersLoading(true);
     try {
       // Use subquery for filter options as well to ensure consistency
-      const query = `
+      const sql = `
         SELECT DISTINCT 
           PROVINCE as province,
           DISTRICT as district,
@@ -207,12 +208,12 @@ export const useGPSData = (filters: GPSFilters): UseGPSDataReturn => {
         ORDER BY PROVINCE, DISTRICT, AREA
       `;
 
-      const response = await fetch('/api/snowflake/query', {
+      const response = await fetch('/api/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ sql }),
       });
 
       if (!response.ok) {
@@ -376,15 +377,15 @@ export const useGPSData = (filters: GPSFilters): UseGPSDataReturn => {
         // When geographic filters are applied, fetch individual points and aggregate them
         console.log('Geographic filters applied, fetching individual points for aggregation');
         
-        const pointsQuery = generatePointsQuery(filters);
-        console.log('Generated points query for aggregation:', pointsQuery);
-        
-        const response = await fetch('/api/snowflake/query', {
+        const sql = generatePointsQuery(filters);
+        console.log('Generated points query for aggregation:', sql);
+
+        const response = await fetch('/api/query', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ query: pointsQuery }),
+          body: JSON.stringify({ sql }),
         });
 
         if (!response.ok) {
@@ -408,15 +409,15 @@ export const useGPSData = (filters: GPSFilters): UseGPSDataReturn => {
         // No geographic filters, use server-side aggregation
         console.log('No geographic filters, using server-side aggregation');
         
-        const query = generateAggregatedQuery(filters);
-        console.log('Generated aggregated query:', query);
+        const sql = generateAggregatedQuery(filters);
+        console.log('Generated aggregated query:', sql);
         
-        const response = await fetch('/api/snowflake/query', {
+        const response = await fetch('/api/query', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({ sql }),
         });
 
         if (!response.ok) {
@@ -474,16 +475,16 @@ export const useGPSData = (filters: GPSFilters): UseGPSDataReturn => {
     setPointsError(null);
 
     try {
-      const query = generatePointsQuery(filters);
-      
-      console.log('Generated points query:', query);
-      
-      const response = await fetch('/api/snowflake/query', {
+      const sql = generatePointsQuery(filters);
+
+      console.log('Generated points query:', sql);
+
+      const response = await fetch('/api/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ sql }),
       });
 
       if (!response.ok) {

@@ -167,12 +167,12 @@ export class SemanticBuilderUtils {
       { 
         name: "DIM_CUSTOMERS", 
         description: "Customer master data including identity, contact information, and demographics", 
-        columns: ["CUSTOMER_ID", "MOBILE", "NIC", "SURNAME", "OTHER_NAMES", "EMAIL", "ADDRESS", "ALT_PHONE", "CITY_ID", "ACTIVE", "DELETED", "CREATED_AT", "UPDATED_AT", "DELETED_AT", "DIVISIONAL_SECRETARIAT", "CUSTOMER_TYPE"] 
+        columns: ["CUSTOMER_ID", "MOBILE", "NIC", "SURNAME", "OTHER_NAMES","FULLNAME", "EMAIL", "ADDRESS", "ALT_PHONE", "CITY_ID", "ACTIVE", "DELETED", "CREATED_AT", "UPDATED_AT", "DELETED_AT", "DIVISIONAL_SECRETARIAT", "CUSTOMER_TYPE"] 
       },
       { 
         name: "DIM_DEALER", 
         description: "Vehicle dealer information including contact details, authorization status, and operational regions", 
-        columns: ["DEALER_ID", "DEALER_SHOP_NAME", "DEALER_CODE", "DEALER_BR_NUMBER", "DEALER_ADDRESS", "DEALER_MOBILE_NUMBER", "DEALER_EMAIL", "ACTIVE", "DELETED", "CREATED_AT", "DELETED_AT", "UPDATED_AT", "STATION_ID", "NIC", "DEALER_NAME", "PERSONAL_ADDRESS", "LOC_STATE", "LOC_AREA", "CITY_ID"] 
+        columns: ["DEALER_ID", "DEALER_SHOP_NAME", "DEALER_CODE", "DEALER_BR_NUMBER", "DEALER_ADDRESS", "DEALER_MOBILE_NUMBER", "DEALER_EMAIL", "ACTIVE", "DELETED", "CREATED_AT", "DELETED_AT", "UPDATED_AT", "STATION_ID", "NIC", "DEALER_NAME", "PERSONAL_ADDRESS", "LOC_STATE", "LOC_AREA", "LONGITUDE", "LATITUDE"] 
       },
       { 
         name: "DIM_SWAPPING_STATION", 
@@ -212,7 +212,7 @@ export class SemanticBuilderUtils {
       { 
         name: "FACT_VEHICLE_DISTANCE", 
         description: "Daily session-level distance and telemetry data per vehicle with battery and session tracking", 
-        columns: ["SESSION_ID", "TBOXID", "BMSID", "GPS_DATE", "SESSION_START_TIME", "SESSION_END_TIME", "DISTANCE_KM", "TOTAL_GPS_POINTS", "BATTERY_TYPE_ID", "BATTERY_NAME", "CAPACITY"] 
+        columns: ["SESSION_ID", "TBOX_IMEI_NO", "BMSID", "GPS_DATE", "SESSION_START_TIME", "SESSION_END_TIME", "DISTANCE_KM", "TOTAL_GPS_POINTS", "BATTERY_TYPE_ID", "BATTERY_NAME", "CAPACITY"] 
       },
       { 
         name: "FACT-TBOX_BMS_SESSION", 
@@ -283,7 +283,7 @@ export class SemanticBuilderUtils {
       { left_table: "FACT_VEHICLE_DISTANCE", left_column: "SESSION_ID", right_table: "FACT-TBOX_BMS_SESSION", right_column: "SESSION_ID", type: "one-to-one" },
       { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "SESSION_ID", right_table: "FACT-TBOX_BMS_SESSION", right_column: "SESSION_ID", type: "many-to-one" },
       { left_table: "FACT_VEHICLE_DISTANCE", left_column: "TBOXID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
-      { left_table: "FACT_VEHICLE_DISTANCE", left_column: "TBOXID", right_table: "LOOKUP_VIEW", right_column: "TBOX_ID", type: "many-to-one" },
+      { left_table: "FACT_VEHICLE_DISTANCE", left_column: "TBOX_IMEI_NO", right_table: "LOOKUP_VIEW", right_column: "TBOX_IMEI_NO", type: "many-to-one" },
       { left_table: "FACT_VEHICLE_DISTANCE", left_column: "BMSID", right_table: "DIM_BATTERY", right_column: "BMS_ID", type: "many-to-one" },
       { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "TBOXID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
       { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "TBOXID", right_table: "LOOKUP_VIEW", right_column: "TBOX_ID", type: "many-to-one" },

@@ -7,6 +7,7 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -23,6 +24,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/revenue/test/HigherOrderChart.jsx", "components/main-sidebar.tsx", "lib/anomaly-detector.ts", "components/adhoc/BarChartComponent.jsx", "components/gps/GEOMaker.js", "app/gps/batch-reports/components/ReportPreviewModal.jsx", "app/gps/batch-reports/Services/reportService.js", "app/gps/batch-reports/page.jsx", "app/gps/batch-analysis/Services/SnowflakeClient.js", "app/gps/batch-analysis/page.jsx", "hooks/Snowflake/gps/useGPSts", "app/charging/stations/page.jsx", "components/charging/bss-filters.jsx", "app/(layout)/vehicle/page.jsx", "services/SQLGenerationService.js", "app/(layout)/test/page.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/revenue/test/HigherOrderChart.jsx", "components/main-sidebar.tsx", "lib/anomaly-detector.ts", "components/adhoc/BarChartComponent.jsx", "components/gps/GEOMaker.js", "app/gps/batch-reports/components/ReportPreviewModal.jsx", "app/gps/batch-reports/Services/reportService.js", "app/gps/batch-reports/page.jsx", "app/gps/batch-analysis/Services/SnowflakeClient.js", "app/gps/batch-analysis/page.jsx", "hooks/Snowflake/gps/useGPSts", "app/charging/stations/page.jsx", "components/charging/bss-filters.jsx", "app/(layout)/vehicle/page.jsx", "services/SQLGenerationService.js", "app/(layout)/test/page.jsx", "services/TableSelectorService.js", "components/vehicles/BatteryHistory.jsx"],
   "exclude": ["node_modules"]
 }

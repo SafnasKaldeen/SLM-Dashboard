@@ -457,11 +457,11 @@ export default function AIQueryBuilder({
         timestamp: new Date().toISOString(),
       };
 
-      await fetch("/api/query-history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(document),
-      });
+      // await fetch("/api/query-history", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify(document),
+      // });
     } catch (err) {
       console.error("Failed to save query to history:", err);
     }

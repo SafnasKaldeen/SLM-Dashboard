@@ -58,10 +58,10 @@ export function GPSChart({ filters }: GPSChartProps) {
 
       // console.log("Executing GPS chart query:", query);
       try {
-        const response = await fetch("/api/snowflake/query", {
+        const response = await fetch("/api/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({ sql: query }),
         });
 
         const json = await response.json();

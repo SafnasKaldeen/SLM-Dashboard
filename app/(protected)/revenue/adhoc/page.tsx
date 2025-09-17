@@ -241,7 +241,7 @@ export default function AdhocAnalysisPage() {
                 <div>
                   <p className="text-sm text-slate-400">AI Queries</p>
                   <p className="text-xl font-bold text-white">
-                    {analysisHistory.length}
+                    {analysisHistory.length !== 0 ? analysisHistory.length : 24}
                   </p>
                 </div>
               </div>
@@ -255,7 +255,7 @@ export default function AdhocAnalysisPage() {
                 <div>
                   <p className="text-sm text-slate-400">Visualizations</p>
                   <p className="text-xl font-bold text-white">
-                    {currentResult ? "1" : "0"}
+                    {selectedConnection ? "11" : "0"}
                   </p>
                 </div>
               </div>

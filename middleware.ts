@@ -36,7 +36,7 @@ export default withAuth(
         
         // Require authentication for protected routes
         if (isProtectedRoute) {
-          return true;
+          return isAuthenticated;
         }
         
         return true;

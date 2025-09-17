@@ -460,13 +460,13 @@ export default function BatterySwapHistory({
 
       const cutoffUnix = Math.floor(Date.now() / 1000) - 100 * 24 * 60 * 60; // 100 days ago in seconds
 
-      const response = await fetch("/api/snowflake/query", {
+      const response = await fetch("/api/query", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          query: `
+          sql: `
             SELECT *
               FROM SOURCE_DATA.DYNAMO_DB.FACT_PAYMENT
               WHERE CUSTOMER_ID = '${CustomerID}'

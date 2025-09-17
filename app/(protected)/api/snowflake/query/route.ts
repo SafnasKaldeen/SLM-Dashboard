@@ -1,126 +1,101 @@
-import { runQuery } from "../../../gps/batch-analysis/Services/SnowflakeClientWith2FA";
-import { NextResponse } from "next/server";
-import path from "path";
-import fs from "fs/promises";
+import { NextRequest, NextResponse } from "next/server";
+import SnowflakeConnectionManager from "@/lib/snowflake";
+import crypto from "crypto";
+import { getRedis } from "@/lib/redis";
 
-export const dynamic = "force-dynamic";
-
-const CACHE_DIR = path.join(process.cwd(), ".cache");
-
-// Ensure cache folder exists
-async function ensureCacheDir() {
-  try {
-    await fs.mkdir(CACHE_DIR, { recursive: true });
-  } catch {}
+// -------------------- Cache Helpers --------------------
+// Include date in key to automatically expire daily
+function generateQueryHash(sql: string, userId?: string): string {
+  const normalizedSql = sql.trim().toLowerCase().replace(/\s+/g, " ");
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const queryString = userId
+    ? `${userId}:${normalizedSql}:${today}`
+    : `${normalizedSql}:${today}`;
+  return crypto.createHash("sha256").update(queryString).digest("hex");
 }
 
-// Get cache file path for a query (using hash for shorter filenames)
-function getCacheFilePath(query: string) {
-  const crypto = require('crypto');
-  const hash = crypto.createHash('sha256').update(query).digest('hex').substring(0, 32);
-  return path.join(CACHE_DIR, hash + ".json");
-}
+// Write cache with 5MB reserved
+async function writeToCache(hash: string, data: any[]): Promise<void> {
+  const redis = await getRedis();
 
-// Get today's date string in YYYY-MM-DD format
-function getTodayDateString() {
-  return new Date().toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
-}
+  // Redis memory check
+  const info = await redis.info("memory");
+  const usedMemoryMatch = info.match(/used_memory:(\d+)/);
+  const usedMemory = usedMemoryMatch ? parseInt(usedMemoryMatch[1]) : 0;
 
-// Check if cache file is from today
-async function isCacheFromToday(filePath: string) {
-  try {
-    const stat = await fs.stat(filePath);
-    const fileDate = stat.mtime.toLocaleDateString('en-CA');
-    const today = getTodayDateString();
-    return fileDate === today;
-  } catch {
-    return false;
+  const dataSize = Buffer.byteLength(JSON.stringify(data), "utf-8");
+  const maxMemory = 30 * 1024 * 1024; // 30MB plan
+  const reserve = 5 * 1024 * 1024;    // 5MB reserve
+
+  if (usedMemory + dataSize > maxMemory - reserve) {
+    console.warn(`Skipping cache for ${hash}: not enough memory`);
+    return;
   }
+
+  await redis.set(hash, JSON.stringify(data), { EX: 86400 }); // 24h TTL
 }
 
-// Clean up all cache files that are not from today (runs on first request after midnight)
-async function cleanupOldCache() {
+async function readFromCache(hash: string): Promise<any[] | null> {
+  const redis = await getRedis();
+  const data = await redis.get(hash);
+  return data ? JSON.parse(data) : null;
+}
+
+// -------------------- API Handler --------------------
+export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+
   try {
-    const files = await fs.readdir(CACHE_DIR);
-    const today = getTodayDateString();
-    
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      
-      const filePath = path.join(CACHE_DIR, file);
-      try {
-        const stat = await fs.stat(filePath);
-        const fileDate = stat.mtime.toLocaleDateString('en-CA');
-        
-        if (fileDate !== today) {
-          await fs.unlink(filePath);
-          console.log(`🗑️ Deleted old cache file: ${file}`);
-        }
-      } catch (error) {
-        // If we can't read the file, try to delete it anyway
-        try {
-          await fs.unlink(filePath);
-          console.log(`🗑️ Deleted unreadable cache file: ${file}`);
-        } catch {}
-      }
-    }
-  } catch (error) {
-    console.warn("⚠️ Cache cleanup failed:", error.message);
-  }
-}
-
-// Check if we need to run cleanup (first request of the day)
-let lastCleanupDate = '';
-async function shouldRunCleanup() {
-  const today = getTodayDateString();
-  if (lastCleanupDate !== today) {
-    lastCleanupDate = today;
-    return true;
-  }
-  return false;
-}
-
-export async function POST(request: Request) {
-  try {
-    const { query } = await request.json();
-    await ensureCacheDir();
-
-    // Run cleanup on first request of the day
-    if (await shouldRunCleanup()) {
-      console.log(`🧹 Running daily cache cleanup for ${getTodayDateString()}`);
-      await cleanupOldCache();
+    const { sql, userId } = await req.json();
+    if (!sql || typeof sql !== "string") {
+      return NextResponse.json({ error: "Missing or invalid SQL" }, { status: 400 });
     }
 
-    const filePath = getCacheFilePath(query);
+    const queryHash = generateQueryHash(sql, userId);
+    const shortHash = queryHash.substring(0, 8);
 
-    // Check if we have valid cache from today
-    if (await isCacheFromToday(filePath)) {
-      try {
-        const cached = await fs.readFile(filePath, "utf-8");
-        console.log("📋 Returning cached result");
-        return NextResponse.json(JSON.parse(cached));
-      } catch (error) {
-        console.warn("⚠️ Failed to read cache file:", error.message);
-        // Continue to run fresh query if cache read fails
-      }
+    // 1️⃣ Check Redis cache
+    const cachedData = await readFromCache(queryHash);
+    if (cachedData) {
+      const duration = Date.now() - startTime;
+      console.log(`🟢 CACHE HIT [${shortHash}] - ${cachedData.length} rows - ${duration}ms`);
+      return NextResponse.json(cachedData, {
+        status: 200,
+        headers: { "X-Cache-Status": "HIT", "X-Cache-Hash": queryHash },
+      });
     }
 
-    // Run fresh query
-    console.log("🔍 Running fresh query");
-    const results = await runQuery(query);
+    // 2️⃣ Cache miss → query Snowflake
+    console.log(`🔴 CACHE MISS [${shortHash}] - Executing Snowflake`);
+    await SnowflakeConnectionManager.connect();
+    const connection = SnowflakeConnectionManager.getConnection();
 
-    // Save to cache
-    try {
-      await fs.writeFile(filePath, JSON.stringify(results), "utf-8");
-      console.log("💾 Results cached successfully");
-    } catch (error) {
-      console.warn("⚠️ Failed to save to cache:", error.message);
-      // Continue anyway, caching is not critical
+    const rows = await new Promise<any[]>((resolve, reject) => {
+      connection.execute({
+        sqlText: sql,
+        complete: (err, _stmt, rows) => {
+          if (err) return reject(err);
+          resolve(rows || []);
+        },
+      });
+    });
+
+    if (!rows || rows.length === 0) {
+      return NextResponse.json({ error: "No records found" }, { status: 404 });
     }
 
-    return NextResponse.json(results);
-  } catch (error: any) {
-    console.error("❌ API error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // 3️⃣ Cache the result
+    await writeToCache(queryHash, rows);
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`✅ QUERY COMPLETE [${shortHash}] - ${rows.length} rows - ${totalDuration}ms`);
+
+    return NextResponse.json(rows, {
+      status: 200,
+      headers: { "X-Cache-Status": "MISS", "X-Cache-Hash": queryHash },
+    });
+  } catch (err: any) {
+    console.error(`❌ QUERY ERROR - Duration: ${Date.now() - startTime}ms`, err);
+    return NextResponse.json([{ error: "snowflake connection failed" }], { status: 500 });
   }
 }

@@ -33,8 +33,6 @@ DATA ARCHITECTURE:
 QUERY OPTIMIZATION:
 - Use LOOKUP_VIEW for cross-dimensional analysis (avoids complex joins)
 - **Always use CREATED_EPOCH for date filtering in FACT_PAYMENT, never CREATED_AT**
-- Convert epoch to number for month/year comparison: 
-  TO_NUMBER(TO_CHAR(adhoc.metadata.unix_to_timestamp(fp.CREATED_EPOCH), 'YYYYMM'))
 - Filter FACT_PAYMENT by date ranges using epoch
 - Use session-based aggregation for high-volume telemetry
 - Exclude inactive records (ACTIVE = 0 or DELETED = 1)
@@ -47,6 +45,16 @@ PERFORMANCE METRICS:
 - Payment transaction success rates and refund percentages
 - Session-based vehicle utilization through FACT_TBOX_BMS_SESSION
 
+SQL STYLE RULES
+
+- Use standard Snowflake syntax.
+- Use simple, readable aliases: fp for FACT_PAYMENT, ss for DIM_SWAPPING_STATION.
+- Avoid % or other non-standard characters in aliases.
+- Always fully qualify schema/table names.
+- Include only necessary columns in SELECT.
+- Group and order appropriately.
+
+
 LOOKUP_VIEW PATTERNS:
 ┌─────────────────────────────────────────────────────────────────┐
 │ TYPICAL JOINS:                                                 │
@@ -54,18 +62,6 @@ LOOKUP_VIEW PATTERNS:
 │ • Distance → LOOKUP_VIEW → (Customers, Dealers)               │
 │ • Payment → LOOKUP_VIEW → Cross-entity analysis               │  
 └─────────────────────────────────────────────────────────────────┘
-
-UTILITY FUNCTIONS:
-- unix_to_timestamp(epoch NUMBER) → TIMESTAMP_NTZ(6)
-  • Converts Unix epoch (ms) to readable timestamp
-  • Usage: ✅ EXTRACT(MONTH FROM adhoc.metadata.unix_to_timestamp(fp.CREATED_EPOCH))
-           ❌ Avoid EXTRACT(MONTH FROM fp.CREATED_AT)
-
-IMPORTANT DATE RULES:
-- Always use CREATED_EPOCH with unix_to_timestamp → TIMESTAMP_NTZ
-- Do NOT use LTZ or session time zone conversions for revenue or monthly aggregates
-- For month/year calculations, always convert to NUMBER:
-  TO_NUMBER(TO_CHAR(unix_to_timestamp(CREATED_EPOCH), 'YYYYMM'))
 
 EXAMPLE QUERIES:
 1. Customer Sessions: FACT_VEHICLE_DISTANCE → LOOKUP_VIEW → DIM_CUSTOMERS

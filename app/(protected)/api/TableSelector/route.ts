@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { TableSelectorService } from "@/services/TableSelectorService";
-import { TableSelectorUtils } from "@/utils/TableSelectorUtils";
+import TableSelectorUtils from "@/utils/TableSelectorUtils";
 
 export async function POST(req: Request) {
   try {

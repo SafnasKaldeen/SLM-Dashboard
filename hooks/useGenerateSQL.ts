@@ -58,7 +58,7 @@ export const useGenerateSQL = () => {
         //   semanticModelKeys: currentPayload.semanticModel ? Object.keys(currentPayload.semanticModel) : 'none'
         // });
 
-        const res = await fetch(step.endpoint, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}${step.endpoint}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(currentPayload),

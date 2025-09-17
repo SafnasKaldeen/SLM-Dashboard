@@ -37,12 +37,12 @@ export class DataAnalysisService {
         }
       });
 
-      const response = await fetch("/api/snowflake/query", {
+      const response = await fetch("/api/query", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: finalQuery }),
+        body: JSON.stringify({ sql: finalQuery }),
       });
 
       if (!response.ok) {

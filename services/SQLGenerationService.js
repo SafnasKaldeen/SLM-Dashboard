@@ -39,6 +39,26 @@ export class SQLQueryService {
     return await ReportGenerationService(prompt);
   }
 
+  static sanitizeSQL(sql) {
+    if (!sql || typeof sql !== "string") return sql;
+
+    // 1️⃣ Remove % characters from aliases like "fp%" → fp
+    sql = sql.replace(/(["\w]+)%/g, "$1");
+
+    // 2️⃣ Fix quoted aliases: remove quotes around simple identifiers
+    //    But keep quotes around fully qualified table/column names with special chars
+    sql = sql.replace(/"([a-zA-Z0-9_]+)"/g, "$1");
+
+    // 3️⃣ Fix column references like ss%.NAME or fp%.CREATED_EPOCH → ss.NAME
+    sql = sql.replace(/([a-zA-Z0-9_]+)\.%/g, "$1.");
+
+    // 4️⃣ Collapse multiple spaces/newlines into single space for cleanliness
+    sql = sql.replace(/\s+/g, " ");
+
+    // 5️⃣ Trim leading/trailing whitespace
+    return sql.trim();
+  }
+
   static async runPermissionCheck(semanticModel) {
     // console.log(
     //   "🔄 Running permission check...",
@@ -116,8 +136,11 @@ export class SQLQueryService {
       throw new Error("Invalid response from SQL generation step.");
     }
 
+    // Sanitize the SQL before returning
+    const sanitizedSQL = this.sanitizeSQL(sqlResult.sql);
+
     return {
-      sql: sqlResult.sql.trim(),
+      sql: sanitizedSQL,
       explanation: sqlResult.explanation.trim(),
     };
   }

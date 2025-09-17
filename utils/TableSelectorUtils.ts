@@ -1,7 +1,9 @@
 // utils/TableSelectorUtils.ts
 import { TableDescription } from "../models/TableDescription.js";
 
-export class TableSelectorUtils {
+// utils/TableSelectorUtils.ts
+export default class TableSelectorUtils {
+
   /**
    * Fetch table descriptions dynamically from Snowflake metadata
    */
@@ -31,7 +33,7 @@ export class TableSelectorUtils {
     }
 
     const json = await response.json();
-    console.log("Metadata response:", json);
+    // console.log("Metadata response:", json);
 
     // ❌ Adjusted: use result.rows instead of json.rows
     if (!json?.result?.rows) {

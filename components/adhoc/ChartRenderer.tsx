@@ -1556,6 +1556,7 @@ export default function ChartRenderer({
   const categoricalColumns = columns.filter(
     (col) => fieldTypes[col] === "categorical"
   );
+  const dateColumns = columns.filter((col) => fieldTypes[col] === "date");
   const geographicColumns = columns.filter(
     (col) => fieldTypes[col] === "geographic"
   );
@@ -1564,7 +1565,10 @@ export default function ChartRenderer({
   const suggestedCharts = useMemo(() => {
     const suggestions: ChartType[] = ["table"];
 
-    if (numericColumns.length >= 1 && categoricalColumns.length >= 1) {
+    if (
+      numericColumns.length >= 1 &&
+      (categoricalColumns.length >= 1 || dateColumns.length >= 1)
+    ) {
       suggestions.push("bar", "line", "area", "pie");
     }
     if (numericColumns.length >= 2) {

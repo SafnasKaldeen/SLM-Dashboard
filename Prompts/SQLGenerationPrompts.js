@@ -120,11 +120,13 @@ ${formattedFilters}
 4. Use proper JOIN syntax and optimize for performance.
 5. Resolve ambiguous terms using synonyms or predefined measures.
 6. **Date filtering rules (enforced):**
-   - Always use "CREATED_EPOCH" → "unix_to_timestamp(CREATED_EPOCH)" → NTZ
-   - Convert to NUMBER for monthly/yearly aggregation:
-     TO_NUMBER(TO_CHAR(unix_to_timestamp(CREATED_EPOCH), 'YYYYMM'))
-   - NEVER use LTZ or session-local conversions
-   - NEVER use CREATED_AT or other timestamp fields for month/year aggregation
+   - "CREATED_EPOCH" and "TIME_STAMP" fields are proper TIMESTAMP(0) types in UTC.
+   - For month/year aggregation, use:
+       TO_NUMBER(TO_CHAR(CREATED_EPOCH, 'YYYYMM'))
+     or
+       DATE_TRUNC('MONTH', CREATED_EPOCH)
+   - NEVER use epoch conversion functions like unix_to_timestamp.
+   - NEVER use CREATED_AT or other timestamp fields for month/year aggregation.
 7. Use meaningful aliases for readability and maintainability.
 8. Ensure SQL is syntactically correct.
 9. Return exactly one JSON object with "sql" and very descriptive "explanation".
@@ -140,3 +142,10 @@ IMPORTANT: Return the JSON object in valid JSON format, escaping newlines inside
 }
 `.trim();
 };
+
+// 6. **Date filtering rules (enforced):**
+//    - Always use "CREATED_EPOCH" → "unix_to_timestamp(CREATED_EPOCH)" → NTZ
+//    - Convert to NUMBER for monthly/yearly aggregation:
+//      TO_NUMBER(TO_CHAR(unix_to_timestamp(CREATED_EPOCH), 'YYYYMM'))
+//    - NEVER use LTZ or session-local conversions
+//    - NEVER use CREATED_AT or other timestamp fields for month/year aggregation
