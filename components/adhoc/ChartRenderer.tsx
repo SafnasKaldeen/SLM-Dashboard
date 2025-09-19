@@ -114,6 +114,7 @@ interface ChartRendererProps {
   data: any[][];
   columns: string[];
   query: string;
+  // Prompt: string;
   onBack?: () => void;
 }
 
@@ -1480,6 +1481,7 @@ export default function ChartRenderer({
   data,
   columns,
   query,
+  // Prompt,
   onBack,
 }: ChartRendererProps) {
   const [chartConfig, setChartConfig] = useState<ChartConfig>({
@@ -1566,8 +1568,9 @@ export default function ChartRenderer({
     const suggestions: ChartType[] = ["table"];
 
     if (
-      numericColumns.length >= 1 &&
-      (categoricalColumns.length >= 1 || dateColumns.length >= 1)
+      numericColumns.length >= 2 ||
+      (numericColumns.length >= 1 &&
+        (categoricalColumns.length >= 1 || dateColumns.length >= 1))
     ) {
       suggestions.push("bar", "line", "area", "pie");
     }
@@ -1669,12 +1672,14 @@ export default function ChartRenderer({
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
-  // Prepare chart data with aggregation
+  // Prepare chart data with aggregation - uses filtered/sorted data for all visualizations
   const chartData = useMemo(() => {
+    const sourceData = filteredData; // Always use filtered/sorted data for consistency
+
     if (chartConfig.type === "choropleth") {
       if (!chartConfig.latField || !chartConfig.longField) return [];
 
-      return processedData.map((item, index) => ({
+      return sourceData.map((item, index) => ({
         id: `point-${index}`,
         name: item[chartConfig.xAxis || "name"] || `Point ${index + 1}`,
         latitude: Number(item[chartConfig.latField]) || 0,
@@ -1690,7 +1695,7 @@ export default function ChartRenderer({
     if (chartConfig.type === "map") {
       if (!chartConfig.latField || !chartConfig.longField) return [];
 
-      return processedData.map((item, index) => ({
+      return sourceData.map((item, index) => ({
         id: `point-${index}`,
         name: item[chartConfig.xAxis || "name"] || `Point ${index + 1}`,
         latitude: Number(item[chartConfig.latField]) || 0,
@@ -1720,16 +1725,16 @@ export default function ChartRenderer({
 
     if (chartConfig.type === "heatmap") {
       const xValues = [
-        ...new Set(processedData.map((row) => row[chartConfig.xAxis!])),
+        ...new Set(sourceData.map((row) => row[chartConfig.xAxis!])),
       ];
       const yValues = [
-        ...new Set(processedData.map((row) => row[chartConfig.yAxis!])),
+        ...new Set(sourceData.map((row) => row[chartConfig.yAxis!])),
       ];
 
       const heatmapData = [];
       for (let x = 0; x < xValues.length; x++) {
         for (let y = 0; y < yValues.length; y++) {
-          const matchingRows = processedData.filter(
+          const matchingRows = sourceData.filter(
             (row) =>
               row[chartConfig.xAxis!] === xValues[x] &&
               row[chartConfig.yAxis!] === yValues[y]
@@ -1751,7 +1756,7 @@ export default function ChartRenderer({
                 Math.floor(
                   (value /
                     Math.max(
-                      ...processedData.map(
+                      ...sourceData.map(
                         (r) => Number(r[chartConfig.yAxis!]) || 0
                       )
                     )) *
@@ -1765,14 +1770,14 @@ export default function ChartRenderer({
     }
 
     if (chartConfig.type === "kpi" && chartConfig.column) {
-      return processedData;
+      return sourceData;
     }
 
     // Build color map based on colorBy field
     const colorMap: Record<string, string> = {};
     if (chartConfig.colorBy) {
       const uniqueCategories = [
-        ...new Set(processedData.map((row) => row[chartConfig.colorBy!])),
+        ...new Set(sourceData.map((row) => row[chartConfig.colorBy!])),
       ];
       uniqueCategories.forEach((category, idx) => {
         colorMap[String(category)] = colors[idx % colors.length];
@@ -1780,8 +1785,8 @@ export default function ChartRenderer({
     }
 
     // Final chart data mapping for bar/line/area/etc.
-    return processedData;
-  }, [processedData, chartConfig, numericColumns]);
+    return sourceData;
+  }, [processedData, filteredData, chartConfig, numericColumns]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -2203,6 +2208,9 @@ export default function ChartRenderer({
                 )}
                 <CardTitle className="text-white">Query</CardTitle>
               </div>
+              {/* <p className="text-sm text-slate-400 font-mono bg-slate-900/50 p-2 rounded">
+                {Prompt}
+              </p> */}
               <p className="text-sm text-slate-400 font-mono bg-slate-900/50 p-2 rounded">
                 {query}
               </p>

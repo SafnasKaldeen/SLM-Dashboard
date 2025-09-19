@@ -370,7 +370,7 @@ const VERIFIED_QUERIES = [
     bgColor: "bg-rose-500/10 border-rose-500/20",
     queries: [
       {
-        text: "What are the peak hours for battery swaps across all stations?",
+        text: "What are the peak hours for battery swaps across all stations for all 24 hours?",
         description:
           "Time-based analysis of swap transactions for demand planning",
       },
@@ -457,11 +457,13 @@ export default function AIQueryBuilder({
         timestamp: new Date().toISOString(),
       };
 
-      await fetch("/api/query-history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(document),
-      });
+      if (!document.error) {
+        await fetch("/api/query-history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(document),
+        });
+      }
     } catch (err) {
       console.error("Failed to save query to history:", err);
     }

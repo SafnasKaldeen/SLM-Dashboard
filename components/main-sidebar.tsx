@@ -139,11 +139,11 @@ export function MainSidebar() {
           label: "Overview",
           icon: <Layers className="h-4 w-4" />,
         },
-        // {
-        //   path: "/gps/route-planning",
-        //   label: "Route Planning",
-        //   icon: <Route className="h-4 w-4" />,
-        // },
+        {
+          path: "/gps/route-planning",
+          label: "Route Planning",
+          icon: <Route className="h-4 w-4" />,
+        },
         // {
         //   path: "/gps/station-allocation",
         //   label: "Station Allocation",

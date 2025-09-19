@@ -108,11 +108,11 @@ export function GPSMetrics({
       icon: MapPin,
     },
     {
-      title: "Average Distance per Scooter",
+      title: "Average Distance per period",
       value: `${Math.round(
-        totalDistance / Math.max(1, totalScooters)
+        totalDistance / Math.max(1, aggregatedData.length)
       ).toLocaleString()} km`,
-      description: "Average distance travelled per scooter",
+      description: "Average distance travelled per period",
       icon: Cpu,
     },
   ];

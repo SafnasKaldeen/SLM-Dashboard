@@ -38,6 +38,7 @@ import {
   TrendingUp,
   Database,
   Zap,
+  Brain,
   Calendar,
   ChevronRight,
   Loader2,
@@ -45,6 +46,14 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  DollarSign,
+  Edit3,
+  User,
+  MapPin,
+  Battery,
+  Truck,
+  Users,
+  Activity,
 } from "lucide-react";
 
 interface AnalysisHistoryProps {
@@ -62,11 +71,18 @@ interface QueryResult {
 
 const categories = [
   "All Categories",
+  "General Analysis",
   "Revenue Analysis",
+  "Expense Insights",
+  "Sales Insights",
+  "Dealer Insights",
+  "Marketing Insights",
+  "GPS Insights",
   "Station Performance",
-  "Battery Health",
-  "Usage Patterns",
-  "E-Commerce Insights",
+  "Battery Analytics",
+  "Vehicle Operations",
+  "Customer Analytics",
+  "Operational Insights",
 ];
 
 const timeFilters = [
@@ -213,12 +229,12 @@ export function AnalysisHistory({
         );
         if (!res.ok) throw new Error("Failed to fetch query history");
         const data = await res.json();
-
+        // console.log("Fetched query history:", data);
         const processed = data.map((item: any) => ({
           ...item,
           timestamp: item.timestamp ? new Date(item.timestamp) : new Date(),
         }));
-
+        // console.log("Processed query history:", processed);
         setMongoHistory(processed);
       } catch (err: any) {
         setError(err.message || "Unknown error");
@@ -260,10 +276,31 @@ export function AnalysisHistory({
 
   const getCategoryIcon = (subtitle: string) => {
     switch (subtitle) {
+      case "General Analysis":
+        return <Brain className="h-4 w-4 text-cyan-400" />;
       case "Revenue Analysis":
-        return <TrendingUp className="h-4 w-4 text-green-400" />;
+        return <DollarSign className="h-4 w-4 text-emerald-400" />;
+      case "Expense Insights":
+        return <Edit3 className="h-4 w-4 text-red-400" />;
+      case "Sales Insights":
+        return <ShoppingCart className="h-4 w-4 text-orange-400" />;
+      case "Dealer Insights":
+        return <User className="h-4 w-4 text-indigo-400" />;
+      case "Marketing Insights":
+        return <BarChart3 className="h-4 w-4 text-green-400" />;
+      case "GPS Insights":
+        return <Clock className="h-4 w-4 text-purple-400" />;
       case "Station Performance":
-        return <Database className="h-4 w-4 text-blue-400" />;
+        return <MapPin className="h-4 w-4 text-blue-400" />;
+      case "Battery Analytics":
+        return <Battery className="h-4 w-4 text-amber-400" />;
+      case "Vehicle Operations":
+        return <Truck className="h-4 w-4 text-purple-400" />;
+      case "Customer Analytics":
+        return <Users className="h-4 w-4 text-cyan-400" />;
+      case "Operational Insights":
+        return <Activity className="h-4 w-4 text-rose-400" />;
+      // Legacy cases (keeping for backward compatibility)
       case "Battery Health":
         return <Zap className="h-4 w-4 text-yellow-400" />;
       case "Usage Patterns":
@@ -352,9 +389,6 @@ export function AnalysisHistory({
 
       // Convert to the format expected by ChartRenderer
       const formattedData = convertToChartFormat(rows, columns);
-
-      // console.log("Formatted data for ChartRenderer:", formattedData);
-      // console.log("Columns:", columns);
 
       // Call the parent component's rerun handler with the formatted results
       const queryResult: QueryResult = {
@@ -648,6 +682,7 @@ export function AnalysisHistory({
                   ? "animate-out slide-out-to-right-2 fade-out-50 duration-300"
                   : "animate-in fade-in-50 slide-in-from-left-2 duration-300"
               }`}
+              // onClick={() => handleHistorySelect(analysis)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
@@ -671,11 +706,11 @@ export function AnalysisHistory({
                           </div>
                           <div className="flex items-center gap-1">
                             <Database className="h-3 w-3" />
-                            {analysis.rowCount} rows
+                            {parseInt(analysis.rowCount) || 0} rows
                           </div>
                           <div className="flex items-center gap-1">
                             <Zap className="h-3 w-3" />
-                            {analysis.executionTime}s
+                            {parseFloat(analysis.executionTime) || 0}s
                           </div>
                         </div>
                       </div>
@@ -741,46 +776,123 @@ export function AnalysisHistory({
         </div>
       )}
 
-      {/* Summary Stats */}
+      {/* Enhanced Summary Stats Footer */}
       <Card className="bg-slate-800/50 border-slate-700">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-white">
-                {combinedHistory.length}
+        <CardContent className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            {/* Total Queries */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 text-cyan-400">
+                <Database className="h-5 w-5" />
+              </div>
+              <p className="text-3xl font-bold text-white">
+                {filteredHistory.length.toLocaleString()}
               </p>
-              <p className="text-sm text-slate-400">Total Queries</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">
-                {categories.length - 1}
+              <p className="text-sm text-slate-400 font-medium">
+                Total Queries
               </p>
-              <p className="text-sm text-slate-400">Categories</p>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-white">
-                {combinedHistory.length
+
+            {/* Unique Categories */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 text-purple-400">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+              <p className="text-3xl font-bold text-white">
+                {
+                  filteredHistory
+                    .map((h) => h.subtitle)
+                    .filter((v, i, a) => a.indexOf(v) === i).length
+                }
+              </p>
+              <p className="text-sm text-slate-400 font-medium">Categories</p>
+            </div>
+
+            {/* Average Execution Time */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 text-amber-400">
+                <Zap className="h-5 w-5" />
+              </div>
+              <p className="text-3xl font-bold text-white">
+                {filteredHistory.length > 0
                   ? (
-                      combinedHistory.reduce(
-                        (sum, item) => sum + (item.executionTime || 0),
+                      filteredHistory.reduce(
+                        (sum, item) =>
+                          sum + (parseFloat(item.executionTime) || 0),
                         0
-                      ) / combinedHistory.length
+                      ) / filteredHistory.length
                     ).toFixed(2)
-                  : 0}
-                s
+                  : "0.00"}
+                <span className="text-lg text-slate-400">s</span>
               </p>
-              <p className="text-sm text-slate-400">Avg Execution</p>
+              <p className="text-sm text-slate-400 font-medium">
+                Avg Execution
+              </p>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-white">
-                {combinedHistory.reduce(
-                  (sum, item) => sum + (item.rowCount || 0),
-                  0
-                )}
+
+            {/* Total Rows */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 text-emerald-400">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <p className="text-3xl font-bold text-white">
+                {filteredHistory
+                  .reduce(
+                    (sum, item) => sum + (parseInt(item.rowsReturned) || 0),
+                    0
+                  )
+                  .toLocaleString()}
               </p>
-              <p className="text-sm text-slate-400">Total Rows</p>
+              <p className="text-sm text-slate-400 font-medium">Total Rows</p>
             </div>
           </div>
+
+          {/* Additional Stats Row */}
+          {filteredHistory.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-slate-700">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+                {/* Total Execution Time */}
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold text-white">
+                    {filteredHistory
+                      .reduce(
+                        (sum, item) =>
+                          sum + (parseFloat(item.executionTime) || 0),
+                        0
+                      )
+                      .toFixed(2)}
+                    s
+                  </p>
+                  <p className="text-xs text-slate-400">Total Execution Time</p>
+                </div>
+
+                {/* Most Recent Query */}
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold text-white">
+                    {formatTimeAgo(new Date(filteredHistory[0]?.timestamp))}
+                  </p>
+                  <p className="text-xs text-slate-400">Most Recent</p>
+                </div>
+
+                {/* Most Common Category */}
+                <div className="space-y-1 col-span-2 md:col-span-1">
+                  <p className="text-lg font-semibold text-white truncate">
+                    {(() => {
+                      const counts = filteredHistory.reduce((acc, item) => {
+                        acc[item.subtitle] = (acc[item.subtitle] || 0) + 1;
+                        return acc;
+                      }, {} as Record<string, number>);
+                      const mostCommon = Object.entries(counts).sort(
+                        ([, a], [, b]) => b - a
+                      )[0];
+                      return mostCommon ? mostCommon[0] : "None";
+                    })()}
+                  </p>
+                  <p className="text-xs text-slate-400">Most Common Category</p>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
