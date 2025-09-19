@@ -393,6 +393,9 @@ export default function AdhocAnalysisPage() {
                       data={currentResult.data}
                       columns={currentResult.columns}
                       query={currentQuery}
+                      // Prompt={
+                      //   "Show top 5 areas by revenue and swap count, include a trend column with up or down arrows and percentage change"
+                      // }
                     />
                   ) : (
                     <Card className="bg-slate-800/50 border-slate-700">

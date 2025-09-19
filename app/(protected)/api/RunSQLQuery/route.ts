@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       account: process.env.SNOWFLAKE_ACCOUNT,
         username: process.env.SNOWFLAKE_USERNAME,
         privateKey: privateKey,
-      warehouse: "SNOWFLAKE_LEARNING_WH",
+      warehouse: "ADHOC",
       database: "ADHOC",
       schema: "PUBLIC",
       role: "ACCOUNTADMIN",
