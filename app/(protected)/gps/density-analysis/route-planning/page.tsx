@@ -20,7 +20,6 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
 import DashboardLayout from "@/components/dashboard-layout";
-import { se } from "date-fns/locale";
 
 interface RouteSummary {
   location: string; // e.g. "(6.9271, 79.8612)"
@@ -37,46 +36,24 @@ interface RouteData {
   message: string;
   planned_charging_stops_count: number;
   route_summary: RouteSummary[];
-  export_message: string;
+  export_message?: string;
+  llm_description?: string;
+  llm_charging_strategy?: string;
 }
 
-const mockRouteData: RouteData = {
-  success: true,
-  distance_km: 83.08,
-  message: "Route planned successfully.",
-  planned_charging_stops_count: 1,
-  route_summary: [
-    {
-      location: "(6.9271, 79.8612)",
-      category: "Source",
-      battery_on_arrival_percent: 25.0,
-      battery_on_departure_percent: 25.0,
-      next_stop_distance_km: 4.34,
-    },
-    {
-      location: "(6.960975, 79.880949)",
-      category: "Visiting_Charging_Station",
-      battery_on_arrival_percent: 21.9,
-      battery_on_departure_percent: 100.0,
-      next_stop_distance_km: 78.75,
-      station_name: "Paliyagoda_Station",
-    },
-    {
-      location: "(7.4863, 80.3623)",
-      category: "Destination",
-      battery_on_arrival_percent: 43.75,
-      battery_on_departure_percent: 43.75,
-      next_stop_distance_km: 0.0,
-    },
-  ],
-  export_message:
-    "Data successfully uploaded to Snowflake stage: @ROUTE_PLANNER/plan.csv",
-};
-
-interface SnowflakeApiResponse {
-  status: string;
-  message: string;
-  data: RouteData;
+// Frontend route data structure for map display
+interface ProcessedRouteData {
+  route: Array<{ lat: number; lng: number; name: string }>;
+  batteryUsage: number;
+  distance: number;
+  estimatedTime: number;
+  chargingStops: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+    chargingTime: number;
+    batteryAdded: number;
+  }>;
 }
 
 export default function RoutePlanningPage() {
@@ -85,64 +62,144 @@ export default function RoutePlanningPage() {
   const [battery, setBattery] = useState(80);
   const [efficiency, setEfficiency] = useState(70);
   const [isLoading, setIsLoading] = useState(false);
-  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [routeData, setRouteData] = useState<ProcessedRouteData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper function to parse location string "(lat, lng)" to coordinates
+  const parseLocation = (locationStr: string): { lat: number; lng: number } => {
+    const match = locationStr.match(/\(([^,]+),\s*([^)]+)\)/);
+    if (match) {
+      return {
+        lat: parseFloat(match[1]),
+        lng: parseFloat(match[2]),
+      };
+    }
+    throw new Error(`Invalid location format: ${locationStr}`);
+  };
+
+  // Helper function to get location name
+  const getLocationName = (summary: RouteSummary): string => {
+    if (summary.category === "Source") return "Starting Point";
+    if (summary.category === "Destination") return "Destination";
+    return summary.station_name || "Charging Station";
+  };
+
+  // Transform API response to frontend format
+  const transformRouteData = (apiData: RouteData): ProcessedRouteData => {
+    const route = apiData.route_summary.map((summary) => {
+      const coords = parseLocation(summary.location);
+      return {
+        lat: coords.lat,
+        lng: coords.lng,
+        name: getLocationName(summary),
+      };
+    });
+
+    const chargingStops = apiData.route_summary
+      .filter((summary) => summary.category === "Visiting_Charging_Station")
+      .map((summary) => {
+        const coords = parseLocation(summary.location);
+        const batteryAdded =
+          summary.battery_on_departure_percent -
+          summary.battery_on_arrival_percent;
+        return {
+          name: summary.station_name || "Charging Station",
+          lat: coords.lat,
+          lng: coords.lng,
+          chargingTime: 30, // Estimate - you might want to add this to your API response
+          batteryAdded: Math.round(batteryAdded),
+        };
+      });
+
+    const startBattery =
+      apiData.route_summary[0]?.battery_on_arrival_percent || battery;
+    const endBattery =
+      apiData.route_summary[apiData.route_summary.length - 1]
+        ?.battery_on_arrival_percent || 0;
+    const batteryUsage = Math.round(startBattery - endBattery);
+
+    return {
+      route,
+      batteryUsage: Math.max(0, batteryUsage), // Ensure positive value
+      distance: apiData.distance_km,
+      estimatedTime: Math.round(apiData.distance_km * 1.2), // Rough estimate: 1.2 min per km
+      chargingStops,
+    };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Planning route from", source, "to", destination);
     setIsLoading(true);
     setError(null);
 
     try {
-      // Call API endpoint that will connect to Snowflake
-      const response = await fetch("http://127.0.0.1:8000/ev-route-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "6.9271,79.8612",
-          destination: "7.4863,80.3623",
-          battery: 25,
-          efficiency: 1.4,
-        }),
+      console.log("Sending request to API...");
+
+      setRouteData({
+        route: [
+          { lat: 6.9271, lng: 79.8612, name: "Starting Point" },
+          { lat: 6.9147, lng: 79.9735, name: "Charging Station 1" },
+          { lat: 6.9275, lng: 79.857, name: "Destination" },
+        ],
+        batteryUsage: 45,
+        distance: 25,
+        estimatedTime: 30,
+        chargingStops: [
+          {
+            name: "Charging Station 1",
+            lat: 6.9147,
+            lng: 79.9735,
+            chargingTime: 30,
+            batteryAdded: 40,
+          },
+        ],
       });
 
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
+      // const response = await fetch("http://localhost:8000/ev-route-plan", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //     // Add CORS headers if needed
+      //     "Access-Control-Allow-Origin": "*",
+      //   },
+      //   body: JSON.stringify({
+      //     source,
+      //     destination,
+      //     battery,
+      //     efficiency,
+      //   }),
+      // });
 
-      const data: SnowflakeApiResponse = await response.json();
+      // console.log("Response status:", response.status);
 
-      if (data.status === "success") {
-        // setRouteData(data.data);
-        setRouteData({
-          route: [
-            { lat: 6.9271, lng: 79.8612, name: "Colombo" },
-            { lat: 6.960975, lng: 79.880949, name: "Paliyagoda Station" },
-            { lat: 7.4863, lng: 80.3623, name: "Kandy" },
-          ],
-          batteryUsage: 35,
-          distance: 83.08,
-          estimatedTime: 90,
-          chargingStops: [
-            {
-              name: "Paliyagoda Station",
-              lat: 6.960975,
-              lng: 79.880949,
-              chargingTime: 30,
-              batteryAdded: 75,
-            },
-          ],
-        });
-      } else {
-        setError(data.detail || "Failed to plan route");
-      }
+      // if (!response.ok) {
+      //   throw new Error(`API request failed with status ${response.status}`);
+      // }
+
+      // const data: RouteData = await response.json();
+      // console.log("API Response:", data);
+
+      // if (data.success) {
+      //   const processedData = transformRouteData(data);
+      //   setRouteData(processedData);
+      //   console.log("Processed route data:", processedData);
+      // } else {
+      //   setError(data.message || "Failed to plan route");
+      // }
     } catch (err) {
       console.error("Error planning route:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while planning the route"
-      );
+      if (err instanceof Error) {
+        if (err.message.includes("Failed to fetch")) {
+          setError(
+            "Cannot connect to the route planning service. Please ensure the backend is running and CORS is configured."
+          );
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("An unexpected error occurred while planning the route");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -328,7 +385,11 @@ export default function RoutePlanningPage() {
                 )}
               </Button>
 
-              {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+              {error && (
+                <div className="p-3 rounded-md bg-red-900/20 border border-red-500/30">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
@@ -337,7 +398,7 @@ export default function RoutePlanningPage() {
         <div className="lg:col-span-2 space-y-6">
           <CartoMap
             center={mapCenter as [number, number]}
-            zoom={14}
+            zoom={10}
             markers={mapMarkers}
             routes={mapRoutes}
             height="510px"
