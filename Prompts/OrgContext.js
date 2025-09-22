@@ -11,7 +11,8 @@ KEY ENTITIES:
 - LOOKUP_VIEW: Central hub connecting TBOX_ID, VEHICLE_ID, CUSTOMER_ID, DEALER_ID, BATTERY_TYPE_ID
 
 CORE PROCESSES:
-- Swap transactions: FACT_PAYMENT with payment methods/amounts
+- Swap transactions: FACT_PAYMENT with PAYMENT_TYPE = 'BATTERY_SWAP'
+- Home Charging transactions: FACT_PAYMENT with PAYMENT_TYPE = 'HOME_CHARGING'
 - Vehicle telemetry: FACT_VEHICLE_TELEMETRY and GPS tracking  
 - Station expenses: FACT_EXPENSES (electricity, rent, maintenance)
 - Ownership mapping: FACT_VEHICLE_OWNER
@@ -19,9 +20,7 @@ CORE PROCESSES:
 
 FINANCIAL STRUCTURE:
 - Revenue streams: payment transactions tracked in FACT_PAYMENT
-- Expense categories: electricity, station rent, maintenance in FACT_EXPENSES
 - Payment methods include wallet, card payments, and refunds
-- Station-wise and location-wise expense allocation
 
 DATA ARCHITECTURE:
 - LOOKUP_VIEW eliminates complex multi-hop joins in normalized warehouse
@@ -36,25 +35,15 @@ QUERY OPTIMIZATION:
 - Filter FACT_PAYMENT by date ranges using epoch
 - Use session-based aggregation for high-volume telemetry
 - Exclude inactive records (ACTIVE = 0 or DELETED = 1)
-- PAYMENT_STATUS is a string field; use string literals like 'PAID', 'COMPLETED', 'SUCCESS'
+- PAYMENT_STATUS is a string field; use string literals like 'PAID', 'COMPLETED', 'SUCCESS', 'VOIDED' 
 
 PERFORMANCE METRICS:
 - Vehicle distance and session data in FACT_VEHICLE_DISTANCE
 - Battery health monitoring (SOH, cycle count, voltage, temperature) in telemetry
-- GPS tracking with 30-second intervals in FACT_TBOX_GPS
-- Payment transaction success rates and refund percentages
+- GPS tracking with 30-second intervals in FACT-TBOX-GPS
 - Session-based vehicle utilization through FACT_TBOX_BMS_SESSION
 
-SQL STYLE RULES
-
-- Use standard Snowflake syntax.
-- Use simple, readable aliases: fp for FACT_PAYMENT, ss for DIM_SWAPPING_STATION.
-- Avoid % or other non-standard characters in aliases.
-- Always fully qualify schema/table names.
-- Include only necessary columns in SELECT.
-- Group and order appropriately.
-
-
+        
 LOOKUP_VIEW PATTERNS:
 ┌─────────────────────────────────────────────────────────────────┐
 │ TYPICAL JOINS:                                                 │

@@ -65,7 +65,7 @@ export const useChargingData = (filters: ChargingDataFilters = {}): UseChargingD
     // Build WHERE conditions
     const conditions = [
       `PAYMENT_STATUS = '${paymentStatus}'`,
-      `PAYMENT_TYPE = 'CHARGING'`, // Filter for charging payments only
+      `PAYMENT_TYPE = 'HOMECHARGING'`, // Filter for charging payments only
       `PAID_AT >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL ${dateRange} DAY))`,
       `PAID_AT IS NOT NULL`,
       `AMOUNT > 0`
@@ -96,7 +96,7 @@ export const useChargingData = (filters: ChargingDataFilters = {}): UseChargingD
         ROUND(SUM(CHARGE_AMOUNT), 2) AS TOTAL_ENERGY,
         ROUND(SUM(AMOUNT), 2) AS TOTAL_AMOUNT,
         COUNT(DISTINCT CUSTOMER_ID) AS UNIQUE_CUSTOMERS
-      FROM ADHOC.PAYMENTSFACT_PAYMENT
+      FROM ADHOC.PAYMENTS.FACT_PAYMENT
       WHERE ${conditions.join(' AND ')}
       GROUP BY ${dateGroup}
       ORDER BY CHARGING_DATE ASC

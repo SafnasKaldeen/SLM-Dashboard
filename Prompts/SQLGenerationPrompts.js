@@ -118,7 +118,7 @@ ${formattedFilters}
 2. Include GROUP BY, ORDER BY, COALESCE, and LIMIT if applicable.
 3. Always apply default filters from the model.
 4. Use proper JOIN syntax and optimize for performance.
-5. Resolve ambiguous terms using synonyms or predefined measures.
+5. Resolve ambiguous terms using synonyms or predefined measures **but never introduce new columns or tables not explicitly listed in the schema. If a join seems missing, always route through LOOKUP_VIEW.**
 6. **Date filtering rules (enforced):**
    - "CREATED_EPOCH" and "TIME_STAMP" fields are proper TIMESTAMP(0) types in UTC.
    - For month/year aggregation, use:
@@ -127,11 +127,17 @@ ${formattedFilters}
        DATE_TRUNC('MONTH', CREATED_EPOCH)
    - NEVER use epoch conversion functions like unix_to_timestamp.
    - NEVER use CREATED_AT or other timestamp fields for month/year aggregation.
-7. Use meaningful aliases for readability and maintainability.
+7. Use simple, readable aliases: fp for FACT_PAYMENT, ss for DIM_SWAPPING_STATION.
 8. Ensure SQL is syntactically correct.
 9. Return exactly one JSON object with "sql" and very descriptive "explanation".
 10. Include only necessary columns for the query; do not include extras.
 11. Prefix all tables, views, and functions with their schema (fullName).
+12. Use standard Snowflake syntax.
+13. Include only necessary columns in SELECT.
+14. Use Snowflake-supported functions only:
+        CURRENT_TIMESTAMP instead of NOW()
+        DAYOFWEEK() instead of DAY_OF_WEEK() use CASE DAYOFWEEK() = 0 THEN SUNDAY pattern for day names
+        
 
 IMPORTANT: Return the JSON object in valid JSON format, escaping newlines inside string values as \\n. The object must be parseable by standard JSON parsers.
 
@@ -142,10 +148,3 @@ IMPORTANT: Return the JSON object in valid JSON format, escaping newlines inside
 }
 `.trim();
 };
-
-// 6. **Date filtering rules (enforced):**
-//    - Always use "CREATED_EPOCH" → "unix_to_timestamp(CREATED_EPOCH)" → NTZ
-//    - Convert to NUMBER for monthly/yearly aggregation:
-//      TO_NUMBER(TO_CHAR(unix_to_timestamp(CREATED_EPOCH), 'YYYYMM'))
-//    - NEVER use LTZ or session-local conversions
-//    - NEVER use CREATED_AT or other timestamp fields for month/year aggregation

@@ -3,7 +3,7 @@
 
 import React from "react";
 import { useSwaps } from "@/hooks/Snowflake/useSwaps";
-import { TrendingUp, Battery } from "lucide-react";
+import { TrendingUp, Battery, Clock } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -18,6 +18,7 @@ import {
 import { BatterySwapMetrics } from "./battery-swap-metrics";
 import { RevenueAnalyticsChart } from "./revenue-analytics-chart";
 import SwapVolumeChart from "./swap-volume-chart";
+import HourlySwapsChart from "./HourlySwapsChart";
 
 const TrendSection = ({ filters }) => {
   const {
@@ -25,28 +26,28 @@ const TrendSection = ({ filters }) => {
     loading,
     error,
     totalSwaps,
-    totalRevenue, // ✅ Added missing totalRevenue
+    totalRevenue,
     revenuePerSwap,
     averageSwapTime,
-    performanceComparison, // ✅ Added for growth calculations
+    performanceComparison,
     areawiseData,
     datewiseData,
   } = useSwaps(filters);
 
-  // ✅ Calculate growth percentages for display
+  // Calculate growth percentages for display
   const formatGrowthPercentage = (growth) => {
     if (growth === null || growth === undefined || isNaN(growth)) return null;
     const sign = growth >= 0 ? "+" : "";
     return `${sign}${growth.toFixed(1)}%`;
   };
 
-  // ✅ Prepare data in the format BatterySwapMetrics expects
+  // Prepare data in the format BatterySwapMetrics expects
   const metricsData = React.useMemo(() => {
     return {
       totalSwaps,
       totalRevenue,
-      avgRevenuePerSwap: revenuePerSwap, // ✅ Map to expected prop name
-      avgSwapTime: averageSwapTime, // ✅ Map to expected prop name
+      avgRevenuePerSwap: revenuePerSwap,
+      avgSwapTime: averageSwapTime,
       swapsChange: performanceComparison
         ? formatGrowthPercentage(performanceComparison.growth.swapsGrowth)
         : null,
@@ -58,7 +59,7 @@ const TrendSection = ({ filters }) => {
             performanceComparison.growth.revenuePerSwapGrowth
           )
         : null,
-      swapTimeChange: null, // Add if you have swap time growth data
+      swapTimeChange: null,
     };
   }, [
     totalSwaps,
@@ -87,10 +88,9 @@ const TrendSection = ({ filters }) => {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {/* ✅ Fixed: Pass 'data' prop instead of 'metrics' */}
               <BatterySwapMetrics
                 filters={filters}
-                data={metricsData} // ✅ Correct prop name
+                data={metricsData}
                 loading={loading}
                 error={error?.message}
               />
@@ -99,13 +99,12 @@ const TrendSection = ({ filters }) => {
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid gap-6 lg:grid-cols-2 mt-6">
-        {/* Revenue Analytics Chart Card */}
+      {/* Main Analytics Chart - Full Width */}
+      <div className="grid gap-6 lg:grid-cols-1 mt-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" /> Swap Trends
+              <TrendingUp className="w-5 h-5" /> Swap Trends Analytics
             </CardTitle>
             <CardDescription>
               Track revenue patterns from battery swap transactions over time
@@ -117,22 +116,44 @@ const TrendSection = ({ filters }) => {
             ) : (
               <RevenueAnalyticsChart
                 filters={filters}
-                data={datewiseData} // Your time-series data
+                data={datewiseData}
                 loading={loading}
                 error={error?.message}
               />
             )}
           </CardContent>
         </Card>
+      </div>
 
-        {/* Swap Volume Analysis Chart Card */}
+      {/* Secondary Charts - Two Column Layout */}
+      <div className="grid gap-6 lg:grid-cols-2 mt-6">
+        {/* Hourly Distribution Chart */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Battery className="w-5 h-5" /> Battery Swaps by Area Categories
+              <Clock className="w-5 h-5" /> Hourly Swap Distribution
             </CardTitle>
             <CardDescription>
-              Distribution of swaps across different area types
+              Battery swap patterns across different hours of the day
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <ChartSkeleton />
+            ) : (
+              <HourlySwapsChart filters={filters} />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Area Categories Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Battery className="w-5 h-5" /> Swaps by Area Categories
+            </CardTitle>
+            <CardDescription>
+              Distribution of swaps across different location types
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -163,77 +184,6 @@ const TrendSection = ({ filters }) => {
           </CardContent>
         </Card>
       )}
-
-      {/* 🔍 Debug Panel (Development Only) */}
-      {/* {process.env.NODE_ENV === "development" && (
-        <Card className="mt-4 border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="text-sm">🔍 Debug Panel</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs space-y-2">
-              <div>
-                <strong>Loading:</strong> {loading ? "Yes" : "No"}
-              </div>
-              <div>
-                <strong>Error:</strong> {error ? "Yes" : "No"}
-              </div>
-              <div>
-                <strong>Total Swaps:</strong> {totalSwaps ?? "null"}
-              </div>
-              <div>
-                <strong>Total Revenue:</strong> {totalRevenue ?? "null"}
-              </div>
-              <div>
-                <strong>Revenue Per Swap:</strong> {revenuePerSwap ?? "null"}
-              </div>
-              <div>
-                <strong>Average Swap Time:</strong> {averageSwapTime ?? "null"}
-              </div>
-              <div>
-                <strong>Monthly Data Points:</strong>{" "}
-                {monthlySwapEfficiency?.length ?? 0}
-              </div>
-              <div>
-                <strong>Performance Comparison:</strong>{" "}
-                {performanceComparison ? "Available" : "None"}
-              </div>
-
-              {performanceComparison && (
-                <details>
-                  <summary className="cursor-pointer">Growth Data</summary>
-                  <div className="mt-1 p-2 bg-white rounded text-xs">
-                    <div>
-                      Swaps Growth:{" "}
-                      {performanceComparison.growth.swapsGrowth?.toFixed(1)}%
-                    </div>
-                    <div>
-                      Revenue Growth:{" "}
-                      {performanceComparison.growth.revenueGrowth?.toFixed(1)}%
-                    </div>
-                    <div>
-                      Revenue/Swap Growth:{" "}
-                      {performanceComparison.growth.revenuePerSwapGrowth?.toFixed(
-                        1
-                      )}
-                      %
-                    </div>
-                  </div>
-                </details>
-              )}
-
-              <details>
-                <summary className="cursor-pointer">
-                  Prepared Metrics Data
-                </summary>
-                <pre className="mt-1 p-2 bg-white rounded text-xs overflow-x-auto">
-                  {JSON.stringify(metricsData, null, 2)}
-                </pre>
-              </details>
-            </div>
-          </CardContent>
-        </Card>
-      )} */}
     </>
   );
 };

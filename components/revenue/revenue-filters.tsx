@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   CalendarIcon,
   Filter,
@@ -29,7 +29,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { useAreaStations } from "@/hooks/Snowflake/useAreaStations";
 
 interface RevenueFiltersProps {
   onFiltersChange?: (filters: RevenueFilters) => void;
@@ -37,6 +36,8 @@ interface RevenueFiltersProps {
 
 export interface RevenueFilters {
   dateRange?: DateRange;
+  selectedProvinces: string[];
+  selectedDistricts: string[];
   selectedAreas: string[];
   selectedStations: string[];
   customerSegments: string[];
@@ -48,11 +49,106 @@ export interface RevenueFilters {
   aggregation: "daily" | "monthly" | "quarterly" | "annually";
 }
 
+interface GeographicData {
+  AREA_ID: string;
+  AREA_NAME: string;
+  DISTRICT_ID: string;
+  DISTRICT_NAME: string;
+  PROVICE_ID: string;
+  PROVICE_NAME: string;
+}
+
+interface StationData {
+  AREA: string;
+  STATION: string;
+}
+
+interface PaymentAreaData {
+  AREA: string;
+  DISTRICT: string;
+  PROVINCE: string;
+}
+
+// Enhanced custom hook that fetches complete geographic hierarchy with payment data upfront
+const useGeographicHierarchy = () => {
+  const [completeHierarchy, setCompleteHierarchy] = useState<PaymentAreaData[]>(
+    []
+  );
+  const [stationData, setStationData] = useState<StationData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch all data once on component mount
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch complete hierarchy with payment information - JOIN payment and lookup tables
+        const hierarchyRes = await fetch("/api/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sql: `SELECT DISTINCT 
+                    rs.LOCATIONNAME AS AREA,
+                    adp.DISTRICT_NAME AS DISTRICT,
+                    adp.PROVICE_NAME AS PROVINCE,
+                    adp.AREA_ID,
+                    adp.DISTRICT_ID,
+                    adp.PROVICE_ID
+                  FROM MY_REVENUESUMMARY rs
+                  JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
+                    ON rs.LOCATIONNAME = adp.AREA_NAME
+                  WHERE rs.LOCATIONNAME IS NOT NULL 
+                    AND rs.STATIONNAME IS NOT NULL 
+                    AND rs.TOTAL_REVENUE > 0
+                  ORDER BY PROVINCE, DISTRICT, AREA`,
+          }),
+        });
+
+        // Fetch all stations with their areas
+        const stationsRes = await fetch("/api/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sql: `SELECT DISTINCT 
+                    rs.LOCATIONNAME AS AREA, 
+                    rs.STATIONNAME AS STATION 
+                  FROM MY_REVENUESUMMARY rs
+                  WHERE rs.LOCATIONNAME IS NOT NULL 
+                    AND rs.STATIONNAME IS NOT NULL
+                    AND rs.TOTAL_REVENUE > 0
+                  ORDER BY AREA, STATION`,
+          }),
+        });
+
+        if (!hierarchyRes.ok || !stationsRes.ok) {
+          throw new Error("Failed to fetch geographic data");
+        }
+
+        const hierarchyData: PaymentAreaData[] = await hierarchyRes.json();
+        const stationData: StationData[] = await stationsRes.json();
+
+        setCompleteHierarchy(hierarchyData || []);
+        setStationData(stationData || []);
+        setLoading(false);
+      } catch (err: any) {
+        setError(err.message || "Failed to fetch geographic data");
+        setLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, []); // Only run once on mount
+
+  return { completeHierarchy, stationData, loading, error };
+};
+
 export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
   // Calculate exactly one year: from first day of this month last year to last day of last month
   const today = new Date();
-  const defaultFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1); // First day of this month last year
-  const defaultTo = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of last month
+  const defaultFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+  const defaultTo = new Date(today.getFullYear(), today.getMonth(), 0);
   const defaultRange: DateRange = { from: defaultFrom, to: defaultTo };
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -65,14 +161,12 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
   );
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<"from" | "to">("from");
-
-  // Set default to exactly one year
   const [quickTime, setQuickTime] = useState<string>("last_year");
-
-  const { data: areaStations, loading } = useAreaStations();
 
   const [filters, setFilters] = useState<RevenueFilters>({
     dateRange: defaultRange,
+    selectedProvinces: [],
+    selectedDistricts: [],
     selectedAreas: [],
     selectedStations: [],
     customerSegments: [],
@@ -80,6 +174,26 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     paymentMethods: [],
     aggregation: "monthly",
   });
+
+  // Separate state for applied filters that trigger data fetching
+  const [appliedFilters, setAppliedFilters] = useState<RevenueFilters>({
+    dateRange: defaultRange,
+    selectedProvinces: [],
+    selectedDistricts: [],
+    selectedAreas: [],
+    selectedStations: [],
+    customerSegments: [],
+    revenueRange: {},
+    paymentMethods: [],
+    aggregation: "monthly",
+  });
+
+  const { completeHierarchy, stationData, loading } = useGeographicHierarchy();
+
+  // Track if there are pending changes
+  const hasPendingChanges = useMemo(() => {
+    return JSON.stringify(filters) !== JSON.stringify(appliedFilters);
+  }, [filters, appliedFilters]);
 
   const customerSegments = [
     "Regular Users",
@@ -97,27 +211,85 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     "Corporate Account",
   ];
 
-  const areas = areaStations ? Object.keys(areaStations) : [];
+  // Memoized computed values for cascading filters - based on complete hierarchy data
+  const availableProvinces = useMemo(() => {
+    const provinces = new Set<string>();
+    completeHierarchy.forEach((item) => provinces.add(item.PROVINCE));
+    return Array.from(provinces).sort();
+  }, [completeHierarchy]);
+
+  const availableDistricts = useMemo(() => {
+    const districts = new Set<string>();
+
+    let filteredData = completeHierarchy;
+
+    // Filter by pending selected provinces if any
+    if (filters.selectedProvinces.length > 0) {
+      filteredData = filteredData.filter((item) =>
+        filters.selectedProvinces.includes(item.PROVINCE)
+      );
+    }
+
+    filteredData.forEach((item) => districts.add(item.DISTRICT));
+    return Array.from(districts).sort();
+  }, [completeHierarchy, filters.selectedProvinces]);
+
+  const availableAreas = useMemo(() => {
+    const areas = new Set<string>();
+
+    let filteredData = completeHierarchy;
+
+    // Filter by pending selected provinces if any
+    if (filters.selectedProvinces.length > 0) {
+      filteredData = filteredData.filter((item) =>
+        filters.selectedProvinces.includes(item.PROVINCE)
+      );
+    }
+
+    // Filter by pending selected districts if any
+    if (filters.selectedDistricts.length > 0) {
+      filteredData = filteredData.filter((item) =>
+        filters.selectedDistricts.includes(item.DISTRICT)
+      );
+    }
+
+    filteredData.forEach((item) => areas.add(item.AREA));
+    return Array.from(areas).sort();
+  }, [completeHierarchy, filters.selectedProvinces, filters.selectedDistricts]);
+
+  const availableStations = useMemo(() => {
+    // Only show stations if multiple areas are selected
+    if (filters.selectedAreas.length > 1) {
+      return stationData
+        .filter((station) => filters.selectedAreas.includes(station.AREA))
+        .map((station) => station.STATION)
+        .sort();
+    }
+    return [];
+  }, [stationData, filters.selectedAreas]);
 
   useEffect(() => {
-    onFiltersChange?.(filters);
-  }, [filters, onFiltersChange]);
+    // Only send applied filters to parent, not pending changes
+    onFiltersChange?.(appliedFilters);
+  }, [appliedFilters, onFiltersChange]);
 
   const updateFilters = (newFilters: Partial<RevenueFilters>) => {
     const updated = { ...filters, ...newFilters };
     setFilters(updated);
   };
 
-  const formatDate = (date?: Date) =>
-    date ? date.toISOString().substring(0, 10) : undefined;
+  const applyFilters = () => {
+    setAppliedFilters({ ...filters });
+  };
 
   const clearAllFilters = () => {
     const today = new Date();
-    // Reset to exactly one year
     const oneYearFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
     const oneYearTo = new Date(today.getFullYear(), today.getMonth(), 0);
 
     const cleared: RevenueFilters = {
+      selectedProvinces: [],
+      selectedDistricts: [],
       selectedAreas: [],
       selectedStations: [],
       customerSegments: [],
@@ -128,9 +300,210 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     };
 
     setFilters(cleared);
+    setAppliedFilters(cleared);
     setDateRange(cleared.dateRange);
     setTempRange(cleared.dateRange);
     setQuickTime("last_year");
+  };
+
+  // Cascading handlers - work with pending filters and complete hierarchy data
+  const handleProvinceChange = (province: string, checked: boolean) => {
+    const newProvinces = checked
+      ? [...filters.selectedProvinces, province]
+      : filters.selectedProvinces.filter((p) => p !== province);
+
+    // Clear downstream selections when deselecting
+    let newDistricts = filters.selectedDistricts;
+    let newAreas = filters.selectedAreas;
+    let newStations = filters.selectedStations;
+
+    if (!checked) {
+      if (newProvinces.length === 0) {
+        // Keep current selections
+      } else {
+        // Remove districts that don't belong to remaining provinces
+        const validDistricts = new Set<string>();
+        completeHierarchy
+          .filter((item) => newProvinces.includes(item.PROVINCE))
+          .forEach((item) => validDistricts.add(item.DISTRICT));
+
+        newDistricts = newDistricts.filter((d) => validDistricts.has(d));
+
+        // Remove areas that don't belong to remaining provinces/districts
+        const validAreas = new Set<string>();
+        completeHierarchy
+          .filter(
+            (item) =>
+              newProvinces.includes(item.PROVINCE) &&
+              (newDistricts.length === 0 ||
+                newDistricts.includes(item.DISTRICT))
+          )
+          .forEach((item) => validAreas.add(item.AREA));
+
+        newAreas = newAreas.filter((a) => validAreas.has(a));
+
+        // Remove stations that don't belong to remaining areas
+        newStations = newStations.filter((s) => {
+          const stationArea = stationData.find(
+            (station) => station.STATION === s
+          )?.AREA;
+          return stationArea && validAreas.has(stationArea);
+        });
+      }
+    }
+
+    updateFilters({
+      selectedProvinces: newProvinces,
+      selectedDistricts: newDistricts,
+      selectedAreas: newAreas,
+      selectedStations: newStations,
+    });
+  };
+
+  const handleDistrictChange = (district: string, checked: boolean) => {
+    const newDistricts = checked
+      ? [...filters.selectedDistricts, district]
+      : filters.selectedDistricts.filter((d) => d !== district);
+
+    // Auto-select parent province when district is selected
+    let newProvinces = filters.selectedProvinces;
+    if (checked) {
+      const districtProvince = completeHierarchy.find(
+        (item) => item.DISTRICT === district
+      )?.PROVINCE;
+      if (districtProvince && !newProvinces.includes(districtProvince)) {
+        newProvinces = [...newProvinces, districtProvince];
+      }
+    }
+
+    let newAreas = filters.selectedAreas;
+    let newStations = filters.selectedStations;
+
+    if (!checked) {
+      if (newDistricts.length === 0 && newProvinces.length === 0) {
+        // Keep current selections
+      } else {
+        const validAreas = new Set<string>();
+        completeHierarchy
+          .filter((item) => {
+            const matchesProvince =
+              newProvinces.length === 0 || newProvinces.includes(item.PROVINCE);
+            const matchesDistrict =
+              newDistricts.length === 0 || newDistricts.includes(item.DISTRICT);
+            return matchesProvince && matchesDistrict;
+          })
+          .forEach((item) => validAreas.add(item.AREA));
+
+        if (validAreas.size > 0) {
+          newAreas = newAreas.filter((a) => validAreas.has(a));
+          newStations = newStations.filter((s) => {
+            const stationArea = stationData.find(
+              (station) => station.STATION === s
+            )?.AREA;
+            return stationArea && validAreas.has(stationArea);
+          });
+        }
+      }
+    }
+
+    updateFilters({
+      selectedProvinces: newProvinces,
+      selectedDistricts: newDistricts,
+      selectedAreas: newAreas,
+      selectedStations: newStations,
+    });
+  };
+
+  const handleAreaChange = (area: string, checked: boolean) => {
+    const newAreas = checked
+      ? [...filters.selectedAreas, area]
+      : filters.selectedAreas.filter((a) => a !== area);
+
+    // Auto-select parent district and province when area is selected
+    let newDistricts = filters.selectedDistricts;
+    let newProvinces = filters.selectedProvinces;
+
+    if (checked) {
+      const areaInfo = completeHierarchy.find((item) => item.AREA === area);
+      if (areaInfo) {
+        if (!newDistricts.includes(areaInfo.DISTRICT)) {
+          newDistricts = [...newDistricts, areaInfo.DISTRICT];
+        }
+        if (!newProvinces.includes(areaInfo.PROVINCE)) {
+          newProvinces = [...newProvinces, areaInfo.PROVINCE];
+        }
+      }
+    }
+
+    // Handle stations
+    let newStations = filters.selectedStations;
+    if (!checked) {
+      const areaStations = stationData
+        .filter((station) => station.AREA === area)
+        .map((station) => station.STATION);
+      newStations = newStations.filter((s) => !areaStations.includes(s));
+    }
+
+    updateFilters({
+      selectedProvinces: newProvinces,
+      selectedDistricts: newDistricts,
+      selectedAreas: newAreas,
+      selectedStations: newStations,
+    });
+  };
+
+  const handleStationChange = (station: string, checked: boolean) => {
+    const newStations = checked
+      ? [...filters.selectedStations, station]
+      : filters.selectedStations.filter((s) => s !== station);
+
+    // Auto-select parent hierarchy when station is selected
+    let newAreas = filters.selectedAreas;
+    let newDistricts = filters.selectedDistricts;
+    let newProvinces = filters.selectedProvinces;
+
+    if (checked) {
+      const stationInfo = stationData.find((s) => s.STATION === station);
+      if (stationInfo) {
+        const areaName = stationInfo.AREA;
+        if (!newAreas.includes(areaName)) {
+          newAreas = [...newAreas, areaName];
+        }
+
+        const areaInfo = completeHierarchy.find(
+          (item) => item.AREA === areaName
+        );
+        if (areaInfo) {
+          if (!newDistricts.includes(areaInfo.DISTRICT)) {
+            newDistricts = [...newDistricts, areaInfo.DISTRICT];
+          }
+          if (!newProvinces.includes(areaInfo.PROVINCE)) {
+            newProvinces = [...newProvinces, areaInfo.PROVINCE];
+          }
+        }
+      }
+    }
+
+    updateFilters({
+      selectedProvinces: newProvinces,
+      selectedDistricts: newDistricts,
+      selectedAreas: newAreas,
+      selectedStations: newStations,
+    });
+  };
+
+  const handleCustomerSegmentChange = (segment: string, checked: boolean) => {
+    const newSegments = checked
+      ? [...filters.customerSegments, segment]
+      : filters.customerSegments.filter((s) => s !== segment);
+    updateFilters({ customerSegments: newSegments });
+  };
+
+  const handlePaymentMethodChange = (method: string, checked: boolean) => {
+    const newMethods = checked
+      ? [...filters.paymentMethods, method]
+      : filters.paymentMethods.filter((m) => m !== method);
+    updateFilters({ paymentMethods: newMethods });
   };
 
   // Custom month/year navigation components
@@ -221,6 +594,8 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
   const getActiveFiltersCount = () => {
     let count = 0;
     if (dateRange?.from || dateRange?.to) count++;
+    if (filters.selectedProvinces.length > 0) count++;
+    if (filters.selectedDistricts.length > 0) count++;
     if (filters.selectedAreas.length > 0) count++;
     if (filters.selectedStations.length > 0) count++;
     if (filters.customerSegments.length > 0) count++;
@@ -249,22 +624,18 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
         aggregation = "monthly";
         break;
       case "last_month":
-        // Last month: first day to last day of previous month
         newFrom = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         newTo = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
       case "this_month":
-        // This month: first day of this month to today
         newFrom = new Date(today.getFullYear(), today.getMonth(), 1);
         newTo = today;
         break;
       case "last_3_months":
-        // Last 3 months: first day of 3 months ago to last day of last month
         newFrom = new Date(today.getFullYear(), today.getMonth() - 3, 1);
         newTo = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
       case "last_year":
-        // Exactly one year: first day of this month last year to last day of last month
         newFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
         newTo = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
@@ -276,48 +647,6 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     setDateRange(range);
     setTempRange(range);
     updateFilters({ dateRange: range, aggregation });
-  };
-
-  const handleAreaChange = (area: string, checked: boolean) => {
-    const newAreas = checked
-      ? [...filters.selectedAreas, area]
-      : filters.selectedAreas.filter((a) => a !== area);
-
-    let newStations = filters.selectedStations;
-    if (!checked && areaStations) {
-      const areaStationsList = areaStations[area] || [];
-      newStations = filters.selectedStations.filter(
-        (s) => !areaStationsList.includes(s)
-      );
-    }
-
-    updateFilters({ selectedAreas: newAreas, selectedStations: newStations });
-  };
-
-  const handleStationChange = (station: string, checked: boolean) => {
-    const newStations = checked
-      ? [...filters.selectedStations, station]
-      : filters.selectedStations.filter((s) => s !== station);
-    updateFilters({ selectedStations: newStations });
-  };
-
-  const handleCustomerSegmentChange = (segment: string, checked: boolean) => {
-    const newSegments = checked
-      ? [...filters.customerSegments, segment]
-      : filters.customerSegments.filter((s) => s !== segment);
-    updateFilters({ customerSegments: newSegments });
-  };
-
-  const handlePaymentMethodChange = (method: string, checked: boolean) => {
-    const newMethods = checked
-      ? [...filters.paymentMethods, method]
-      : filters.paymentMethods.filter((m) => m !== method);
-    updateFilters({ paymentMethods: newMethods });
-  };
-
-  const getAvailableStations = () => {
-    if (!areaStations || filters.selectedAreas.length === 0) return [];
-    return filters.selectedAreas.flatMap((area) => areaStations[area] || []);
   };
 
   const autoFixAggregation = (range: DateRange) => {
@@ -335,7 +664,6 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     }
   };
 
-  // Handle single date selection in the calendar
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
 
@@ -343,13 +671,11 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
 
     if (datePickerMode === "from") {
       newRange.from = date;
-      // If "to" date is before the new "from" date, clear "to"
       if (newRange.to && date > newRange.to) {
         newRange.to = undefined;
       }
     } else if (datePickerMode === "to") {
       newRange.to = date;
-      // If "from" date is after the new "to" date, clear "from"
       if (newRange.from && date < newRange.from) {
         newRange.from = undefined;
       }
@@ -358,49 +684,31 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     setTempRange(newRange);
   };
 
-  // Use safe fallbacks if date is not defined
-  const safeDateRange: DateRange = {
-    from: dateRange?.from || defaultFrom,
-    to: dateRange?.to || defaultTo,
-  };
-
   const applyDateRange = () => {
     if (!tempRange?.from || !tempRange?.to) return;
 
-    // Original UI dates (no change)
     const originalFrom = new Date(tempRange.from);
     const originalTo = new Date(tempRange.to);
-
-    // Adjusted date for filtering: from + 1 day
     const adjustedFrom = new Date(originalFrom);
     adjustedFrom.setDate(adjustedFrom.getDate() + 1);
-
-    // extraDate = to + 1 day
     const extraDate = new Date(originalTo);
     extraDate.setDate(extraDate.getDate() + 1);
 
-    // Validate range
     if (adjustedFrom.getTime() > originalTo.getTime()) return;
 
-    // Final filter range object with adjusted dates
     const filterRange = {
       from: originalFrom,
       to: originalTo,
       extraDate,
     };
 
-    // Set UI dates exactly as user picked (no +1 day)
     setDateRange({ from: originalFrom, to: originalTo });
-
-    // Update filters using adjusted range
     updateFilters({ dateRange: filterRange });
-
     autoFixAggregation(filterRange);
     setQuickTime("custom");
     setIsCalendarOpen(false);
   };
 
-  // Handle month navigation for calendar
   const handleCalendarMonthChange = (month: number) => {
     const newDate = new Date(currentMonth.getFullYear(), month);
     setCurrentMonth(newDate);
@@ -411,7 +719,6 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     setCurrentMonth(newDate);
   };
 
-  // Check if date range picker should be disabled and if daily aggregation should be disabled
   const isDateRangeDisabled = quickTime !== "custom";
   const isDailyDisabled = quickTime === "history";
 
@@ -420,7 +727,7 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
       <Card>
         <CardContent className="flex items-center justify-center py-6">
           <Loader2 className="animate-spin h-5 w-5 mr-2" />
-          <span>Loading areas and stations...</span>
+          <span>Loading geographic data...</span>
         </CardContent>
       </Card>
     );
@@ -438,8 +745,26 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                 {getActiveFiltersCount()} active
               </Badge>
             )}
+            {hasPendingChanges && (
+              <Badge
+                variant="outline"
+                className="text-orange-600 border-orange-200"
+              >
+                Changes pending
+              </Badge>
+            )}
           </div>
           <div className="flex gap-2">
+            {hasPendingChanges && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={applyFilters}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Apply Filters
+              </Button>
+            )}
             {getActiveFiltersCount() > 0 && (
               <Button variant="ghost" size="sm" onClick={clearAllFilters}>
                 <X className="h-4 w-4 mr-1" />
@@ -673,6 +998,74 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
             </Select>
           </div>
 
+          {/* Province */}
+          <div className="space-y-2">
+            <Label>Province</Label>
+            <Select
+              onValueChange={(value) => handleProvinceChange(value, true)}
+            >
+              <SelectTrigger>
+                <span>
+                  {filters.selectedProvinces.length > 0
+                    ? `${filters.selectedProvinces.length} selected`
+                    : "Select provinces"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {availableProvinces.map((province) => (
+                  <SelectItem key={province} value={province}>
+                    {province}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex flex-wrap gap-1">
+              {filters.selectedProvinces.map((province) => (
+                <Badge key={province} variant="secondary">
+                  {province}
+                  <X
+                    className="h-3 w-3 ml-1 cursor-pointer"
+                    onClick={() => handleProvinceChange(province, false)}
+                  />
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          {/* District */}
+          <div className="space-y-2">
+            <Label>District</Label>
+            <Select
+              onValueChange={(value) => handleDistrictChange(value, true)}
+            >
+              <SelectTrigger>
+                <span>
+                  {filters.selectedDistricts.length > 0
+                    ? `${filters.selectedDistricts.length} selected`
+                    : "Select districts"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {availableDistricts.map((district) => (
+                  <SelectItem key={district} value={district}>
+                    {district}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex flex-wrap gap-1">
+              {filters.selectedDistricts.map((district) => (
+                <Badge key={district} variant="secondary">
+                  {district}
+                  <X
+                    className="h-3 w-3 ml-1 cursor-pointer"
+                    onClick={() => handleDistrictChange(district, false)}
+                  />
+                </Badge>
+              ))}
+            </div>
+          </div>
+
           {/* Area */}
           <div className="space-y-2">
             <Label>Area</Label>
@@ -680,12 +1073,12 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
               <SelectTrigger>
                 <span>
                   {filters.selectedAreas.length > 0
-                    ? filters.selectedAreas.join(", ")
+                    ? `${filters.selectedAreas.length} selected`
                     : "Select areas"}
                 </span>
               </SelectTrigger>
               <SelectContent>
-                {areas.map((area) => (
+                {availableAreas.map((area) => (
                   <SelectItem key={area} value={area}>
                     {area}
                   </SelectItem>
@@ -705,20 +1098,26 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
             </div>
           </div>
 
-          {/* BSS Stations */}
-          {filters.selectedAreas.length > 0 && (
+          {/* BSS Stations - Only show if multiple areas selected */}
+          {filters.selectedAreas.length > 1 && (
             <div className="space-y-2">
               <Label>BSS Stations</Label>
               <Select
                 onValueChange={(value) => handleStationChange(value, true)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select station" />
+                  <SelectValue
+                    placeholder={
+                      filters.selectedStations.length > 0
+                        ? `${filters.selectedStations.length} selected`
+                        : "Select stations"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {getAvailableStations().map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
+                  {availableStations.map((station) => (
+                    <SelectItem key={station} value={station}>
+                      {station}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -738,7 +1137,7 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
           )}
         </div>
 
-        {isExpanded && (
+        {isExpanded ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t mt-4">
             {/* Customer Segments */}
             <div className="space-y-2">
@@ -772,7 +1171,7 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
               ))}
             </div>
           </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );
