@@ -97,6 +97,7 @@ interface VehicleData {
   };
   CUSTOMER_ID: string;
   SELLING_PRICE: number;
+  SOLD_DATE?: string;
   TBOX_IMEI_NO: number;
   TOTAL_BATTERY_SWAPS: number;
   TOTAL_DISTANCE: number;

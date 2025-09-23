@@ -229,7 +229,7 @@ export function DatabaseConnector({
       account:
         process.env.NEXT_PUBLIC_SNOWFLAKE_ACCOUNT ||
         "default-account.snowflakecomputing.com",
-      warehouse: "SNOWFLAKE_LEARNING_WH",
+      warehouse: "ADHOC",
       database: "ADHOC",
       schema: "PUBLIC",
       role: "SYSADMIN",

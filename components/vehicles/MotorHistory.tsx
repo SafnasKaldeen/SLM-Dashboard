@@ -80,7 +80,7 @@ const DEFAULT_FILTERS: TelemetryFilters = {
 };
 
 const DEFAULT_TIME_FILTERS: TimeFilters = {
-  timeRange: 500, // Last 500 hours
+  timeRange: 700, // Last 700 hours
   groupBy: "hour",
 };
 
@@ -342,7 +342,7 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
             <option value={24}>Last 24 Hours</option>
             <option value={72}>Last 3 Days</option>
             <option value={168}>Last Week</option>
-            <option value={500}>Last 500 Hours</option>
+            <option value={700}>Last 700 Hours</option>
           </select>
 
           {/* Thresholds Toggle */}
@@ -1042,7 +1042,7 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
                   yAxisId="power"
                   type="monotone"
                   dataKey="AVG_ELECTRICAL_POWER"
-                  stroke="#FFA500"
+                  stroke="#FFA700"
                   strokeWidth={2}
                   dot={false}
                   name="Electrical Power"
@@ -1050,7 +1050,7 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
                 <ReferenceLine
                   yAxisId="power"
                   y={thresholds.highPowerW}
-                  stroke="#FFA500"
+                  stroke="#FFA700"
                   strokeDasharray="5 5"
                 />
               </ComposedChart>
@@ -1171,7 +1171,7 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
                 <XAxis
                   dataKey="DATE_HOUR"
                   stroke="#94a3b8"
-                  tick={{ fill: "#94a3b8", fontSize: 12, fontWeight: 500 }}
+                  tick={{ fill: "#94a3b8", fontSize: 12, fontWeight: 700 }}
                   axisLine={{ stroke: "#64748b", strokeWidth: 1 }}
                   tickLine={{ stroke: "#64748b" }}
                   tickFormatter={(value) =>
@@ -1183,7 +1183,7 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
                 />
                 <YAxis
                   stroke="#94a3b8"
-                  tick={{ fill: "#94a3b8", fontSize: 12, fontWeight: 500 }}
+                  tick={{ fill: "#94a3b8", fontSize: 12, fontWeight: 700 }}
                   axisLine={{ stroke: "#64748b", strokeWidth: 1 }}
                   tickLine={{ stroke: "#64748b" }}
                 />
@@ -1219,222 +1219,6 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
       </div>
 
       {/* Gear Performance Analysis */}
-      <Card className="bg-slate-900/50 border-slate-800">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-100">
-            <Cog className="w-5 h-5 text-purple-400" />
-            Gear Performance Analysis
-          </CardTitle>
-          <CardDescription className="text-slate-400">
-            Individual gear performance metrics and efficiency analysis
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-            <div>
-              <h4 className="text-lg font-semibold text-white mb-4">
-                Efficiency by Gear Position
-              </h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={gearData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    className="stroke-slate-700"
-                  />
-                  <XAxis
-                    dataKey="GEAR_POSITION"
-                    tick={{ fontSize: 12, fill: "#94a3b8" }}
-                  />
-                  <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar
-                    dataKey="AVG_EFFICIENCY"
-                    fill="#8b5cf6"
-                    name="Average Efficiency"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="OPERATIONAL_TIME_PERCENT"
-                    fill="#10b981"
-                    name="Operational Time %"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <ReferenceLine
-                    y={thresholds.mediumEfficiencyPercent}
-                    stroke="#ffd166"
-                    strokeDasharray="5 5"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div>
-              <h4 className="text-lg font-semibold text-white mb-4">
-                Performance Summary
-              </h4>
-              <div className="space-y-3">
-                {[
-                  {
-                    label: "Avg Daily Active time",
-                    value: `${(
-                      systemHealth?.AVG_DAILY_UTILIZATION || 0
-                    ).toFixed(1)}%`,
-                    color:
-                      (systemHealth?.AVG_DAILY_UTILIZATION || 0) > 5
-                        ? "emerald"
-                        : (systemHealth?.AVG_DAILY_UTILIZATION || 0) > 3
-                        ? "yellow"
-                        : "red",
-                  },
-                  {
-                    label: "Power Loss Events",
-                    value: systemHealth?.POWER_LOSS_EVENTS || 0,
-                    color:
-                      (systemHealth?.POWER_LOSS_EVENTS || 0) > 10
-                        ? "red"
-                        : (systemHealth?.POWER_LOSS_EVENTS || 0) > 5
-                        ? "yellow"
-                        : "emerald",
-                  },
-                  {
-                    label: "Thermal Events",
-                    value: systemHealth?.THERMAL_EVENTS || 0,
-                    color:
-                      (systemHealth?.THERMAL_EVENTS || 0) > 20
-                        ? "red"
-                        : (systemHealth?.THERMAL_EVENTS || 0) > 10
-                        ? "yellow"
-                        : "emerald",
-                  },
-                  {
-                    label: "Total Data Points",
-                    value: (
-                      summaryMetrics?.totalDataPoints || 0
-                    ).toLocaleString(),
-                    color: "blue",
-                  },
-                ].map((metric, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center p-3 bg-slate-800/30 rounded-lg"
-                  >
-                    <span className="text-slate-300 font-medium">
-                      {metric.label}
-                    </span>
-                    <span className={`font-bold text-${metric.color}-400`}>
-                      {metric.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-lg font-semibold text-white mb-4">
-              Individual Gear Status
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {gearData.map((gear, idx) => {
-                const isHealthy =
-                  gear.AVG_EFFICIENCY > thresholds.mediumEfficiencyPercent &&
-                  gear.ANOMALY_COUNT < 5;
-                const isCritical =
-                  gear.AVG_EFFICIENCY < thresholds.criticalEfficiencyPercent;
-
-                return (
-                  <Card
-                    key={idx}
-                    className={`${
-                      isHealthy
-                        ? "bg-gradient-to-br from-green-900/30 to-green-800/20 border-green-800/50"
-                        : isCritical
-                        ? "bg-gradient-to-br from-red-900/30 to-red-800/20 border-red-800/50"
-                        : "bg-gradient-to-br from-yellow-900/30 to-yellow-800/20 border-yellow-800/50"
-                    }`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              isHealthy
-                                ? "bg-green-400"
-                                : isCritical
-                                ? "bg-red-400"
-                                : "bg-yellow-400"
-                            }`}
-                          ></div>
-                          <h5 className="text-white font-bold">
-                            Gear {gear.GEAR_POSITION}
-                          </h5>
-                        </div>
-                        {isHealthy && (
-                          <CheckCircle className="w-5 h-5 text-green-400" />
-                        )}
-                        {isCritical && (
-                          <XCircle className="w-5 h-5 text-red-400" />
-                        )}
-                      </div>
-
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Efficiency:</span>
-                          <span className="text-white font-semibold">
-                            {(gear.AVG_EFFICIENCY || 0).toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Operational:</span>
-                          <span className="text-slate-300">
-                            {(gear.OPERATIONAL_TIME_PERCENT || 0).toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Data Points:</span>
-                          <span className="text-slate-300">
-                            {(gear.DATA_POINTS || 0).toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Anomalies:</span>
-                          <span
-                            className={`font-semibold ${
-                              gear.ANOMALY_COUNT > 5
-                                ? "text-red-400"
-                                : "text-green-400"
-                            }`}
-                          >
-                            {gear.ANOMALY_COUNT}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 pt-3 border-t border-slate-600/30">
-                        {isCritical && (
-                          <p className="text-red-400 text-xs font-semibold">
-                            Critical: Immediate inspection required
-                          </p>
-                        )}
-                        {isHealthy && (
-                          <p className="text-green-400 text-xs">
-                            Performing within normal parameters
-                          </p>
-                        )}
-                        {!isHealthy && !isCritical && (
-                          <p className="text-yellow-400 text-xs">
-                            Monitor closely, performance declining
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Recent Anomalies */}
       {anomalies.length > 0 && (
@@ -1633,7 +1417,7 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
                 {(summaryMetrics?.avgEfficiency || 0).toFixed(1)}%
               </div>
               <div className="text-sm text-slate-400">Average Efficiency</div>
-              <div className="text-xs text-slate-500">system performance</div>
+              <div className="text-xs text-slate-700">system performance</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-blue-400">
@@ -1643,21 +1427,21 @@ const EnhancedTelemetryDashboard: React.FC<Props> = ({ IMEI }) => {
                 MWh
               </div>
               <div className="text-sm text-slate-400">Total Power</div>
-              <div className="text-xs text-slate-500">consumed</div>
+              <div className="text-xs text-slate-700">consumed</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-purple-400">
                 {(summaryMetrics?.operationalDataPoints || 0).toLocaleString()}
               </div>
               <div className="text-sm text-slate-400">Operational Readings</div>
-              <div className="text-xs text-slate-500">active usage</div>
+              <div className="text-xs text-slate-700">active usage</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-orange-400">
                 {(systemHealth?.OVERALL_HEALTH_SCORE || 0).toFixed(0)}/100
               </div>
               <div className="text-sm text-slate-400">Health Score</div>
-              <div className="text-xs text-slate-500">system status</div>
+              <div className="text-xs text-slate-700">system status</div>
             </div>
           </div>
         </CardContent>

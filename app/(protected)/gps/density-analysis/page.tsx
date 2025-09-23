@@ -70,6 +70,7 @@ interface SnowflakeDataPoint {
   MEAN_LAT: number;
   MEAN_LONG: number;
   density: number;
+  tbox_count: number;
   density_log: number;
   TBOXID: string;
   MEAN_TIMESTAMP: string;

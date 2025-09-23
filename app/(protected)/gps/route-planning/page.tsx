@@ -21,6 +21,7 @@ import {
   Route,
   Zap,
   ChargingStation,
+  Navigation,
 } from "lucide-react";
 import CartoMap from "@/components/maps/carto-map";
 import { Separator } from "@/components/ui/separator";
@@ -47,12 +48,32 @@ interface RouteData {
   llm_charging_strategy?: string;
 }
 
+// Google Maps Route Optimizer interfaces
+interface Waypoint {
+  id: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+interface GoogleRouteData {
+  distance: string;
+  duration: string;
+  polyline: string;
+  optimizedOrder: number[];
+  stepByStepDirections?: {
+    instruction: string;
+    distance: number;
+    duration: string;
+    maneuver: string;
+  }[];
+}
+
 interface ProcessedRouteData {
   route: { lat: number; lng: number; name: string; category: string }[];
   batteryUsage: number;
   distance: number;
   estimatedTime: number;
-  // finalCharge: number;
   chargingStops: {
     name: string;
     lat: number;
@@ -62,6 +83,8 @@ interface ProcessedRouteData {
     batteryOnArrival: number;
     batteryOnDeparture: number;
   }[];
+  googleRoute?: GoogleRouteData; // Added Google Maps route data
+  optimizedPolyline?: string; // Decoded polyline for map display
 }
 
 export default function RoutePlanningPage() {
@@ -70,6 +93,7 @@ export default function RoutePlanningPage() {
   const [battery, setBattery] = useState(80);
   const [efficiency, setEfficiency] = useState(70);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [routeData, setRouteData] = useState<ProcessedRouteData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,7 +135,6 @@ export default function RoutePlanningPage() {
 
   // Helper function to get location name based on coordinates
   const getLocationName = (lat: number, lng: number): string => {
-    // You can expand this with more locations or use a reverse geocoding service
     const locations: { [key: string]: string } = {
       "6.9271,79.8612": "Colombo",
       "6.960975,79.880949": "Paliyagoda",
@@ -122,8 +145,140 @@ export default function RoutePlanningPage() {
     return locations[key] || `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
   };
 
+  // Function to decode Google Maps polyline
+  const decodePolyline = (encoded: string): [number, number][] => {
+    const points: [number, number][] = [];
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+
+    while (index < encoded.length) {
+      let b;
+      let shift = 0;
+      let result = 0;
+
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+      lng += dlng;
+
+      points.push([lat / 1e5, lng / 1e5]);
+    }
+
+    return points;
+  };
+
+  // Function to convert coordinates to address for Google Maps API
+  const coordsToAddress = async (lat: number, lng: number): Promise<string> => {
+    // For demo purposes, return coordinates as string
+    // In production, you might want to use reverse geocoding
+    return `${lat.toFixed(6)},${lng.toFixed(6)}`;
+  };
+
+  // Function to get optimal route from Google Maps
+  const getOptimalRoute = async (
+    origin: { lat: number; lng: number; name: string },
+    destination: { lat: number; lng: number; name: string },
+    waypoints: { lat: number; lng: number; name: string }[]
+  ): Promise<GoogleRouteData | null> => {
+    try {
+      setIsOptimizing(true);
+
+      // Prepare waypoints for route optimizer API
+      const formattedOrigin: Waypoint = {
+        id: "origin",
+        address: await coordsToAddress(origin.lat, origin.lng),
+        lat: origin.lat,
+        lng: origin.lng,
+      };
+
+      const formattedDestination: Waypoint = {
+        id: "destination",
+        address: await coordsToAddress(destination.lat, destination.lng),
+        lat: destination.lat,
+        lng: destination.lng,
+      };
+
+      const formattedWaypoints: Waypoint[] = await Promise.all(
+        waypoints.map(async (wp, index) => ({
+          id: `waypoint_${index}`,
+          address: await coordsToAddress(wp.lat, wp.lng),
+          lat: wp.lat,
+          lng: wp.lng,
+        }))
+      );
+
+      // Call the route optimizer API
+      const response = await fetch("/api/compute-route", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin: formattedOrigin,
+          destination: formattedDestination,
+          waypoints: formattedWaypoints,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Route optimization failed with status ${response.status}`
+        );
+      }
+
+      const json = await response.json();
+
+      if (!json.routes || json.routes.length === 0) {
+        throw new Error("No routes returned from optimization API");
+      }
+
+      const route = json.routes[0];
+      const optimizedOrder: number[] =
+        route.optimizedIntermediateWaypointIndex || [];
+
+      // Parse duration from the string format (e.g., "1234s" -> 1234 seconds)
+      const durationInSeconds = route.duration
+        ? parseFloat(route.duration.replace("s", ""))
+        : route.staticDuration
+        ? parseFloat(route.staticDuration.replace("s", ""))
+        : 0;
+
+      const googleRouteData: GoogleRouteData = {
+        distance: `${(route.distanceMeters / 1000).toFixed(1)} km`,
+        duration: `${Math.round(durationInSeconds / 60)} mins`,
+        polyline: route.polyline.encodedPolyline,
+        optimizedOrder,
+        stepByStepDirections: route.stepByStepDirections || [],
+      };
+
+      return googleRouteData;
+    } catch (error) {
+      console.error("Error getting optimal route:", error);
+      throw error;
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   // Process API response to match component expectations
-  const processRouteData = (apiData: RouteData): ProcessedRouteData => {
+  const processRouteData = async (
+    apiData: RouteData
+  ): Promise<ProcessedRouteData> => {
     const route = apiData.route_summary.map((item) => {
       const coords = parseLocation(item.location);
       return {
@@ -146,7 +301,7 @@ export default function RoutePlanningPage() {
             (item.battery_on_departure_percent -
               item.battery_on_arrival_percent) *
               0.8
-          ), // Rough estimate
+          ),
           batteryAdded:
             item.battery_on_departure_percent - item.battery_on_arrival_percent,
           batteryOnArrival: item.battery_on_arrival_percent,
@@ -166,12 +321,40 @@ export default function RoutePlanningPage() {
           destinationItem.battery_on_arrival_percent
         : 0;
 
+    // Get the optimal route from Google Maps if we have waypoints
+    let googleRoute: GoogleRouteData | undefined;
+    let optimizedPolyline: string | undefined;
+
+    if (route.length >= 2) {
+      try {
+        const origin = route.find((r) => r.category === "Source");
+        const destination = route.find((r) => r.category === "Destination");
+        const waypoints = route.filter(
+          (r) => r.category === "Visiting_Charging_Station"
+        );
+
+        if (origin && destination) {
+          googleRoute = await getOptimalRoute(origin, destination, waypoints);
+          if (googleRoute) {
+            // Decode polyline for map display
+            const decodedPoints = decodePolyline(googleRoute.polyline);
+            optimizedPolyline = googleRoute.polyline;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to get optimal route:", error);
+        // Continue without optimal route
+      }
+    }
+
     return {
       route,
       batteryUsage: Math.round(batteryUsage),
       distance: apiData.distance_km,
-      estimatedTime: Math.round(apiData.distance_km * 1.2), // Rough estimate: 1.2 min per km
+      estimatedTime: Math.round(apiData.distance_km * 1.2),
       chargingStops,
+      googleRoute,
+      optimizedPolyline,
     };
   };
 
@@ -195,7 +378,7 @@ export default function RoutePlanningPage() {
           source: source.trim(),
           destination: destination.trim(),
           battery: battery,
-          efficiency: efficiency / 100, // Convert percentage to decimal
+          efficiency: efficiency / 100,
         }),
       });
 
@@ -205,13 +388,12 @@ export default function RoutePlanningPage() {
 
       const apiResponse: RouteData = await response.json();
 
-      // Check if the API call was successful
       if (!apiResponse.success) {
         throw new Error(apiResponse.message || "Route planning failed");
       }
 
-      // Process the API response
-      const processedData = processRouteData(apiResponse);
+      // Process the API response (this will also get the optimal route)
+      const processedData = await processRouteData(apiResponse);
       setRouteData(processedData);
       console.log("Processed Route Data:", processedData);
     } catch (err) {
@@ -225,6 +407,61 @@ export default function RoutePlanningPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Start journey with optimal route
+  const startJourney = () => {
+    if (!routeData || !routeData.googleRoute) {
+      // Fallback to basic route
+      if (!routeData) return;
+
+      const origin = routeData.route.find((r) => r.category === "Source");
+      if (!origin) return;
+
+      let url = `https://www.google.com/maps/dir/${origin.lat},${origin.lng}`;
+
+      routeData.chargingStops.forEach((stop) => {
+        url += `/${stop.lat},${stop.lng}`;
+      });
+
+      const destination = routeData.route.find(
+        (r) => r.category === "Destination"
+      );
+      if (destination) {
+        url += `/${destination.lat},${destination.lng}`;
+      }
+
+      window.open(url, "_blank");
+      return;
+    }
+
+    // Use optimized route
+    const origin = routeData.route.find((r) => r.category === "Source");
+    const destination = routeData.route.find(
+      (r) => r.category === "Destination"
+    );
+
+    if (!origin) return;
+
+    // Reorder waypoints based on optimization
+    const orderedWaypoints =
+      routeData.googleRoute.optimizedOrder.length > 0
+        ? routeData.googleRoute.optimizedOrder.map(
+            (i) => routeData.chargingStops[i]
+          )
+        : routeData.chargingStops;
+
+    let url = `https://www.google.com/maps/dir/${origin.lat},${origin.lng}`;
+
+    orderedWaypoints.forEach((wp) => {
+      url += `/${wp.lat},${wp.lng}`;
+    });
+
+    if (destination) {
+      url += `/${destination.lat},${destination.lng}`;
+    }
+
+    window.open(url, "_blank");
   };
 
   // Prepare map data from route data
@@ -251,7 +488,7 @@ export default function RoutePlanningPage() {
           color: "#3b82f6", // blue
         },
         // Visited charging stops (from route)
-        ...routeData.chargingStops.map((stop) => ({
+        ...routeData.chargingStops.map((stop, index) => ({
           position: [stop.lat, stop.lng] as [number, number],
           popup: `<strong>⚡ ${stop.name}</strong><br>Arrive with: ${stop.batteryOnArrival}%<br>Depart with: ${stop.batteryOnDeparture}%<br>Battery added: ${stop.batteryAdded}%<br><em>Active charging stop</em>`,
           icon: "lightning",
@@ -282,16 +519,25 @@ export default function RoutePlanningPage() {
         })),
       ];
 
+  // Use optimized route if available, otherwise fall back to direct route
   const mapRoutes = routeData
-    ? [
-        {
-          path: routeData.route.map(
-            (point) => [point.lat, point.lng] as [number, number]
-          ),
-          color: "#06b6d4", // cyan
-          weight: 4,
-        },
-      ]
+    ? routeData.optimizedPolyline
+      ? [
+          {
+            path: decodePolyline(routeData.optimizedPolyline),
+            color: "#06b6d4", // cyan - optimized route
+            weight: 4,
+          },
+        ]
+      : [
+          {
+            path: routeData.route.map(
+              (point) => [point.lat, point.lng] as [number, number]
+            ),
+            color: "#94a3b8", // slate - fallback route
+            weight: 3,
+          },
+        ]
     : [];
 
   const mapCenter = routeData
@@ -313,7 +559,8 @@ export default function RoutePlanningPage() {
             EV Route Planning
           </h1>
           <p className="text-slate-400">
-            Plan optimal routes for electric vehicles with charging stops
+            Plan optimal routes for electric vehicles with charging stops and
+            Google Maps integration
           </p>
         </div>
       </div>
@@ -324,7 +571,8 @@ export default function RoutePlanningPage() {
           <CardHeader>
             <CardTitle className="text-slate-100">Plan Your Route</CardTitle>
             <CardDescription className="text-slate-400">
-              Enter your journey details to calculate the optimal route
+              Enter your journey details to calculate the optimal route with
+              Google Maps integration
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -414,17 +662,22 @@ export default function RoutePlanningPage() {
               <Button
                 type="submit"
                 className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
-                disabled={isLoading}
+                disabled={isLoading || isOptimizing}
               >
                 {isLoading ? (
                   <>
                     <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
                     Planning Route...
                   </>
+                ) : isOptimizing ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
+                    Optimizing with Google Maps...
+                  </>
                 ) : (
                   <>
                     <Route className="mr-2 h-4 w-4" />
-                    Plan Route
+                    Plan Optimal Route
                   </>
                 )}
               </Button>
@@ -443,54 +696,56 @@ export default function RoutePlanningPage() {
             routes={mapRoutes}
             height="510px"
           />
+
+          {routeData && routeData.googleRoute && (
+            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-slate-100 flex items-center">
+                  <Navigation className="h-5 w-5 mr-2 text-cyan-400" />
+                  Google Maps Optimized Route
+                </CardTitle>
+                <CardDescription className="text-slate-400">
+                  Real-time optimized route with accurate directions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-4">
+                    <Badge className="bg-cyan-900/30 text-cyan-400 border-cyan-500/50">
+                      Distance: {routeData.googleRoute.distance}
+                    </Badge>
+                    <Badge className="bg-cyan-900/30 text-cyan-400 border-cyan-500/50">
+                      Duration: {routeData.googleRoute.duration}
+                    </Badge>
+                  </div>
+                  <Button
+                    onClick={startJourney}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Navigation className="h-4 w-4 mr-2" />
+                    Start Navigation
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
       {routeData && (
         <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-slate-100">Route Details</CardTitle>
-            <CardDescription className="text-slate-400">
-              Summary of your planned journey
-            </CardDescription>
-          </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                <div className="text-slate-400 text-sm mb-1">Distance</div>
-                <div className="text-xl font-bold text-cyan-400">
-                  {routeData.distance} km
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                <div className="text-slate-400 text-sm mb-1">
-                  Estimated Time
-                </div>
-                <div className="text-xl font-bold text-cyan-400">
-                  {routeData.estimatedTime} min
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                <div className="text-slate-400 text-sm mb-1">Battery Usage</div>
-                <div className="text-xl font-bold text-cyan-400">
-                  {routeData.batteryUsage}%
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                <div className="text-slate-400 text-sm mb-1">
-                  Charging Stops
-                </div>
-                <div className="text-xl font-bold text-cyan-400">
-                  {routeData.chargingStops.length}
-                </div>
-              </div>
-            </div>
-
-            <Separator className="my-4 bg-slate-700/50" />
-
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-slate-200">
-                Route Waypoints
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-slate-200">
+                  Route Waypoints
+                </h3>
+                {routeData.googleRoute && (
+                  <Badge className="bg-green-900/30 text-green-400 border-green-500/50">
+                    Google Maps Optimized
+                  </Badge>
+                )}
+              </div>
               <div className="space-y-2">
                 {routeData.route.map((point, index) => (
                   <div
@@ -598,6 +853,49 @@ export default function RoutePlanningPage() {
                 </div>
               </>
             )}
+
+            {routeData.googleRoute?.stepByStepDirections &&
+              routeData.googleRoute.stepByStepDirections.length > 0 && (
+                <>
+                  <Separator className="my-4 bg-slate-700/50" />
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-slate-200 flex items-center">
+                      <Navigation className="h-5 w-5 mr-2 text-cyan-400" />
+                      Turn-by-Turn Directions
+                    </h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {routeData.googleRoute.stepByStepDirections.map(
+                        (direction, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start p-3 rounded-md bg-slate-800/30 border border-slate-700/30"
+                          >
+                            <div className="h-6 w-6 rounded-full bg-cyan-900/30 text-cyan-400 border border-cyan-500/50 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
+                              <span className="text-xs font-medium">
+                                {index + 1}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm text-slate-300 mb-1">
+                                {direction.instruction}
+                              </div>
+                              <div className="flex items-center text-xs text-slate-500 space-x-3">
+                                <span>{direction.distance} m</span>
+                                <span>•</span>
+                                <span>{direction.duration}</span>
+                                <span>•</span>
+                                <span className="capitalize">
+                                  {direction.maneuver}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
           </CardContent>
         </Card>
       )}

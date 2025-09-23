@@ -350,7 +350,7 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
   const [selectedTboxId, setSelectedTboxId] = useState<string>(IMEI || "");
   const [inputTboxId, setInputTboxId] = useState<string>("");
   const [filters, setFilters] = useState<BatteryFilters>({
-    timeRange: 500, // 500 hours default
+    timeRange: 700, // 500 hours default
     includeIdleData: false,
   });
   const [showFilters, setShowFilters] = useState(false);

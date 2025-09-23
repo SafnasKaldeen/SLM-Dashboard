@@ -17,7 +17,7 @@ class SnowflakeConnectionManager {
         account: process.env.SNOWFLAKE_ACCOUNT,
         username: process.env.SNOWFLAKE_USERNAME,
         privateKey: privateKey,
-        warehouse: 'SNOWFLAKE_LEARNING_WH',
+        warehouse: 'ADHOC',
         database: 'DB_DUMP',
         schema: 'PUBLIC',
         role: 'SYSADMIN',

@@ -109,7 +109,7 @@ function generateBMSColorMap(bmsIds: string[]): Record<string, string> {
   ];
 
   const colorMap: Record<string, string> = {};
-  colorMap["UNAVAILABLE"] = "#000000";
+  colorMap["UNAVAILABLE"] = "#FFFFFF";
   colorMap["UNCOVERED"] = "#6b7280";
   colorMap["NO_BMS"] = "#6b7280";
 
@@ -282,7 +282,7 @@ function getAnalytics(data: ProcessedSwapData[]) {
   ].sort();
 
   const bmsColorMap = generateBMSColorMap(allBMSIds);
-  const UNAVAILABLE_COLOR = "#000000";
+  const UNAVAILABLE_COLOR = "#FFFFFF";
   const NULL_COLOR = "#6b7280";
   const UNCOVERED_COLOR = "#6b7280";
 
