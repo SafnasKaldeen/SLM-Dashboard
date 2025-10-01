@@ -563,7 +563,7 @@ export default function CoverageAreaDashboard() {
                   </div>
                 </div>
 
-                <div className="text-center">
+                {/* <div className="text-center">
                   <Slider
                     min={0}
                     max={359}
@@ -575,7 +575,7 @@ export default function CoverageAreaDashboard() {
                   <p className="text-xs text-slate-500 mt-1">
                     Click compass or drag slider to set direction
                   </p>
-                </div>
+                </div> */}
               </div>
 
               <Button
@@ -652,7 +652,7 @@ export default function CoverageAreaDashboard() {
               </CardContent>
             </Card>
 
-            {coverageData?.travel_metrics?.heading_degrees !== null &&
+            {/* {coverageData?.travel_metrics?.heading_degrees !== null &&
               coverageData?.travel_metrics?.heading_degrees !== undefined && (
                 <div className="p-4 rounded-lg bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/30">
                   <div className="flex items-center justify-between">
@@ -698,7 +698,7 @@ export default function CoverageAreaDashboard() {
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
           </div>
         </div>
 
