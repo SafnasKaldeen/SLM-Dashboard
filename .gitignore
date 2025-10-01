@@ -12,6 +12,9 @@
 # production
 /build
 
+snowflake.log
+/snowflake.log
+
 /components/gps/geojson
 
 # debug
@@ -23,8 +26,6 @@ yarn-error.log*
 # env files
 .env*
 .env.production
-.env.local
-env
 
 # vercel
 .vercel

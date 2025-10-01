@@ -34,7 +34,7 @@ CtN5P55wZfvaAUqNBem+/W4=
 const connectionConfig = {
   account: "JPCNHUS-SK19327",
   username: "USMAAN",
-  warehouse: "COMPUTE_WH",
+  warehouse: "AIDASHBOARD",
   database: "REPORT_DB",
   schema: "GPS_DASHBOARD",
   role: "SYSADMIN",

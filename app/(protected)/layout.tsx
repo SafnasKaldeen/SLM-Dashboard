@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { cookies } from "next/headers";
+import Script from "next/script";
 
 import DashboardLayout from "@/components/dashboard-layout";
 import AuthHeader from "@/components/AuthHeader";
@@ -30,6 +31,13 @@ export default function RootLayout({
       className={isDarkMode ? "dark" : ""}
       style={isDarkMode ? { colorScheme: "dark" } : {}}
     >
+      <head>
+        {/* Google Maps API Script */}
+        <Script
+          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
+          strategy="beforeInteractive"
+        />
+      </head>
       <body>
         <Providers>
           <DashboardLayout>{children}</DashboardLayout>

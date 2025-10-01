@@ -36,9 +36,20 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
-      // Only send minimal info to client
-      session.user = token.user;
-      if (token.accessToken) session.accessToken = token.accessToken;
+      if (!session.user) {
+        session.user = {};
+      }
+
+      // Type assertion because we know token.user matches session.user shape
+      session.user = token.user as {
+        name?: string;
+        email?: string;
+      };
+
+      if (token.accessToken) {
+        session.accessToken = token.accessToken;
+      }
+
       return session;
     },
 

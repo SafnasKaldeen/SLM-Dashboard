@@ -234,7 +234,7 @@ function useBatteryData(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sql: query,
-          warehouse: process.env.SNOWFLAKE_WAREHOUSE || "COMPUTE_WH",
+          warehouse: process.env.SNOWFLAKE_WAREHOUSE || "AIDASHBOARD",
           database: process.env.SNOWFLAKE_DATABASE || "SOURCE_DATA",
           schema: process.env.SNOWFLAKE_SCHEMA || "VEHICLE_DATA",
         })

@@ -81,15 +81,15 @@ export function RevenueChart({ filters }: RevenueChartProps) {
         const getAggregationFormat = () => {
           switch (filters.aggregation) {
             case "daily":
-              return "TO_DATE(DATE)";
+              return "rs.DATE"; // group by raw date
             case "monthly":
-              return "TO_VARCHAR(YEAR(DATE)) || '-' || LPAD(MONTH(DATE), 2, '0')";
+              return "DATE_TRUNC('MONTH', rs.DATE)";
             case "quarterly":
-              return "TO_VARCHAR(YEAR(DATE)) || '-Q' || TO_VARCHAR(QUARTER(DATE))";
+              return "DATE_TRUNC('QUARTER', rs.DATE)";
             case "annually":
-              return "TO_VARCHAR(YEAR(DATE))";
+              return "DATE_TRUNC('YEAR', rs.DATE)";
             default:
-              return "TO_VARCHAR(YEAR(DATE)) || '-' || LPAD(MONTH(DATE), 2, '0')";
+              return "DATE_TRUNC('MONTH', rs.DATE)";
           }
         };
 
@@ -250,7 +250,7 @@ export function RevenueChart({ filters }: RevenueChartProps) {
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={400}>
       <LineChart data={chartData}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
         <XAxis

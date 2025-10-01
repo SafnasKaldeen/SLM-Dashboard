@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Filters {
   dateRange?: {
@@ -340,75 +341,72 @@ export default function TopPerformingScooters({
           {isDescending ? "Descending" : "Ascending"}
         </Button>
       </CardHeader>
-
       <CardContent>
-        <div className="space-y-4">
-          {sortedScooters.slice(0, 5).map((scooter, index) => {
-            const displayPercentage =
-              maxDistance > 0
-                ? (scooter.TOTAL_DISTANCE / maxDistance) * 100
-                : 0;
+        <ScrollArea className="h-[600px] w-full rounded-md">
+          <div className="space-y-4 pr-4">
+            {(isDescending
+              ? sortedScooters.slice(0, 100)
+              : sortedScooters.slice(Math.max(sortedScooters.length - 100, 0))
+            ).map((scooter, index) => {
+              const displayPercentage =
+                maxDistance > 0
+                  ? (scooter.TOTAL_DISTANCE / maxDistance) * 100
+                  : 0;
 
-            return (
-              <div
-                key={`${scooter.TBOXID}-${scooter.PERIOD_START}-${index}`}
-                className="p-4 border rounded-lg"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        #{index + 1}
-                      </span>
-                      <p
-                        className="text-sm font-medium leading-none truncate max-w-[160px]"
-                        title={scooter.TBOXID}
-                      >
-                        {scooter.TBOXID}
+              return (
+                <div
+                  key={`${scooter.TBOXID}-${scooter.PERIOD_START}-${index}`}
+                  className="p-4 border rounded-lg hover:shadow-md transition-shadow duration-200"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          #{index + 1}
+                        </span>
+                        <p
+                          className="text-sm font-medium leading-none truncate max-w-[160px]"
+                          title={scooter.TBOXID}
+                        >
+                          {scooter.TBOXID}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>Last used: {formatDate(scooter.LAST_USED)}</span>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${getBatteryTypeColor(
+                            scooter.BATTERY_NAME
+                          )}`}
+                        >
+                          {scooter.CAPACITY} Ah
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <p className="text-sm font-medium text-green-600">
+                        {formatDistance(scooter.TOTAL_DISTANCE)}
                       </p>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Last used: {formatDate(scooter.LAST_USED)}</span>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${getBatteryTypeColor(
-                          scooter.BATTERY_NAME
-                        )}`}
-                      >
-                        {scooter.CAPACITY} Ah
-                      </Badge>
-                      {/* <Badge variant="outline" className="text-xs">
-                        {scooter.CAPACITY} Ah
-                      </Badge> */}
-                    </div>
-                    {/* <div className="text-xs text-muted-foreground">
-                      Period: {scooter.PERIOD_START.slice(0, 7)} •{" "}
-                      {scooter.GPS_POINTS} GPS points
-                    </div> */}
-                  </div>
-                  <div className="text-right space-y-1">
-                    <p className="text-sm font-medium text-green-600">
-                      {formatDistance(scooter.TOTAL_DISTANCE)}
-                    </p>
 
-                    <div className="flex items-center gap-4 flex-wrap justify-end">
-                      {getBadge(index)}
-                      <Badge
-                        variant={
-                          displayPercentage >= 100 ? "default" : "secondary"
-                        }
-                        className="text-xs"
-                      >
-                        {displayPercentage.toFixed(1)}% of top
-                      </Badge>
+                      <div className="flex items-center gap-4 flex-wrap justify-end">
+                        {getBadge(index)}
+                        <Badge
+                          variant={
+                            displayPercentage >= 100 ? "default" : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {displayPercentage.toFixed(1)}% of top
+                        </Badge>
+                      </div>
                     </div>
                   </div>
+                  <Progress value={displayPercentage} className="h-2 mt-2" />
                 </div>
-                <Progress value={displayPercentage} className="h-2 mt-2" />
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   );

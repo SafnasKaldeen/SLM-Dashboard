@@ -39,7 +39,7 @@ const getMockConnections = (): DatabaseConnection[] => [
     config: {
       account: "demo-account.snowflakecomputing.com",
       database: "PRODUCTION_DB",
-      warehouse: "COMPUTE_WH",
+      warehouse: "ADHOC",
     },
   },
   {
