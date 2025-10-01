@@ -729,41 +729,41 @@ export default function RoutePlanningPage() {
             routes={mapRoutes}
             height="510px"
           />
-
-          {routeData && routeData.googleRoute && (
-            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-slate-100 flex items-center">
-                  <Navigation className="h-5 w-5 mr-2 text-cyan-400" />
-                  Google Maps Optimized Route
-                </CardTitle>
-                <CardDescription className="text-slate-400">
-                  Real-time optimized route with accurate directions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-4">
-                    <Badge className="bg-cyan-900/30 text-cyan-400 border-cyan-500/50">
-                      Distance: {routeData.googleRoute.distance}
-                    </Badge>
-                    <Badge className="bg-cyan-900/30 text-cyan-400 border-cyan-500/50">
-                      Duration: {routeData.googleRoute.duration}
-                    </Badge>
-                  </div>
-                  <Button
-                    onClick={startJourney}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Navigation className="h-4 w-4 mr-2" />
-                    Start Navigation
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
+
+      {routeData && routeData.googleRoute && (
+        <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-slate-100 flex items-center">
+              <Navigation className="h-5 w-5 mr-2 text-cyan-400" />
+              Google Maps Optimized Route
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              Real-time optimized route with accurate directions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-4">
+                <Badge className="bg-cyan-900/30 text-cyan-400 border-cyan-500/50">
+                  Distance: {routeData.googleRoute.distance}
+                </Badge>
+                <Badge className="bg-cyan-900/30 text-cyan-400 border-cyan-500/50">
+                  Duration: {routeData.googleRoute.duration}
+                </Badge>
+              </div>
+              <Button
+                onClick={startJourney}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Navigation className="h-4 w-4 mr-2" />
+                Start Navigation
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Enhanced Data Display Section */}
       {routeData && routeData.originalApiData && (
