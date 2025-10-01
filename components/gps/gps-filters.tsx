@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
@@ -62,6 +71,15 @@ export function GPSFilters({
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<"from" | "to">("from");
 
+  // Temporary state for pending filters
+  const [pendingFilters, setPendingFilters] = useState<GPSFilters>(filters);
+  const [hasUnappliedChanges, setHasUnappliedChanges] = useState(false);
+
+  // State for searchable comboboxes
+  const [tboxOpen, setTboxOpen] = useState(false);
+  const [bmsOpen, setBmsOpen] = useState(false);
+  const [batteryTypeOpen, setBatteryTypeOpen] = useState(false);
+
   // Track original counts for cascading info
   const [originalCounts, setOriginalCounts] = useState({
     tboxes: 0,
@@ -90,6 +108,12 @@ export function GPSFilters({
     setTempRange(filters.dateRange);
   }, [filters.dateRange]);
 
+  // Sync pending filters with actual filters when they change externally
+  useEffect(() => {
+    setPendingFilters(filters);
+    setHasUnappliedChanges(false);
+  }, [filters]);
+
   const getDefaultDateRange = () => {
     const today = new Date();
     const from = new Date(today.getFullYear() - 1, today.getMonth(), 1);
@@ -97,8 +121,20 @@ export function GPSFilters({
     return { from, to };
   };
 
-  const updateFilters = (newFilters: Partial<GPSFilters>) => {
-    onFiltersChange({ ...filters, ...newFilters });
+  const updatePendingFilters = (newFilters: Partial<GPSFilters>) => {
+    const updated = { ...pendingFilters, ...newFilters };
+    setPendingFilters(updated);
+    setHasUnappliedChanges(true);
+  };
+
+  const applyFilters = () => {
+    onFiltersChange(pendingFilters);
+    setHasUnappliedChanges(false);
+  };
+
+  const cancelPendingChanges = () => {
+    setPendingFilters(filters);
+    setHasUnappliedChanges(false);
   };
 
   const clearAllFilters = () => {
@@ -111,8 +147,18 @@ export function GPSFilters({
       dateRange: defaultRange,
       aggregation: "monthly",
     };
+    setPendingFilters(clearedFilters);
     onFiltersChange(clearedFilters);
     setTempRange(defaultRange);
+    setHasUnappliedChanges(false);
+  };
+
+  const handleCalendarMonthChange = (month: number) => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), month, 1));
+  };
+
+  const handleCalendarYearChange = (year: number) => {
+    setCurrentMonth(new Date(year, currentMonth.getMonth(), 1));
   };
 
   const handleQuickTimeChange = (value: string) => {
@@ -138,7 +184,7 @@ export function GPSFilters({
           newFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
           newTo = new Date(today.getFullYear(), today.getMonth(), 0);
           break;
-        case "this_month": // <-- NEW CASE
+        case "this_month":
           newFrom = new Date(today.getFullYear(), today.getMonth(), 1);
           newTo = today;
           break;
@@ -148,14 +194,14 @@ export function GPSFilters({
 
       const range = { from: newFrom, to: newTo };
       setTempRange(range);
-      updateFilters({
+      updatePendingFilters({
         quickTime: value,
         dateRange: range,
       });
     } else {
-      const currentRange = filters.dateRange || getDefaultDateRange();
+      const currentRange = pendingFilters.dateRange || getDefaultDateRange();
       setTempRange(currentRange);
-      updateFilters({
+      updatePendingFilters({
         quickTime: value,
         dateRange: currentRange,
       });
@@ -168,12 +214,12 @@ export function GPSFilters({
     item: string,
     checked: boolean
   ) => {
-    const currentArray = filters[filterKey];
+    const currentArray = pendingFilters[filterKey];
     const newArray = checked
       ? [...currentArray, item]
       : currentArray.filter((i) => i !== item);
 
-    updateFilters({ [filterKey]: newArray });
+    updatePendingFilters({ [filterKey]: newArray });
   };
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -183,15 +229,12 @@ export function GPSFilters({
 
     if (datePickerMode === "from") {
       newRange.from = date;
-      // If the new from date is after the current to date, clear the to date
       if (newRange.to && date > newRange.to) {
         newRange.to = undefined;
       }
-      // Auto-switch to "to" mode after selecting from date
       setDatePickerMode("to");
     } else if (datePickerMode === "to") {
       newRange.to = date;
-      // If the new to date is before the current from date, clear the from date
       if (newRange.from && date < newRange.from) {
         newRange.from = undefined;
         setDatePickerMode("from");
@@ -209,7 +252,7 @@ export function GPSFilters({
       to: tempRange.to,
     };
 
-    updateFilters({
+    updatePendingFilters({
       dateRange: range,
       quickTime: "custom",
     });
@@ -217,26 +260,24 @@ export function GPSFilters({
   };
 
   const cancelDateRange = () => {
-    // Revert to the current filter's date range
-    setTempRange(filters.dateRange);
+    setTempRange(pendingFilters.dateRange);
     setIsCalendarOpen(false);
     setDatePickerMode("from");
   };
 
   const getActiveFiltersCount = () => {
     let count = 0;
-    if (filters.quickTime !== "last_year") count++; // Count non-default time selection
-    if (filters.selectedTboxes.length > 0) count++;
-    if (filters.selectedBmses.length > 0) count++;
-    if (filters.selectedBatteryTypes.length > 0) count++;
-    if (filters.aggregation !== "monthly") count++;
+    if (pendingFilters.quickTime !== "last_year") count++;
+    if (pendingFilters.selectedTboxes.length > 0) count++;
+    if (pendingFilters.selectedBmses.length > 0) count++;
+    if (pendingFilters.selectedBatteryTypes.length > 0) count++;
+    if (pendingFilters.aggregation !== "monthly") count++;
     return count;
   };
 
-  const isDateRangeDisabled = filters.quickTime !== "custom";
-  const isDailyDisabled = filters.quickTime === "history";
+  const isDateRangeDisabled = pendingFilters.quickTime !== "custom";
+  const isDailyDisabled = pendingFilters.quickTime === "history";
 
-  // Check if options are being filtered by cascading
   const isCascadingActive =
     filters.selectedTboxes.length > 0 ||
     filters.selectedBmses.length > 0 ||
@@ -347,12 +388,14 @@ export function GPSFilters({
     );
   };
 
-  const renderFilterSelect = (
+  const renderSearchableSelect = (
     items: string[],
     selectedItems: string[],
     placeholder: string,
     onItemChange: (item: string, checked: boolean) => void,
     filterType: "tboxes" | "bmses" | "batteryTypes",
+    open: boolean,
+    setOpen: (open: boolean) => void,
     disabled = false
   ) => {
     const cascadingInfo = getCascadingInfo(filterType);
@@ -360,42 +403,68 @@ export function GPSFilters({
     return (
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <Select
-            onValueChange={(value) => onItemChange(value, true)}
-            disabled={disabled || loading}
-          >
-            <SelectTrigger className={disabled ? "opacity-50" : ""}>
-              <SelectValue
-                placeholder={
-                  loading
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-full justify-between"
+                disabled={disabled || loading}
+              >
+                <span className="truncate">
+                  {loading
                     ? "Loading..."
                     : disabled
                     ? "No options available"
-                    : placeholder
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {loading ? (
-                <div className="flex items-center justify-center p-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="ml-2 text-sm">Loading...</span>
-                </div>
-              ) : items.length === 0 ? (
-                <div className="p-2 text-sm text-muted-foreground">
-                  No options available
-                </div>
-              ) : (
-                items
-                  .filter((item) => !selectedItems.includes(item))
-                  .map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item}
-                    </SelectItem>
-                  ))
-              )}
-            </SelectContent>
-          </Select>
+                    : placeholder}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0">
+              <Command>
+                <CommandInput
+                  placeholder={`Search ${placeholder.toLowerCase()}...`}
+                />
+                <CommandEmpty>No item found.</CommandEmpty>
+                <CommandGroup className="max-h-64 overflow-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center p-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="ml-2 text-sm">Loading...</span>
+                    </div>
+                  ) : items.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      No options available
+                    </div>
+                  ) : (
+                    items
+                      .filter((item) => !selectedItems.includes(item))
+                      .map((item) => (
+                        <CommandItem
+                          key={item}
+                          value={item}
+                          onSelect={() => {
+                            onItemChange(item, true);
+                            setOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              selectedItems.includes(item)
+                                ? "opacity-100"
+                                : "opacity-0"
+                            }`}
+                          />
+                          {item}
+                        </CommandItem>
+                      ))
+                  )}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
           {cascadingInfo && (
             <TooltipProvider>
@@ -443,6 +512,14 @@ export function GPSFilters({
                 {getActiveFiltersCount()} active
               </Badge>
             )}
+            {hasUnappliedChanges && (
+              <Badge
+                variant="outline"
+                className="text-orange-600 border-orange-300"
+              >
+                Unapplied Changes
+              </Badge>
+            )}
             {isCascadingActive && (
               <Badge
                 variant="outline"
@@ -461,6 +538,20 @@ export function GPSFilters({
             )}
           </div>
           <div className="flex gap-2">
+            {hasUnappliedChanges && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={cancelPendingChanges}
+                >
+                  Cancel
+                </Button>
+                <Button variant="default" size="sm" onClick={applyFilters}>
+                  Apply Filters
+                </Button>
+              </>
+            )}
             {getActiveFiltersCount() > 0 && (
               <Button variant="ghost" size="sm" onClick={clearAllFilters}>
                 <X className="h-4 w-4 mr-1" />
@@ -482,7 +573,7 @@ export function GPSFilters({
           <div className="space-y-2">
             <Label>Quick Time</Label>
             <Select
-              value={filters.quickTime}
+              value={pendingFilters.quickTime}
               onValueChange={handleQuickTimeChange}
             >
               <SelectTrigger>
@@ -493,8 +584,7 @@ export function GPSFilters({
                 <SelectItem value="last_month">Last Month</SelectItem>
                 <SelectItem value="last_3_months">Last 3 Months</SelectItem>
                 <SelectItem value="last_year">Last Year (Default)</SelectItem>
-                <SelectItem value="this_month">This Month</SelectItem>{" "}
-                {/* <-- NEW */}
+                <SelectItem value="this_month">This Month</SelectItem>
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
@@ -502,14 +592,7 @@ export function GPSFilters({
 
           {/* Date Range Picker */}
           <div className="space-y-2">
-            <Label>
-              Date Range
-              {filters.quickTime === "custom" && (
-                <span className="text-xs text-blue-600 ml-1">
-                  (Custom Mode)
-                </span>
-              )}
-            </Label>
+            <Label>Date Range</Label>
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -518,7 +601,7 @@ export function GPSFilters({
                     isDateRangeDisabled
                       ? "opacity-50 cursor-not-allowed bg-muted"
                       : "hover:bg-accent hover:text-accent-foreground"
-                  } ${filters.quickTime === "custom" ? "border-blue-300" : ""}`}
+                  }`}
                   disabled={isDateRangeDisabled}
                   onClick={() =>
                     !isDateRangeDisabled && setIsCalendarOpen(true)
@@ -526,14 +609,18 @@ export function GPSFilters({
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                   <span className="truncate">
-                    {filters.dateRange?.from ? (
-                      filters.dateRange.to ? (
+                    {pendingFilters.dateRange?.from ? (
+                      pendingFilters.dateRange.to ? (
                         <>
-                          {format(filters.dateRange.from, "MMM dd, yyyy")} -{" "}
-                          {format(filters.dateRange.to, "MMM dd, yyyy")}
+                          {format(
+                            pendingFilters.dateRange.from,
+                            "MMM dd, yyyy"
+                          )}{" "}
+                          -{" "}
+                          {format(pendingFilters.dateRange.to, "MMM dd, yyyy")}
                         </>
                       ) : (
-                        format(filters.dateRange.from, "MMM dd, yyyy")
+                        format(pendingFilters.dateRange.from, "MMM dd, yyyy")
                       )
                     ) : (
                       "Pick a date range"
@@ -574,20 +661,12 @@ export function GPSFilters({
                         </div>
                       </div>
 
-                      {/* Calendar */}
+                      {/* Single Calendar */}
                       <div className="space-y-2">
                         <MonthYearSelector
                           date={currentMonth}
-                          onMonthChange={(month) =>
-                            setCurrentMonth(
-                              new Date(currentMonth.getFullYear(), month)
-                            )
-                          }
-                          onYearChange={(year) =>
-                            setCurrentMonth(
-                              new Date(year, currentMonth.getMonth())
-                            )
-                          }
+                          onMonthChange={handleCalendarMonthChange}
+                          onYearChange={handleCalendarYearChange}
                         />
                         <Calendar
                           selected={
@@ -596,6 +675,11 @@ export function GPSFilters({
                               : tempRange?.to
                           }
                           onSelect={handleDateSelect}
+                          mode="single"
+                          month={currentMonth}
+                          numberOfMonths={1}
+                          showOutsideDays={false}
+                          className="p-0"
                           modifiers={{
                             selected_range_start: tempRange?.from,
                             selected_range_end: tempRange?.to,
@@ -638,7 +722,7 @@ export function GPSFilters({
                         />
                       </div>
 
-                      {/* Footer */}
+                      {/* Footer with selected range info and apply button */}
                       <div className="border-t pt-3 space-y-3">
                         {tempRange?.from && tempRange?.to && (
                           <div className="flex items-center justify-between text-xs">
@@ -665,14 +749,7 @@ export function GPSFilters({
                           </div>
                         )}
 
-                        <div className="flex justify-between">
-                          <Button
-                            onClick={cancelDateRange}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Cancel
-                          </Button>
+                        <div className="flex justify-end">
                           <Button
                             onClick={applyDateRange}
                             disabled={!tempRange?.from || !tempRange?.to}
@@ -694,9 +771,9 @@ export function GPSFilters({
           <div className="space-y-2">
             <Label>Aggregation</Label>
             <Select
-              value={filters.aggregation}
+              value={pendingFilters.aggregation}
               onValueChange={(value) =>
-                updateFilters({
+                updatePendingFilters({
                   aggregation: value as GPSFilters["aggregation"],
                 })
               }
@@ -719,16 +796,18 @@ export function GPSFilters({
           {/* IMEI No */}
           <div className="space-y-2">
             <Label>IMEI No</Label>
-            {renderFilterSelect(
+            {renderSearchableSelect(
               tboxes,
-              filters.selectedTboxes,
+              pendingFilters.selectedTboxes,
               "Select IMEI No",
               (item, checked) =>
                 handleFilterArrayChange("selectedTboxes", item, checked),
-              "tboxes"
+              "tboxes",
+              tboxOpen,
+              setTboxOpen
             )}
             <div className="flex flex-wrap gap-1">
-              {filters.selectedTboxes.map((tbox) => (
+              {pendingFilters.selectedTboxes.map((tbox) => (
                 <Badge key={tbox} variant="secondary" className="text-xs">
                   {tbox}
                   <X
@@ -745,16 +824,18 @@ export function GPSFilters({
           {/* BMS IDs */}
           <div className="space-y-2">
             <Label>BMS IDs</Label>
-            {renderFilterSelect(
+            {renderSearchableSelect(
               bmses,
-              filters.selectedBmses,
+              pendingFilters.selectedBmses,
               "Select BMS IDs",
               (item, checked) =>
                 handleFilterArrayChange("selectedBmses", item, checked),
-              "bmses"
+              "bmses",
+              bmsOpen,
+              setBmsOpen
             )}
             <div className="flex flex-wrap gap-1">
-              {filters.selectedBmses.map((bms) => (
+              {pendingFilters.selectedBmses.map((bms) => (
                 <Badge key={bms} variant="secondary" className="text-xs">
                   {bms}
                   <X
@@ -771,9 +852,9 @@ export function GPSFilters({
           {/* Battery Type IDs */}
           <div className="space-y-2">
             <Label>Battery Type IDs</Label>
-            {renderFilterSelect(
+            {renderSearchableSelect(
               batteryTypes,
-              filters.selectedBatteryTypes,
+              pendingFilters.selectedBatteryTypes,
               "Select battery types",
               (item, checked) =>
                 handleFilterArrayChange("selectedBatteryTypes", item, checked),

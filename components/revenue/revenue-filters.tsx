@@ -667,21 +667,23 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
 
-    const newRange = { ...tempRange } || {};
+    setTempRange((prevRange) => {
+      const newRange = { ...prevRange } || {};
 
-    if (datePickerMode === "from") {
-      newRange.from = date;
-      if (newRange.to && date > newRange.to) {
-        newRange.to = undefined;
+      if (datePickerMode === "from") {
+        newRange.from = date;
+        if (newRange.to && date > newRange.to) {
+          newRange.to = undefined;
+        }
+      } else if (datePickerMode === "to") {
+        newRange.to = date;
+        if (newRange.from && date < newRange.from) {
+          newRange.from = undefined;
+        }
       }
-    } else if (datePickerMode === "to") {
-      newRange.to = date;
-      if (newRange.from && date < newRange.from) {
-        newRange.from = undefined;
-      }
-    }
 
-    setTempRange(newRange);
+      return newRange;
+    });
   };
 
   const applyDateRange = () => {
@@ -689,20 +691,13 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
 
     const originalFrom = new Date(tempRange.from);
     const originalTo = new Date(tempRange.to);
-    const adjustedFrom = new Date(originalFrom);
-    adjustedFrom.setDate(adjustedFrom.getDate() + 1);
-    const extraDate = new Date(originalTo);
-    extraDate.setDate(extraDate.getDate() + 1);
-
-    if (adjustedFrom.getTime() > originalTo.getTime()) return;
 
     const filterRange = {
       from: originalFrom,
       to: originalTo,
-      extraDate,
     };
 
-    setDateRange({ from: originalFrom, to: originalTo });
+    setDateRange(filterRange);
     updateFilters({ dateRange: filterRange });
     autoFixAggregation(filterRange);
     setQuickTime("custom");
@@ -977,12 +972,17 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
           <div className="space-y-2">
             <Label>Aggregation</Label>
             <Select
-              value={filters.aggregation}
-              onValueChange={(value) =>
-                updateFilters({
-                  aggregation: value as RevenueFilters["aggregation"],
-                })
-              }
+              value={appliedFilters.aggregation}
+              onValueChange={(value) => {
+                const newAggregation = value as RevenueFilters["aggregation"];
+                const newFilters = { ...filters, aggregation: newAggregation };
+                const newAppliedFilters = {
+                  ...appliedFilters,
+                  aggregation: newAggregation,
+                };
+                setFilters(newFilters);
+                setAppliedFilters(newAppliedFilters);
+              }}
             >
               <SelectTrigger>
                 <SelectValue />

@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -35,10 +35,8 @@ import CartoMap from "@/components/maps/carto-map";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
-import DashboardLayout from "@/components/dashboard-layout";
-
 interface RouteSummary {
-  location: string; // e.g. "(6.9271, 79.8612)"
+  location: string;
   category: "Source" | "Destination" | "Visiting_Charging_Station";
   battery_on_arrival_percent: number;
   battery_on_departure_percent: number;
@@ -92,7 +90,6 @@ interface RouteData {
   llm_charging_strategy?: string;
 }
 
-// Google Maps Route Optimizer interfaces
 interface Waypoint {
   id: string;
   address: string;
@@ -129,19 +126,28 @@ interface ProcessedRouteData {
   }[];
   googleRoute?: GoogleRouteData;
   optimizedPolyline?: string;
-  // Add the original API data for detailed display
   originalApiData?: RouteData;
 }
 
 export default function RoutePlanningPage() {
   const [source, setSource] = useState("");
   const [destination, setDestination] = useState("");
+  const [sourceDisplay, setSourceDisplay] = useState("");
+  const [destinationDisplay, setDestinationDisplay] = useState("");
   const [battery, setBattery] = useState(80);
   const [efficiency, setEfficiency] = useState(70);
   const [isLoading, setIsLoading] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [routeData, setRouteData] = useState<ProcessedRouteData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const sourceInputRef = useRef<HTMLInputElement>(null);
+  const destinationInputRef = useRef<HTMLInputElement>(null);
+  const sourceAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(
+    null
+  );
+  const destinationAutocompleteRef =
+    useRef<google.maps.places.Autocomplete | null>(null);
 
   const [DEFAULT_CHARGING_STATIONS, setStations] = useState<
     { lat: number; lon: number; name: string }[]
@@ -154,14 +160,72 @@ export default function RoutePlanningPage() {
       .catch((err) => console.error(err));
   }, []);
 
-  // Helper function to parse location string "(lat, lng)" to numbers
+  // Initialize Google Places Autocomplete
+  useEffect(() => {
+    if (!window.google || !window.google.maps) {
+      console.error("Google Maps API not loaded");
+      return;
+    }
+
+    // Initialize source autocomplete
+    if (sourceInputRef.current && !sourceAutocompleteRef.current) {
+      const autocomplete = new google.maps.places.Autocomplete(
+        sourceInputRef.current,
+        {
+          fields: ["formatted_address", "geometry", "name"],
+          componentRestrictions: { country: ["lk"] },
+        }
+      );
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const placeName =
+            place.name || place.formatted_address || "Selected Location";
+
+          setSource(`${lat.toFixed(6)},${lng.toFixed(6)}`);
+          setSourceDisplay(placeName);
+        }
+      });
+
+      sourceAutocompleteRef.current = autocomplete;
+    }
+
+    // Initialize destination autocomplete
+    if (destinationInputRef.current && !destinationAutocompleteRef.current) {
+      const autocomplete = new google.maps.places.Autocomplete(
+        destinationInputRef.current,
+        {
+          fields: ["formatted_address", "geometry", "name"],
+          componentRestrictions: { country: ["lk"] },
+        }
+      );
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const placeName =
+            place.name || place.formatted_address || "Selected Location";
+
+          setDestination(`${lat.toFixed(6)},${lng.toFixed(6)}`);
+          setDestinationDisplay(placeName);
+        }
+      });
+
+      destinationAutocompleteRef.current = autocomplete;
+    }
+  }, []);
+
   const parseLocation = (locationStr: string): { lat: number; lng: number } => {
     const cleaned = locationStr.replace(/[()]/g, "");
     const [lat, lng] = cleaned.split(",").map((s) => parseFloat(s.trim()));
     return { lat, lng };
   };
 
-  // Helper function to get location name based on coordinates
   const getLocationName = (lat: number, lng: number): string => {
     const locations: { [key: string]: string } = {
       "6.9271,79.8612": "Colombo",
@@ -173,7 +237,6 @@ export default function RoutePlanningPage() {
     return locations[key] || `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
   };
 
-  // Function to decode Google Maps polyline
   const decodePolyline = (encoded: string): [number, number][] => {
     const points: [number, number][] = [];
     let index = 0;
@@ -212,14 +275,10 @@ export default function RoutePlanningPage() {
     return points;
   };
 
-  // Function to convert coordinates to address for Google Maps API
   const coordsToAddress = async (lat: number, lng: number): Promise<string> => {
-    // For demo purposes, return coordinates as string
-    // In production, you might want to use reverse geocoding
     return `${lat.toFixed(6)},${lng.toFixed(6)}`;
   };
 
-  // Function to get optimal route from Google Maps
   const getOptimalRoute = async (
     origin: { lat: number; lng: number; name: string },
     destination: { lat: number; lng: number; name: string },
@@ -228,7 +287,6 @@ export default function RoutePlanningPage() {
     try {
       setIsOptimizing(true);
 
-      // Prepare waypoints for route optimizer API
       const formattedOrigin: Waypoint = {
         id: "origin",
         address: await coordsToAddress(origin.lat, origin.lng),
@@ -252,7 +310,6 @@ export default function RoutePlanningPage() {
         }))
       );
 
-      // Call the route optimizer API
       const response = await fetch("/api/compute-route", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -279,7 +336,6 @@ export default function RoutePlanningPage() {
       const optimizedOrder: number[] =
         route.optimizedIntermediateWaypointIndex || [];
 
-      // Parse duration from the string format (e.g., "1234s" -> 1234 seconds)
       const durationInSeconds = route.duration
         ? parseFloat(route.duration.replace("s", ""))
         : route.staticDuration
@@ -303,7 +359,6 @@ export default function RoutePlanningPage() {
     }
   };
 
-  // Process API response to match component expectations
   const processRouteData = async (
     apiData: RouteData
   ): Promise<ProcessedRouteData> => {
@@ -349,7 +404,6 @@ export default function RoutePlanningPage() {
           destinationItem.battery_on_arrival_percent
         : 0;
 
-    // Get the optimal route from Google Maps if we have waypoints
     let googleRoute: GoogleRouteData | undefined;
     let optimizedPolyline: string | undefined;
 
@@ -364,14 +418,11 @@ export default function RoutePlanningPage() {
         if (origin && destination) {
           googleRoute = await getOptimalRoute(origin, destination, waypoints);
           if (googleRoute) {
-            // Decode polyline for map display
-            const decodedPoints = decodePolyline(googleRoute.polyline);
             optimizedPolyline = googleRoute.polyline;
           }
         }
       } catch (error) {
         console.error("Failed to get optimal route:", error);
-        // Continue without optimal route
       }
     }
 
@@ -383,14 +434,13 @@ export default function RoutePlanningPage() {
       chargingStops,
       googleRoute,
       optimizedPolyline,
-      originalApiData: apiData, // Store original API data for detailed display
+      originalApiData: apiData,
     };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate form inputs
     if (!source.trim() || !destination.trim()) {
       setError("Please enter both source and destination");
       return;
@@ -421,14 +471,8 @@ export default function RoutePlanningPage() {
         throw new Error(apiResponse.message || "Route planning failed");
       }
 
-      console.log("API Response:", apiResponse);
-
-      // Process the API response (this will also get the optimal route)
       const processedData = await processRouteData(apiResponse);
-
       setRouteData(processedData);
-
-      // console.log("Processed Route Data:", processedData);
     } catch (err) {
       console.error("Error planning route:", err);
       setRouteData(null);
@@ -442,10 +486,20 @@ export default function RoutePlanningPage() {
     }
   };
 
-  // Start journey with optimal route
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSourceDisplay(value);
+    setSource(value);
+  };
+
+  const handleDestinationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDestinationDisplay(value);
+    setDestination(value);
+  };
+
   const startJourney = () => {
     if (!routeData || !routeData.googleRoute) {
-      // Fallback to basic route
       if (!routeData) return;
 
       const origin = routeData.route.find((r) => r.category === "Source");
@@ -468,7 +522,6 @@ export default function RoutePlanningPage() {
       return;
     }
 
-    // Use optimized route
     const origin = routeData.route.find((r) => r.category === "Source");
     const destination = routeData.route.find(
       (r) => r.category === "Destination"
@@ -476,7 +529,6 @@ export default function RoutePlanningPage() {
 
     if (!origin) return;
 
-    // Reorder waypoints based on optimization
     const orderedWaypoints =
       routeData.googleRoute.optimizedOrder.length > 0
         ? routeData.googleRoute.optimizedOrder.map(
@@ -497,19 +549,16 @@ export default function RoutePlanningPage() {
     window.open(url, "_blank");
   };
 
-  // Prepare map data from route data
   const mapMarkers = routeData
     ? [
-        // Start marker
         {
           position: [routeData.route[0].lat, routeData.route[0].lng] as [
             number,
             number
           ],
           popup: `<strong>Start:</strong> ${routeData.route[0].name}`,
-          color: "#10b981", // green
+          color: "#10b981",
         },
-        // End marker
         {
           position: [
             routeData.route[routeData.route.length - 1].lat,
@@ -518,16 +567,14 @@ export default function RoutePlanningPage() {
           popup: `<strong>Destination:</strong> ${
             routeData.route[routeData.route.length - 1].name
           }`,
-          color: "#3b82f6", // blue
+          color: "#3b82f6",
         },
-        // Visited charging stops (from route)
-        ...routeData.chargingStops.map((stop, index) => ({
+        ...routeData.chargingStops.map((stop) => ({
           position: [stop.lat, stop.lng] as [number, number],
           popup: `<strong>⚡ ${stop.name}</strong><br>Arrive with: ${stop.batteryOnArrival}%<br>Depart with: ${stop.batteryOnDeparture}%<br>Battery added: ${stop.batteryAdded}%<br><em>Active charging stop</em>`,
           icon: "lightning",
-          color: "#f59e0b", // amber - visited charging stations
+          color: "#f59e0b",
         })),
-        // Unvisited charging stations
         ...DEFAULT_CHARGING_STATIONS.filter(
           (station) =>
             !routeData.chargingStops.some(
@@ -539,26 +586,24 @@ export default function RoutePlanningPage() {
           position: [station.lat, station.lon] as [number, number],
           popup: `<strong>🔋 ${station.name}</strong><br><em>Available charging station</em>`,
           icon: "charging",
-          color: "#64748b", // gray - unvisited charging stations
+          color: "#64748b",
         })),
       ]
     : [
-        // Show all charging stations when no route is planned
         ...DEFAULT_CHARGING_STATIONS.map((station) => ({
           position: [station.lat, station.lon] as [number, number],
           popup: `<strong>🔋 ${station.name}</strong><br><em>Available charging station</em>`,
           icon: "charging",
-          color: "#64748b", // gray
+          color: "#64748b",
         })),
       ];
 
-  // Use optimized route if available, otherwise fall back to direct route
   const mapRoutes = routeData
     ? routeData.optimizedPolyline
       ? [
           {
             path: decodePolyline(routeData.optimizedPolyline),
-            color: "#06b6d4", // cyan - optimized route
+            color: "#06b6d4",
             weight: 4,
           },
         ]
@@ -567,7 +612,7 @@ export default function RoutePlanningPage() {
             path: routeData.route.map(
               (point) => [point.lat, point.lng] as [number, number]
             ),
-            color: "#94a3b8", // slate - fallback route
+            color: "#94a3b8",
             weight: 3,
           },
         ]
@@ -582,7 +627,7 @@ export default function RoutePlanningPage() {
           routeData.route[routeData.route.length - 1].lng) /
           2,
       ]
-    : [6.9271, 79.8612]; // Default to Colombo
+    : [6.9271, 79.8612];
 
   return (
     <div className="space-y-6">
@@ -599,13 +644,11 @@ export default function RoutePlanningPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Route Planning Form */}
         <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-slate-100">Plan Your Route</CardTitle>
             <CardDescription className="text-slate-400">
-              Enter your journey details to calculate the optimal route with
-              Google Maps integration
+              Search for locations using Google Places or enter coordinates
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -620,13 +663,17 @@ export default function RoutePlanningPage() {
                     Starting Point
                   </Label>
                   <Input
+                    ref={sourceInputRef}
                     id="source"
-                    placeholder="e.g. 6.9271,79.8612 or Colombo"
-                    value={source}
-                    onChange={(e) => setSource(e.target.value)}
+                    placeholder="Search location or enter coordinates"
+                    value={sourceDisplay}
+                    onChange={handleSourceChange}
                     className="bg-slate-800/50 border-slate-700 text-slate-300"
                     required
                   />
+                  <p className="text-xs text-slate-500">
+                    Try: "Colombo" or "6.9271,79.8612"
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -638,13 +685,17 @@ export default function RoutePlanningPage() {
                     Destination
                   </Label>
                   <Input
+                    ref={destinationInputRef}
                     id="destination"
-                    placeholder="e.g. 7.4863,80.3623 or Kandy"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
+                    placeholder="Search location or enter coordinates"
+                    value={destinationDisplay}
+                    onChange={handleDestinationChange}
                     className="bg-slate-800/50 border-slate-700 text-slate-300"
                     required
                   />
+                  <p className="text-xs text-slate-500">
+                    Try: "Kandy" or "7.4863,80.3623"
+                  </p>
                 </div>
 
                 <div className="space-y-2">
