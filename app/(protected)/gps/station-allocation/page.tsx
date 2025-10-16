@@ -102,6 +102,23 @@ export default function StationAllocationPage() {
   );
   const [error, setError] = useState<string | null>(null);
 
+  function getDynamicDateRange() {
+    const now = new Date();
+
+    // Start = first day of same month last year
+    const start = new Date(now.getFullYear() - 1, now.getMonth(), 1, 0, 0, 0);
+
+    // End = last day of previous month this year
+    const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const format = (d: Date) => d.toISOString().slice(0, 19).replace("T", " "); // YYYY-MM-DD HH:mm:ss
+
+    return {
+      start: format(start),
+      end: format(end),
+    };
+  }
+
   const handleDensitySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -109,6 +126,8 @@ export default function StationAllocationPage() {
 
     try {
       // Build the Snowflake stored procedure call
+      const { start, end } = getDynamicDateRange();
+
       const query = `
         CALL REPORT_DB.GPS_DASHBOARD.CLUSTER_CHARGING_STATIONS(
           eps => ${eps},
@@ -116,8 +135,8 @@ export default function StationAllocationPage() {
           top_n => ${topN},
           zoom_level => ${zoomLevel},
           stage_name => '@CLUSTERING_ALGOS',
-          start_time => '2024-08-01 00:00:00',
-          end_time => '2025-07-31 23:59:59',
+          start_time => '${start}'::TIMESTAMP_NTZ,
+          end_time => '${end}'::TIMESTAMP_NTZ,
           area => ${area ? `'${area}'` : "NULL"},
           province => ${province ? `'${province}'` : "NULL"},
           district => ${district ? `'${district}'` : "NULL"}
@@ -128,7 +147,7 @@ export default function StationAllocationPage() {
       const response = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql: query}),
+        body: JSON.stringify({ sql: query }),
       });
 
       if (!response.ok) {

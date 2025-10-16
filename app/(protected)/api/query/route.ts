@@ -3,248 +3,449 @@ import SnowflakeConnectionManager from "@/lib/snowflake";
 import crypto from "crypto";
 import { getRedis } from "@/lib/redis";
 
-// -------------------- Cache Helpers --------------------
-// Include date in key to automatically expire daily
+// -------------------- Types --------------------
+interface QueryLogEntry {
+  queryHash: string;
+  shortHash: string;
+  sql: string;
+  userId?: string;
+  cacheStatus: "HIT" | "MISS" | "REVALIDATED";
+  rowCount: number;
+  duration: number;
+  timestamp: Date;
+  dataSize?: number;
+}
+
+interface QueryStats {
+  queryHash: string;
+  shortHash: string;
+  sql: string;
+  totalHits: number;
+  totalMisses: number;
+  totalExecutions: number;
+  avgDuration: number;
+  avgRowCount: number;
+  lastExecuted: string | null;
+  lastCacheHit: string | null;
+  firstSeen: string;
+  cacheHitRate: number;
+  preWarmScore: number;
+  dailyHitHistory: { [date: string]: number };
+  consecutiveDaysNoHits: number;
+  isPersistent: boolean;
+}
+
+interface CacheMetadata {
+  lastVerified: string;
+  dataHash: string;
+  verificationCount: number;
+  lastDataChange: string | null;
+  dataChangeCount: number;
+}
+
+// -------------------- Query Normalization --------------------
+const DYNAMIC_DATE_FUNCTIONS = [
+  'current_date', 'current_timestamp', 'current_time',
+  'localtime', 'localtimestamp', 'now(', 'curdate(',
+  'curtime(', 'sysdate(', 'utc_date', 'utc_time',
+  'utc_timestamp', 'getdate(', 'getutcdate(',
+  'sysdatetime(', 'sysutcdatetime(',
+];
+
+function hasDynamicDates(sql: string): boolean {
+  const lower = sql.toLowerCase();
+  return DYNAMIC_DATE_FUNCTIONS.some(func => lower.includes(func));
+}
+
+function normalizeSQL(sql: string): string {
+  let normalized = sql.trim().toLowerCase().replace(/\s+/g, " ");
+  normalized = normalized.replace(/--[^\n]*/g, ''); // Remove comments
+  normalized = normalized.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove block comments
+  normalized = normalized.replace(/current_date\s*\(\s*\)/gi, 'current_date()');
+  normalized = normalized.replace(/current_timestamp\s*\(\s*\)/gi, 'current_timestamp()');
+  normalized = normalized.replace(/now\s*\(\s*\)/gi, 'now()');
+  normalized = normalized.replace(/interval\s+['"]?\d+['"]?/gi, 'interval __N__');
+  return normalized.trim();
+}
+
 function generateQueryHash(sql: string, userId?: string): string {
-  const normalizedSql = sql.trim().toLowerCase().replace(/\s+/g, " ");
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const queryString = userId
-    ? `${userId}:${normalizedSql}:${today}`
-    : `${normalizedSql}:${today}`;
+  const normalizedSql = normalizeSQL(sql);
+  const queryString = userId ? `${userId}:${normalizedSql}` : normalizedSql;
   return crypto.createHash("sha256").update(queryString).digest("hex");
 }
 
-// Generate cleanup tracking key
-function getCleanupKey(): string {
-  const today = new Date().toISOString().slice(0, 10);
-  return `cleanup:${today}`;
+function generateCacheKey(queryHash: string, sql: string, forceDynamic?: boolean): string {
+  if (hasDynamicDates(sql) || forceDynamic) {
+    const today = new Date().toISOString().slice(0, 10);
+    return `cache:${queryHash}:${today}`;
+  }
+  return `cache:${queryHash}`;
 }
 
-// Cleanup old cache entries (yesterday and older)
-async function cleanupOldCache(): Promise<void> {
-  const redis = await getRedis();
-  const cleanupKey = getCleanupKey();
+function generateDataHash(data: any[]): string {
+  return crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex");
+}
+
+function getCacheStrategy(sql: string, forceDynamic?: boolean): {
+  type: 'static' | 'daily' | 'hourly';
+  ttl: number | null;
+} {
+  if (forceDynamic) {
+    return { type: 'daily', ttl: 86400 };
+  }
   
-  // Always check memory pressure, but respect daily cleanup flag for routine maintenance
-  const { needsCleanup: memoryPressure } = await checkMemoryPressure();
+  const lower = sql.toLowerCase();
+  const hasTimeFunc = ['current_timestamp', 'current_time', 'now(', 'getdate(', 'sysdatetime(']
+    .some(func => lower.includes(func));
   
-  if (!memoryPressure) {
-    // Check if routine cleanup already done today
-    const cleanupDone = await redis.get(cleanupKey);
-    if (cleanupDone) {
-      return; // Already cleaned up today and no memory pressure
-    }
+  if (hasTimeFunc) {
+    return { type: 'hourly', ttl: 3600 };
   }
-
-  const reason = memoryPressure ? "memory pressure" : "daily maintenance";
-  console.log(`🧹 Starting cache cleanup (${reason})...`);
-  const startTime = Date.now();
-
-  try {
-    let deletedCount = 0;
-    let cursor = 0;
-
-    // Use SCAN for better performance and to avoid blocking
-    do {
-      const result = await redis.scan(cursor, { MATCH: '*', COUNT: 50 });
-      cursor = result.cursor;
-      
-      for (const key of result.keys) {
-        // Skip cleanup tracking keys
-        if (key.startsWith("cleanup:")) continue;
-        
-        const ttl = await redis.ttl(key);
-        
-        // More aggressive cleanup under memory pressure
-        const threshold = memoryPressure ? 43200 : 82800; // 12h vs 23h
-        
-        if (ttl !== -1 && ttl < threshold) {
-          await redis.del(key);
-          deletedCount++;
-          
-          // Log progress every 20 deletions during memory pressure
-          if (memoryPressure && deletedCount % 20 === 0) {
-            console.log(`🧹 Cleaned ${deletedCount} entries so far...`);
-          }
-        }
-      }
-    } while (cursor !== 0);
-
-    // Mark cleanup as done for today (only for routine cleanup)
-    if (!memoryPressure) {
-      await redis.set(cleanupKey, "1", { EX: 86400 });
-    }
-
-    const duration = Date.now() - startTime;
-    console.log(`🧹 Cleanup complete (${reason}): deleted ${deletedCount} entries in ${duration}ms`);
-    
-  } catch (error) {
-    console.error("❌ Cache cleanup failed:", error);
+  
+  if (hasDynamicDates(sql)) {
+    return { type: 'daily', ttl: 86400 };
   }
+  
+  return { type: 'static', ttl: null };
 }
 
-// Aggressive cleanup to make space for large datasets
-async function aggressiveCleanup(targetMemory: number, isLargeDataset: boolean): Promise<void> {
+// -------------------- Revalidation Logic --------------------
+async function acquireRevalidationLock(cacheKey: string): Promise<boolean> {
   const redis = await getRedis();
-  console.log(`🧹 Starting aggressive cleanup (target: ${(targetMemory / 1024 / 1024).toFixed(1)}MB)...`);
-  const startTime = Date.now();
-
-  try {
-    let deletedCount = 0;
-    let { usedMemory } = await checkMemoryPressure();
-
-    // Fallback: Use KEYS * if SCAN fails (less efficient but works)
-    let allKeys: string[];
-    try {
-      allKeys = await redis.keys('*');
-    } catch (keysError) {
-      console.error("❌ Redis KEYS command failed:", keysError);
-      return;
-    }
-
-    console.log(`🔍 Found ${allKeys.length} keys to evaluate`);
-
-    for (const key of allKeys) {
-      if (key.startsWith("cleanup:")) continue;
-      
-      const ttl = await redis.ttl(key);
-      
-      // More aggressive thresholds for large datasets
-      let threshold = isLargeDataset ? 21600 : 43200; // 6h vs 12h
-      
-      // If still over target, be even more aggressive
-      if (usedMemory > targetMemory) {
-        threshold = isLargeDataset ? 43200 : 64800; // 12h vs 18h
-      }
-      
-      if (ttl !== -1 && ttl < threshold) {
-        await redis.del(key);
-        deletedCount++;
-        
-        // Check memory periodically during cleanup
-        if (deletedCount % 20 === 0) {
-          ({ usedMemory } = await checkMemoryPressure());
-          console.log(`🧹 Progress: deleted ${deletedCount} keys, ${(usedMemory / 1024 / 1024).toFixed(1)}MB used`);
-          if (usedMemory <= targetMemory) {
-            console.log(`🎯 Reached target memory: ${(usedMemory / 1024 / 1024).toFixed(1)}MB`);
-            break;
-          }
-        }
-      }
-    }
-
-    // Phase 2: If still over target, delete older entries more aggressively
-    if (usedMemory > targetMemory && isLargeDataset) {
-      console.log(`🧹 Phase 2: More aggressive cleanup needed...`);
-      
-      for (const key of allKeys) {
-        if (key.startsWith("cleanup:")) continue;
-        
-        const ttl = await redis.ttl(key);
-        
-        // Delete anything with less than 20 hours TTL
-        if (ttl !== -1 && ttl < 72000) {
-          try {
-            await redis.del(key);
-            deletedCount++;
-            
-            if (deletedCount % 10 === 0) {
-              ({ usedMemory } = await checkMemoryPressure());
-              if (usedMemory <= targetMemory) {
-                console.log(`🎯 Phase 2 target reached: ${(usedMemory / 1024 / 1024).toFixed(1)}MB`);
-                break;
-              }
-            }
-          } catch (delError) {
-            console.warn(`⚠️ Failed to delete key ${key}:`, delError);
-          }
-        }
-      }
-    }
-
-    const duration = Date.now() - startTime;
-    const finalMemory = (await checkMemoryPressure()).usedMemory;
-    console.log(`🧹 Aggressive cleanup complete: deleted ${deletedCount} entries, ${(finalMemory / 1024 / 1024).toFixed(1)}MB used in ${duration}ms`);
-    
-  } catch (error) {
-    console.error("❌ Aggressive cleanup failed:", error);
-  }
+  const lockKey = `lock:revalidate:${cacheKey}`;
+  const lockValue = Date.now().toString();
+  
+  // Try to acquire lock with 5 minute expiration
+  const acquired = await redis.set(lockKey, lockValue, { NX: true, EX: 300 });
+  return acquired === 'OK';
 }
 
-// Write cache with 5MB reserved
-async function writeToCache(hash: string, data: any[], shortHash: string): Promise<void> {
+async function releaseRevalidationLock(cacheKey: string): Promise<void> {
   const redis = await getRedis();
+  const lockKey = `lock:revalidate:${cacheKey}`;
+  await redis.del(lockKey);
+}
 
-  const dataSize = Buffer.byteLength(JSON.stringify(data), "utf-8");
-  const maxMemory = 30 * 1024 * 1024; // 30MB plan
-  const reserve = 2 * 1024 * 1024;    // Reduced to 2MB reserve for large datasets
+async function needsRevalidation(
+  cacheKey: string, 
+  isPersistent: boolean
+): Promise<boolean> {
+  if (!isPersistent) return false;
+  
+  const redis = await getRedis();
+  const metaKey = `${cacheKey}:meta`;
+  const metaData = await redis.get(metaKey);
+  
+  if (!metaData) return true;
+  
+  const meta: CacheMetadata = JSON.parse(metaData);
+  const lastVerified = new Date(meta.lastVerified);
+  const daysSinceVerification = (Date.now() - lastVerified.getTime()) / (1000 * 60 * 60 * 24);
+  
+  return daysSinceVerification >= 7;
+}
 
-  console.log(`📊 Dataset info for [${shortHash}]: ${data.length} rows = ${(dataSize / 1024 / 1024).toFixed(1)}MB`);
-
-  // Check current memory pressure
-  let { usedMemory } = await checkMemoryPressure();
-
-  // For very large datasets, be more aggressive about cleanup
-  const isLargeDataset = dataSize > 3 * 1024 * 1024; // >3MB
-  const targetMemoryAfterCleanup = maxMemory * (isLargeDataset ? 0.3 : 0.7); // Target 30% or 70% usage
-
-  if (usedMemory + dataSize > maxMemory - reserve) {
-    console.log(`🧹 Need space for [${shortHash}]: ${(dataSize / 1024 / 1024).toFixed(1)}MB data, ${(usedMemory / 1024 / 1024).toFixed(1)}MB currently used`);
-    
-    // Aggressive cleanup for large datasets
-    await aggressiveCleanup(targetMemoryAfterCleanup, isLargeDataset);
-    
-    // Recheck memory after cleanup
-    ({ usedMemory } = await checkMemoryPressure());
-    
-    if (usedMemory + dataSize > maxMemory - reserve) {
-      console.warn(`⚠️  Still not enough space for [${shortHash}] after cleanup: ${(usedMemory / 1024 / 1024).toFixed(1)}MB + ${(dataSize / 1024 / 1024).toFixed(1)}MB > ${((maxMemory - reserve) / 1024 / 1024).toFixed(1)}MB limit`);
-      return;
-    }
-  }
-
+async function performRevalidation(
+  cacheKey: string,
+  shortHash: string,
+  sql: string,
+  connection: any
+): Promise<{ dataChanged: boolean; newData?: any[]; error?: string }> {
+  console.log(`[REVALIDATE] [${shortHash}] Checking for data changes...`);
+  
+  const redis = await getRedis();
+  const metaKey = `${cacheKey}:meta`;
+  
   try {
-    await redis.set(hash, JSON.stringify(data), { EX: 86400 }); // 24h TTL
-    console.log(`💾 Cached [${shortHash}] - ${data.length} rows (${(dataSize / 1024 / 1024).toFixed(1)}MB)${isLargeDataset ? ' [LARGE]' : ''}`);
-  } catch (error: any) {
-    if (error.message?.includes('OOM') || error.message?.includes('maxmemory')) {
-      console.error(`🚨 OOM during cache write for [${shortHash}] - attempting emergency cleanup`);
-      await aggressiveCleanup(targetMemoryAfterCleanup, true);
-      
-      // One retry attempt after emergency cleanup
-      try {
-        await redis.set(hash, JSON.stringify(data), { EX: 86400 });
-        console.log(`💾 Cached [${shortHash}] after emergency cleanup - ${data.length} rows (${(dataSize / 1024 / 1024).toFixed(1)}MB)`);
-      } catch (retryError) {
-        console.error(`❌ Final cache attempt failed for [${shortHash}]`);
-      }
+    // Execute query to get fresh data
+    const freshData = await new Promise<any[]>((resolve, reject) => {
+      connection.execute({
+        sqlText: sql,
+        complete: (err: any, _stmt: any, rows: any) => {
+          if (err) return reject(err);
+          resolve(rows || []);
+        },
+      });
+    });
+    
+    const freshDataHash = generateDataHash(freshData);
+    const existingMetaData = await redis.get(metaKey);
+    const existingMeta: CacheMetadata | null = existingMetaData 
+      ? JSON.parse(existingMetaData) 
+      : null;
+    
+    const dataChanged = !existingMeta || existingMeta.dataHash !== freshDataHash;
+    
+    // Update metadata with TTL matching cache
+    const cachedData = await redis.get(cacheKey);
+    const cacheTTL = cachedData ? await redis.ttl(cacheKey) : null;
+    
+    const newMeta: CacheMetadata = {
+      lastVerified: new Date().toISOString(),
+      dataHash: freshDataHash,
+      verificationCount: (existingMeta?.verificationCount || 0) + 1,
+      lastDataChange: dataChanged ? new Date().toISOString() : existingMeta?.lastDataChange || null,
+      dataChangeCount: (existingMeta?.dataChangeCount || 0) + (dataChanged ? 1 : 0),
+    };
+    
+    if (cacheTTL && cacheTTL > 0) {
+      await redis.set(metaKey, JSON.stringify(newMeta), { EX: cacheTTL });
     } else {
-      console.error(`❌ Cache write failed for [${shortHash}]:`, error.message);
-      throw error;
+      await redis.set(metaKey, JSON.stringify(newMeta));
     }
+    
+    if (dataChanged) {
+      console.log(`[REVALIDATE] [${shortHash}] Data changed (change #${newMeta.dataChangeCount})`);
+      return { dataChanged: true, newData: freshData };
+    } else {
+      console.log(`[REVALIDATE] [${shortHash}] Data unchanged (check #${newMeta.verificationCount})`);
+      return { dataChanged: false };
+    }
+  } catch (error: any) {
+    console.error(`[REVALIDATE] [${shortHash}] Failed:`, error.message);
+    return { dataChanged: false, error: error.message };
   }
 }
 
-async function readFromCache(hash: string): Promise<any[] | null> {
+// -------------------- Analytics Logger --------------------
+async function logQueryAnalytics(entry: QueryLogEntry): Promise<void> {
   const redis = await getRedis();
-  const data = await redis.get(hash);
+  
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Log entry with 7 day expiration
+    const logKey = `query:log:${entry.shortHash}:${Date.now()}`;
+    await redis.set(logKey, JSON.stringify(entry), { EX: 604800 });
+
+    const statsKey = `query:stats:${entry.queryHash}`;
+    const existingStats = await redis.get(statsKey);
+    
+    let stats: QueryStats = existingStats ? JSON.parse(existingStats) : {
+      queryHash: entry.queryHash,
+      shortHash: entry.shortHash,
+      sql: entry.sql,
+      totalHits: 0,
+      totalMisses: 0,
+      totalExecutions: 0,
+      avgDuration: 0,
+      avgRowCount: 0,
+      lastExecuted: null,
+      lastCacheHit: null,
+      firstSeen: new Date().toISOString(),
+      cacheHitRate: 0,
+      preWarmScore: 0,
+      dailyHitHistory: {},
+      consecutiveDaysNoHits: 0,
+      isPersistent: false,
+    };
+    
+    // Update execution counts
+    stats.totalExecutions++;
+    if (entry.cacheStatus === "HIT" || entry.cacheStatus === "REVALIDATED") {
+      stats.totalHits++;
+      stats.lastCacheHit = entry.timestamp.toISOString();
+      
+      if (!stats.dailyHitHistory[today]) {
+        stats.dailyHitHistory[today] = 0;
+      }
+      stats.dailyHitHistory[today]++;
+    } else {
+      stats.totalMisses++;
+    }
+    
+    // Update averages
+    stats.avgDuration = ((stats.avgDuration * (stats.totalExecutions - 1)) + entry.duration) / stats.totalExecutions;
+    stats.avgRowCount = ((stats.avgRowCount * (stats.totalExecutions - 1)) + entry.rowCount) / stats.totalExecutions;
+    stats.lastExecuted = entry.timestamp.toISOString();
+    stats.cacheHitRate = (stats.totalHits / stats.totalExecutions) * 100;
+    
+    // Clean history to last 14 days only
+    cleanOldHistory(stats, 14);
+    
+    // Calculate consecutive days without hits
+    stats.consecutiveDaysNoHits = calculateConsecutiveDaysNoHits(stats, today);
+    
+    // Calculate score and persistence
+    stats = applyDecayAndCalculateScore(stats);
+    stats.isPersistent = shouldBePersistent(stats);
+    
+    await redis.set(statsKey, JSON.stringify(stats));
+    
+    // Update sorted set for candidates
+    await redis.zAdd('query:prewarm:candidates', {
+      score: stats.preWarmScore,
+      value: entry.queryHash
+    });
+    
+    const statusLabel = entry.cacheStatus === 'REVALIDATED' ? 'REVALIDATED' : entry.cacheStatus;
+    console.log(`[${entry.shortHash}] ${statusLabel} | Score: ${stats.preWarmScore.toFixed(2)} | Persistent: ${stats.isPersistent} | No-hit: ${stats.consecutiveDaysNoHits}d`);
+    
+  } catch (error) {
+    console.error("Failed to log analytics:", error);
+  }
+}
+
+function cleanOldHistory(stats: QueryStats, keepDays: number): void {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - keepDays);
+  const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+  
+  Object.keys(stats.dailyHitHistory).forEach(date => {
+    if (date < cutoffStr) {
+      delete stats.dailyHitHistory[date];
+    }
+  });
+}
+
+function calculateConsecutiveDaysNoHits(stats: QueryStats, today: string): number {
+  if (!stats.lastCacheHit) {
+    return stats.totalExecutions > 0 ? 1 : 0;
+  }
+  
+  const lastHitDate = new Date(stats.lastCacheHit).toISOString().slice(0, 10);
+  
+  // Reset counter if there was activity today
+  if (lastHitDate === today) {
+    return 0;
+  }
+  
+  // Calculate days since last hit
+  const daysSinceLastHit = Math.floor(
+    (new Date(today).getTime() - new Date(lastHitDate).getTime()) / 86400000
+  );
+  
+  return Math.max(0, daysSinceLastHit);
+}
+
+function shouldBePersistent(stats: QueryStats): boolean {
+  // Don't persist if no activity for a week
+  if (stats.consecutiveDaysNoHits >= 7) {
+    return false;
+  }
+  
+  const last7Days = getLast7Days();
+  const dailyHitHistory = stats.dailyHitHistory || {};
+  const activeDays = last7Days.filter(date => (dailyHitHistory[date] || 0) > 0);
+  
+  if (activeDays.length < 3) {
+    return false;
+  }
+  
+  const totalHitsLast7Days = activeDays.reduce((sum, date) => sum + (dailyHitHistory[date] || 0), 0);
+  const avgHitsPerActiveDay = totalHitsLast7Days / activeDays.length;
+  
+  // Need consistent usage pattern
+  return avgHitsPerActiveDay >= 2;
+}
+
+function getLast7Days(): string[] {
+  const days: string[] = [];
+  const now = Date.now();
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(now - (i * 86400000));
+    days.push(date.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+function applyDecayAndCalculateScore(stats: QueryStats): QueryStats {
+  const { totalExecutions, avgDuration, avgRowCount, totalHits, consecutiveDaysNoHits } = stats;
+  
+  const last7Days = getLast7Days();
+  const dailyHitHistory = stats.dailyHitHistory || {};
+  const recentHits = last7Days.reduce((sum, date) => sum + (dailyHitHistory[date] || 0), 0);
+  const activeDaysLast7 = last7Days.filter(date => (dailyHitHistory[date] || 0) > 0).length;
+  
+  // Scoring components (sum to 1.0)
+  const frequencyScore = Math.min(totalExecutions / 100, 1) * 0.2;
+  const durationScore = Math.min(avgDuration / 5000, 1) * 0.15;
+  const dataSizeScore = Math.min(avgRowCount / 100000, 1) * 0.1;
+  const hitScore = Math.min(totalHits / 50, 1) * 0.2;
+  const recentActivityScore = Math.min(recentHits / 20, 1) * 0.25;
+  const consistencyScore = (activeDaysLast7 / 7) * 0.1;
+  
+  // Apply decay for inactivity
+  let decayMultiplier = 1.0;
+  if (consecutiveDaysNoHits > 0) {
+    decayMultiplier = Math.pow(0.75, consecutiveDaysNoHits);
+  }
+  
+  const baseScore = (
+    frequencyScore + 
+    durationScore + 
+    dataSizeScore + 
+    hitScore + 
+    recentActivityScore +
+    consistencyScore
+  ) * 100;
+  
+  // Cap at 100
+  stats.preWarmScore = Math.min(100, Math.max(0, baseScore * decayMultiplier));
+  
+  return stats;
+}
+
+// -------------------- Cache Helpers --------------------
+async function readFromCache(cacheKey: string): Promise<any[] | null> {
+  const redis = await getRedis();
+  const data = await redis.get(cacheKey);
   return data ? JSON.parse(data) : null;
 }
 
-// Check if we're under memory pressure
-async function checkMemoryPressure(): Promise<{ needsCleanup: boolean; usedMemory: number }> {
+async function writeToCache(
+  cacheKey: string, 
+  data: any[], 
+  shortHash: string, 
+  options: { strategy: { type: string; ttl: number | null }; stats?: QueryStats; isRevalidation?: boolean }
+): Promise<void> {
   const redis = await getRedis();
-  const info = await redis.info("memory");
-  const usedMemoryMatch = info.match(/used_memory:(\d+)/);
-  const usedMemory = usedMemoryMatch ? parseInt(usedMemoryMatch[1]) : 0;
-  
-  const maxMemory = 30 * 1024 * 1024; // 30MB
-  const criticalThreshold = 0.8; // 80% usage
-  
-  return {
-    needsCleanup: usedMemory > (maxMemory * criticalThreshold),
-    usedMemory
-  };
+  const dataSize = Buffer.byteLength(JSON.stringify(data), "utf-8");
+
+  try {
+    const { strategy, stats, isRevalidation = false } = options;
+    
+    if (strategy.type === 'static' && stats?.isPersistent) {
+      await redis.set(cacheKey, JSON.stringify(data));
+      
+      // Initialize/update metadata
+      if (!isRevalidation) {
+        const metaKey = `${cacheKey}:meta`;
+        const meta: CacheMetadata = {
+          lastVerified: new Date().toISOString(),
+          dataHash: generateDataHash(data),
+          verificationCount: 0,
+          lastDataChange: new Date().toISOString(),
+          dataChangeCount: 0,
+        };
+        await redis.set(metaKey, JSON.stringify(meta));
+      }
+      
+      const action = isRevalidation ? "Refreshed" : "Cached";
+      console.log(`${action} [${shortHash}] PERSISTENT - ${data.length} rows (${(dataSize / 1024 / 1024).toFixed(1)}MB)`);
+    } else if (strategy.ttl) {
+      await redis.set(cacheKey, JSON.stringify(data), { EX: strategy.ttl });
+      
+      // Add metadata with matching TTL
+      const metaKey = `${cacheKey}:meta`;
+      const meta: CacheMetadata = {
+        lastVerified: new Date().toISOString(),
+        dataHash: generateDataHash(data),
+        verificationCount: 0,
+        lastDataChange: new Date().toISOString(),
+        dataChangeCount: 0,
+      };
+      await redis.set(metaKey, JSON.stringify(meta), { EX: strategy.ttl });
+      
+      const hours = Math.floor(strategy.ttl / 3600);
+      console.log(`Cached [${shortHash}] for ${hours}h (${strategy.type}) - ${data.length} rows (${(dataSize / 1024 / 1024).toFixed(1)}MB)`);
+    } else {
+      await redis.set(cacheKey, JSON.stringify(data), { EX: 86400 });
+      console.log(`Cached [${shortHash}] for 24h - ${data.length} rows (${(dataSize / 1024 / 1024).toFixed(1)}MB)`);
+    }
+  } catch (error: any) {
+    console.error(`Cache write failed for [${shortHash}]:`, error.message);
+  }
 }
 
 // -------------------- API Handler --------------------
@@ -252,40 +453,117 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const { sql, userId } = await req.json();
+    const { sql, userId, forceDynamic } = await req.json();
     if (!sql || typeof sql !== "string") {
       return NextResponse.json({ error: "Missing or invalid SQL" }, { status: 400 });
     }
 
-    // 🧹 CRITICAL: Check memory pressure and run cleanup FIRST
-    const { needsCleanup, usedMemory } = await checkMemoryPressure();
-    
-    if (needsCleanup) {
-      console.log(`⚠️  Memory pressure detected: ${(usedMemory / 1024 / 1024).toFixed(1)}MB - Running immediate cleanup`);
-      await cleanupOldCache(); // Synchronous cleanup when under pressure
-    } else {
-      // Non-blocking cleanup for daily maintenance
-      cleanupOldCache().catch(err => 
-        console.error("Background cleanup failed:", err)
-      );
-    }
-
     const queryHash = generateQueryHash(sql, userId);
+    const cacheKey = generateCacheKey(queryHash, sql, forceDynamic);
     const shortHash = queryHash.substring(0, 8);
+    const strategy = getCacheStrategy(sql, forceDynamic);
 
-    // 1️⃣ Check Redis cache
-    const cachedData = await readFromCache(queryHash);
+    const redis = await getRedis();
+    const statsKey = `query:stats:${queryHash}`;
+    const statsData = await redis.get(statsKey);
+    const stats = statsData ? JSON.parse(statsData) as QueryStats : undefined;
+    const isPersistent = stats?.isPersistent || false;
+
+    const cachedData = await readFromCache(cacheKey);
+    
     if (cachedData) {
+      // Check if revalidation needed for persistent queries
+      const shouldRevalidate = await needsRevalidation(cacheKey, isPersistent);
+      
+      if (shouldRevalidate) {
+        const lockAcquired = await acquireRevalidationLock(cacheKey);
+        
+        if (lockAcquired) {
+          const duration = Date.now() - startTime;
+          console.log(`🟡   [CACHE HIT] [${shortHash}] [PERSISTENT] - Revalidating in background - ${cachedData.length} rows - ${duration}ms`);
+          
+          // Return cached data immediately, revalidate in background
+          (async () => {
+            try {
+              await SnowflakeConnectionManager.connect();
+              const connection = SnowflakeConnectionManager.getConnection();
+              
+              const revalidationResult = await performRevalidation(
+                cacheKey,
+                shortHash,
+                sql,
+                connection
+              );
+              
+              if (revalidationResult.dataChanged && revalidationResult.newData) {
+                await writeToCache(cacheKey, revalidationResult.newData, shortHash, { 
+                  strategy, 
+                  stats, 
+                  isRevalidation: true 
+                });
+              }
+            } catch (error) {
+              console.error(`Background revalidation failed for [${shortHash}]:`, error);
+            } finally {
+              await releaseRevalidationLock(cacheKey);
+            }
+          })();
+          
+          await logQueryAnalytics({
+            queryHash,
+            shortHash,
+            sql,
+            userId,
+            cacheStatus: "REVALIDATED",
+            rowCount: cachedData.length,
+            duration,
+            timestamp: new Date(),
+            dataSize: Buffer.byteLength(JSON.stringify(cachedData), "utf-8")
+          });
+          
+          return NextResponse.json(cachedData, {
+            status: 200,
+            headers: { 
+              "X-Cache-Status": "HIT-REVALIDATING",
+              "X-Cache-Hash": queryHash,
+              "X-Cache-Type": strategy.type,
+              "X-Persistent": "true",
+              "X-Revalidation": "background"
+            },
+          });
+        }
+      }
+      
+      // Standard cache hit
       const duration = Date.now() - startTime;
-      console.log(`🟢 CACHE HIT [${shortHash}] - ${cachedData.length} rows - ${duration}ms`);
+      const persistentLabel = isPersistent ? " [PERSISTENT]" : "";
+      console.log(`🟢 [CACHE HIT] [${shortHash}] (${strategy.type})${persistentLabel} - ${cachedData.length} rows - ${duration}ms`);
+      console.log(`Query: ${sql}`);
+      await logQueryAnalytics({
+        queryHash,
+        shortHash,
+        sql,
+        userId,
+        cacheStatus: "HIT",
+        rowCount: cachedData.length,
+        duration,
+        timestamp: new Date(),
+        dataSize: Buffer.byteLength(JSON.stringify(cachedData), "utf-8")
+      });
+      
       return NextResponse.json(cachedData, {
         status: 200,
-        headers: { "X-Cache-Status": "HIT", "X-Cache-Hash": queryHash },
+        headers: { 
+          "X-Cache-Status": "HIT", 
+          "X-Cache-Hash": queryHash,
+          "X-Cache-Type": strategy.type,
+          "X-Persistent": isPersistent ? "true" : "false"
+        },
       });
     }
 
-    // 2️⃣ Cache miss → query Snowflake
-    console.log(`🔴 CACHE MISS [${shortHash}] - Executing Snowflake`);
+    // Cache miss - execute query
+    console.log(`🔴 [CACHE MISS] [${shortHash}] (${strategy.type}) - Executing Snowflake`);
     await SnowflakeConnectionManager.connect();
     const connection = SnowflakeConnectionManager.getConnection();
 
@@ -299,27 +577,69 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // Cache empty results with shorter TTL (1 hour)
     if (!rows || rows.length === 0) {
-      return NextResponse.json({ error: "No records found" }, { status: 404 });
+      const emptyResult: any[] = [];
+      await redis.set(cacheKey, JSON.stringify(emptyResult), { EX: 3600 });
+      console.log(`[EMPTY RESULT] [${shortHash}] - Cached for 1h`);
+      
+      const duration = Date.now() - startTime;
+      await logQueryAnalytics({
+        queryHash,
+        shortHash,
+        sql,
+        userId,
+        cacheStatus: "MISS",
+        rowCount: 0,
+        duration,
+        timestamp: new Date(),
+        dataSize: 0
+      });
+      
+      return NextResponse.json(emptyResult, {
+        status: 200,
+        headers: { 
+          "X-Cache-Status": "MISS",
+          "X-Cache-Hash": queryHash,
+          "X-Cache-Type": "hourly",
+          "X-Row-Count": "0"
+        },
+      });
     }
 
-    // 3️⃣ Cache the result
-    await writeToCache(queryHash, rows, shortHash);
+    await writeToCache(cacheKey, rows, shortHash, { strategy, stats });
 
     const totalDuration = Date.now() - startTime;
-    console.log(`✅ QUERY COMPLETE FROM SNOWFLAKE [${shortHash}] - ${rows.length} rows - ${totalDuration}ms${rows.length > 50000 ? ' (LARGE DATASET)' : ''}`);
+    console.log(`✅ [QUERY COMPLETE] [${shortHash}] - ${rows.length} rows - ${totalDuration}ms`);
+
+    const dataSize = Buffer.byteLength(JSON.stringify(rows), "utf-8");
+    await logQueryAnalytics({
+      queryHash,
+      shortHash,
+      sql,
+      userId,
+      cacheStatus: "MISS",
+      rowCount: rows.length,
+      duration: totalDuration,
+      timestamp: new Date(),
+      dataSize
+    });
 
     return NextResponse.json(rows, {
       status: 200,
       headers: { 
         "X-Cache-Status": "MISS", 
         "X-Cache-Hash": queryHash,
+        "X-Cache-Type": strategy.type,
         "X-Row-Count": rows.length.toString(),
         "X-Query-Duration": totalDuration.toString()
       },
     });
   } catch (err: any) {
-    console.error(`❌ QUERY ERROR - Duration: ${Date.now() - startTime}ms`, err);
-    return NextResponse.json([{ error: "snowflake connection failed" }], { status: 500 });
+    console.error(`❌ [ERROR] Duration: ${Date.now() - startTime}ms`, err);
+    return NextResponse.json(
+      { error: "Query execution failed", details: err.message }, 
+      { status: 500 }
+    );
   }
 }

@@ -1,83 +1,127 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-import { AlertCircle, MapPin, Building, TrendingUp } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertCircle, MapPin } from "lucide-react";
 
-// Optimized hook that fetches only essential columns for pie chart
-function useEnhancedSwaps(filters) {
-  const [areawiseData, setAreawiseData] = useState([]);
+// ================= TYPES =================
+interface Filters {
+  aggregation: string;
+  customerSegments: string[];
+  dateRange: {
+    from: Date | null;
+    to: Date | null;
+  };
+  selectedProvinces: string[];
+  selectedDistricts: string[];
+  selectedAreas: string[];
+  selectedStations: string[];
+}
+
+interface SwapSummaryRow {
+  LOCATION: string;
+  STATIONNAME: string;
+  TOTAL_SWAPS: number;
+  TOTAL_REVENUE: number;
+  AVG_REVENUE_PER_SWAP: number;
+  AVG_EFFICIENCY: number;
+}
+
+interface Area {
+  area: string;
+  swaps: number;
+  revenue: number;
+  avgPerSwap: number;
+  efficiency: number;
+  percentage?: string | number;
+  location?: string;
+  key: string;
+}
+
+interface Category {
+  category: string;
+  areas: Area[];
+  color: string;
+}
+
+// ================= HOOK =================
+function useEnhancedSwaps(filters: Filters | null) {
+  const [areawiseData, setAreawiseData] = useState<SwapSummaryRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<Error | null>(null);
+
+  const prevFiltersRef = useRef<string>("");
 
   useEffect(() => {
+    if (!filters) return;
+
+    const currentFiltersString = JSON.stringify(filters);
+
+    if (prevFiltersRef.current === currentFiltersString) {
+      console.log("Filters unchanged, skipping fetch");
+      return;
+    }
+
+    prevFiltersRef.current = currentFiltersString;
+
     const fetchAreawiseData = async () => {
-      if (!filters?.dateRange?.from || !filters?.dateRange?.to) {
-        return;
-      }
+      if (!filters?.dateRange?.from || !filters?.dateRange?.to) return;
 
       setLoading(true);
       setError(null);
 
       try {
-        // Build geographic filter conditions (same as reference code)
         const buildGeographicFilters = () => {
-          let conditions = [];
+          const conditions: string[] = [];
 
-          if (filters.selectedProvinces?.length > 0) {
+          if (filters.selectedProvinces?.length) {
             const provinces = filters.selectedProvinces
               .map((p) => `'${p.replace(/'/g, "''")}'`)
               .join(", ");
             conditions.push(`adp.PROVICE_NAME IN (${provinces})`);
           }
 
-          if (filters.selectedDistricts?.length > 0) {
+          if (filters.selectedDistricts?.length) {
             const districts = filters.selectedDistricts
               .map((d) => `'${d.replace(/'/g, "''")}'`)
               .join(", ");
             conditions.push(`adp.DISTRICT_NAME IN (${districts})`);
           }
 
-          if (filters.selectedAreas?.length > 0) {
+          if (filters.selectedAreas?.length) {
             const areas = filters.selectedAreas
               .map((a) => `'${a.replace(/'/g, "''")}'`)
               .join(", ");
             conditions.push(`ss.LOCATIONNAME IN (${areas})`);
           }
 
-          if (filters.selectedStations?.length > 0) {
+          if (filters.selectedStations?.length) {
             const stations = filters.selectedStations
               .map((s) => `'${s.replace(/'/g, "''")}'`)
               .join(", ");
             conditions.push(`ss.STATIONNAME IN (${stations})`);
           }
 
-          return conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
+          return conditions.length ? `AND ${conditions.join(" AND ")}` : "";
+        };
+
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
         };
 
         const geographicFilters = buildGeographicFilters();
-        const fromDate = filters.dateRange.from.toISOString().split("T")[0];
-        const toDate = filters.dateRange.to.toISOString().split("T")[0];
+        const fromDate = addOneDay(filters.dateRange.from)
+          .toISOString()
+          .split("T")[0];
+        const toDate = addOneDay(filters.dateRange.to)
+          .toISOString()
+          .split("T")[0];
 
-        // Optimized query - only essential columns for pie chart
         const areawiseQuery = `
           SELECT 
             ss.LOCATIONNAME as LOCATION,
@@ -93,9 +137,7 @@ function useEnhancedSwaps(filters) {
             AND ss.DATE <= '${toDate}'
             AND ss.TOTAL_SWAPS > 0
             ${geographicFilters}
-          GROUP BY 
-            ss.LOCATIONNAME,
-            ss.STATIONNAME
+          GROUP BY ss.LOCATIONNAME, ss.STATIONNAME
           ORDER BY TOTAL_SWAPS DESC
         `;
 
@@ -111,35 +153,25 @@ function useEnhancedSwaps(filters) {
           throw new Error(`Failed to fetch areawise data: ${response.status}`);
         }
 
-        const result = await response.json();
-        console.log("Optimized Areawise Data:", result);
-
+        const result: SwapSummaryRow[] = await response.json();
         setAreawiseData(result || []);
-      } catch (err) {
-        console.error("Error fetching optimized areawise data:", err);
-        setError(err);
+      } catch (err: any) {
+        setError(err instanceof Error ? err : new Error("Unknown error"));
       } finally {
         setLoading(false);
       }
     };
 
     fetchAreawiseData();
-  }, [
-    filters?.dateRange?.from,
-    filters?.dateRange?.to,
-    filters?.selectedProvinces,
-    filters?.selectedDistricts,
-    filters?.selectedAreas,
-    filters?.selectedStations,
-  ]);
+  }, [filters]);
 
   return { areawiseData, loading, error };
 }
 
-function groupByCategory(areawiseData) {
-  const categoriesMap = new Map();
+// ================= HELPERS =================
+function groupByCategory(areawiseData: SwapSummaryRow[]): Category[] {
+  const categoriesMap = new Map<string, Category>();
 
-  // Group by location (simplified for pie chart essentials)
   areawiseData.forEach((item) => {
     const location = item.LOCATION || "Unknown Location";
 
@@ -151,7 +183,7 @@ function groupByCategory(areawiseData) {
       });
     }
 
-    categoriesMap.get(location).areas.push({
+    categoriesMap.get(location)!.areas.push({
       area: item.STATIONNAME || "Unknown Station",
       swaps: item.TOTAL_SWAPS || 0,
       revenue: item.TOTAL_REVENUE || 0,
@@ -161,25 +193,20 @@ function groupByCategory(areawiseData) {
     });
   });
 
-  // Calculate percentages and sort areas by swaps
+  // calculate percentages and sort
   for (const category of categoriesMap.values()) {
-    const totalSwapsCategory = category.areas.reduce(
-      (sum, a) => sum + a.swaps,
-      0
-    );
-
+    const totalSwaps = category.areas.reduce((sum, a) => sum + a.swaps, 0);
     category.areas = category.areas
       .map((area) => ({
         ...area,
-        percentage: totalSwapsCategory
-          ? ((area.swaps / totalSwapsCategory) * 100).toFixed(1)
+        percentage: totalSwaps
+          ? ((area.swaps / totalSwaps) * 100).toFixed(1)
           : 0,
       }))
       .sort((a, b) => b.swaps - a.swaps);
   }
 
-  // Create "All Stations" category combining all areas
-  const allAreas = areawiseData.map((item) => ({
+  const allAreas: Area[] = areawiseData.map((item) => ({
     area: item.STATIONNAME || "Unknown Station",
     location: item.LOCATION || "Unknown Location",
     swaps: item.TOTAL_SWAPS || 0,
@@ -191,7 +218,7 @@ function groupByCategory(areawiseData) {
 
   const totalSwapsAll = allAreas.reduce((sum, a) => sum + a.swaps, 0);
 
-  const allStationsCategory = {
+  const allStationsCategory: Category = {
     category: "All Stations",
     areas: allAreas
       .map((area) => ({
@@ -207,7 +234,12 @@ function groupByCategory(areawiseData) {
   return [allStationsCategory, ...Array.from(categoriesMap.values())];
 }
 
-export default function AreaSwapsChart({ filters }) {
+// ================= COMPONENT =================
+export default function AreaSwapsChart({
+  filters,
+}: {
+  filters: Filters | null;
+}) {
   const { areawiseData, loading, error } = useEnhancedSwaps(filters);
 
   const categories = useMemo(() => {
@@ -215,10 +247,8 @@ export default function AreaSwapsChart({ filters }) {
     return groupByCategory(areawiseData);
   }, [areawiseData]);
 
-  // Default selected index is 0 ("All Stations")
-  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
+  const [selectedCategoryIndex] = useState(0);
 
-  // Loading state
   if (loading) {
     return (
       <div className="space-y-4">
@@ -235,7 +265,6 @@ export default function AreaSwapsChart({ filters }) {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <Card>
@@ -252,7 +281,6 @@ export default function AreaSwapsChart({ filters }) {
     );
   }
 
-  // No data state
   if (!categories.length) {
     return (
       <Card>
@@ -262,9 +290,6 @@ export default function AreaSwapsChart({ filters }) {
             <p className="text-sm text-muted-foreground">
               No area data available for selected filters
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Try adjusting your date range or location filters
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -273,27 +298,10 @@ export default function AreaSwapsChart({ filters }) {
 
   const category = categories[selectedCategoryIndex];
 
-  // Create filter summary
-  const filterSummary = [];
-  if (filters?.selectedProvinces?.length > 0) {
-    filterSummary.push(`${filters.selectedProvinces.length} provinces`);
-  }
-  if (filters?.selectedDistricts?.length > 0) {
-    filterSummary.push(`${filters.selectedDistricts.length} districts`);
-  }
-  if (filters?.selectedAreas?.length > 0) {
-    filterSummary.push(`${filters.selectedAreas.length} areas`);
-  }
-  if (filters?.selectedStations?.length > 0) {
-    filterSummary.push(`${filters.selectedStations.length} stations`);
-  }
-
   return (
     <div className="space-y-4">
       <ScrollArea className="h-[500px]">
         <div className="space-y-4 pr-4">
-          {/* Pie Chart Card */}
-
           <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
@@ -316,7 +324,7 @@ export default function AreaSwapsChart({ filters }) {
                 <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
-                      const data = payload[0].payload;
+                      const data = payload[0].payload as Area;
                       return (
                         <div className="rounded-lg border bg-background p-3 shadow-sm">
                           <div className="grid gap-2">

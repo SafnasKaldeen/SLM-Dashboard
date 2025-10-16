@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   CalendarIcon,
   Filter,
@@ -29,6 +29,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
+import { fi } from "date-fns/locale";
+import { filterProps } from "framer-motion";
 
 interface RevenueFiltersProps {
   onFiltersChange?: (filters: RevenueFilters) => void;
@@ -70,21 +72,40 @@ interface PaymentAreaData {
 }
 
 // Enhanced custom hook that fetches complete geographic hierarchy with payment data upfront
-const useGeographicHierarchy = () => {
+const useGeographicHierarchy = (filters?: RevenueFilters) => {
   const [completeHierarchy, setCompleteHierarchy] = useState<PaymentAreaData[]>(
     []
   );
   const [stationData, setStationData] = useState<StationData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prevFiltersRef = useRef<string>(""); // stores previous filters
+  const isFetchingRef = useRef(false);
 
-  // Fetch all data once on component mount
   useEffect(() => {
-    const fetchAllData = async () => {
-      try {
-        setLoading(true);
+    if (!filters) return;
 
-        // Fetch complete hierarchy with payment information - JOIN payment and lookup tables
+    const currentFiltersString = JSON.stringify(filters);
+
+    // Skip if filters haven't changed
+    if (prevFiltersRef.current === currentFiltersString) {
+      console.log("Filters unchanged, skipping fetch");
+      return;
+    }
+
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      console.log("Already fetching, skipping");
+      return;
+    }
+
+    isFetchingRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    const fetchData = async () => {
+      try {
+        // Fetch hierarchy
         const hierarchyRes = await fetch("/api/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -92,21 +113,16 @@ const useGeographicHierarchy = () => {
             sql: `SELECT DISTINCT 
                     rs.LOCATIONNAME AS AREA,
                     adp.DISTRICT_NAME AS DISTRICT,
-                    adp.PROVICE_NAME AS PROVINCE,
-                    adp.AREA_ID,
-                    adp.DISTRICT_ID,
-                    adp.PROVICE_ID
+                    adp.PROVICE_NAME AS PROVINCE
                   FROM MY_REVENUESUMMARY rs
                   JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
                     ON rs.LOCATIONNAME = adp.AREA_NAME
-                  WHERE rs.LOCATIONNAME IS NOT NULL 
-                    AND rs.STATIONNAME IS NOT NULL 
-                    AND rs.TOTAL_REVENUE > 0
+                  WHERE rs.TOTAL_REVENUE > 0
                   ORDER BY PROVINCE, DISTRICT, AREA`,
           }),
         });
 
-        // Fetch all stations with their areas
+        // Fetch stations
         const stationsRes = await fetch("/api/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -115,9 +131,7 @@ const useGeographicHierarchy = () => {
                     rs.LOCATIONNAME AS AREA, 
                     rs.STATIONNAME AS STATION 
                   FROM MY_REVENUESUMMARY rs
-                  WHERE rs.LOCATIONNAME IS NOT NULL 
-                    AND rs.STATIONNAME IS NOT NULL
-                    AND rs.TOTAL_REVENUE > 0
+                  WHERE rs.TOTAL_REVENUE > 0
                   ORDER BY AREA, STATION`,
           }),
         });
@@ -131,24 +145,26 @@ const useGeographicHierarchy = () => {
 
         setCompleteHierarchy(hierarchyData || []);
         setStationData(stationData || []);
-        setLoading(false);
       } catch (err: any) {
         setError(err.message || "Failed to fetch geographic data");
+      } finally {
         setLoading(false);
+        isFetchingRef.current = false;
+        prevFiltersRef.current = currentFiltersString; // update ref after fetch
       }
     };
 
-    fetchAllData();
-  }, []); // Only run once on mount
+    fetchData();
+  }, [filters]); // re-run effect whenever filters change
 
   return { completeHierarchy, stationData, loading, error };
 };
 
 export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
-  // Calculate exactly one year: from first day of this month last year to last day of last month
+  // With this:
   const today = new Date();
-  const defaultFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
-  const defaultTo = new Date(today.getFullYear(), today.getMonth(), 0);
+  const defaultFrom = new Date(today.getFullYear() - 1, 9, 1); // October 1, 2024 (month is 0-indexed: 9 = October)
+  const defaultTo = new Date(today.getFullYear(), 8, 30); // September 30, 2025 (month 8 = September)
   const defaultRange: DateRange = { from: defaultFrom, to: defaultTo };
 
   const [isExpanded, setIsExpanded] = useState(false);

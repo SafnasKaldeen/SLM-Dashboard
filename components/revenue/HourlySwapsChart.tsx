@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Bar,
   BarChart,
@@ -31,12 +31,21 @@ export function HourlyPaymentsChart({ filters }: HourlyPaymentsChartProps) {
   const [hourlyData, setHourlyData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
   // Fetch hourly payment data with all filters applied
+  const prevFiltersRef = useRef<string>("");
+  const isFetchingRef = useRef(false);
+
   useEffect(() => {
     const fetchHourlyData = async () => {
       if (!filters?.dateRange?.from || !filters?.dateRange?.to) {
         return;
+      }
+
+      // check the filters object to avoid duplicate fetches
+      const filtersString = JSON.stringify(filters);
+      if (filtersString === prevFiltersRef.current || isFetchingRef.current) {
+        console.log("Filters unchanged or fetch in progress, skipping update");
+        return; // Do nothing
       }
 
       setLoading(true);
@@ -80,12 +89,17 @@ export function HourlyPaymentsChart({ filters }: HourlyPaymentsChartProps) {
 
         const geographicFilters = buildGeographicFilters();
 
-        // Convert timestamps to milliseconds for filtering
-        const fromTimestamp = Math.floor(filters.dateRange.from.getTime());
-        const toTimestamp =
-          Math.floor(filters.dateRange.to.getTime()) + 86399000; // End of day in ms
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
+        };
 
-        // Hourly aggregation query with battery swap payments only
+        // Convert timestamps to milliseconds for filtering
+        const fromTimestamp = addOneDay(filters.dateRange.from).getTime(); // add 1 day here
+        const toTimestamp =
+          Math.floor(filters.dateRange.to.getTime()) + 86399000; // End of day
+
         const hourlyQuery = `
           SELECT 
             HOUR(TO_TIMESTAMP_NTZ(fp.CREATED_EPOCH / 1000)) as HOUR,
@@ -100,7 +114,7 @@ export function HourlyPaymentsChart({ filters }: HourlyPaymentsChartProps) {
           LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
             ON fp.LOCATION_NAME = adp.AREA_NAME
           WHERE fp.CREATED_EPOCH >= ${fromTimestamp}
-            AND fp.CREATED_EPOCH < ${toTimestamp}
+            AND fp.CREATED_EPOCH <= ${toTimestamp}
             AND fp.CREATED_EPOCH IS NOT NULL
             AND fp.PAYMENT_TYPE = 'BATTERY_SWAP'
             AND fp.PAYMENT_STATUS IN ('PAID', 'VOIDED')

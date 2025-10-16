@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   PieChart,
   Pie,
@@ -29,6 +29,8 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
   const [data, setData] = useState<AreaStationData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
+  const prevFiltersRef = useRef<string>("");
+  const isFetchingRef = useRef(false);
 
   const colors = [
     "#0ea5e9",
@@ -53,6 +55,22 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
       if (!filters.dateRange?.from || !filters.dateRange?.to) {
         return;
       }
+
+      // Check if filters are the same
+      const currentFiltersString = JSON.stringify(filters);
+      if (prevFiltersRef.current === currentFiltersString) {
+        console.log("Filters unchanged, skipping update");
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log("Already fetching, skipping duplicate request");
+        return;
+      }
+
+      console.log("Fetching area revenue data with filters:", filters);
+      isFetchingRef.current = true;
 
       setLoading(true);
       setError(null);
@@ -93,6 +111,12 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
           return conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
         };
 
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
+        };
+
         const geographicFilters = buildGeographicFilters();
 
         // Determine if we should show stations (when exactly one area is selected)
@@ -114,10 +138,10 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
               LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
                 ON rs.LOCATIONNAME = adp.AREA_NAME
               WHERE rs.DATE >= '${
-                filters.dateRange.from.toISOString().split("T")[0]
+                addOneDay(filters.dateRange.from).toISOString().split("T")[0]
               }'
                 AND rs.DATE <= '${
-                  filters.dateRange.to.toISOString().split("T")[0]
+                  addOneDay(filters.dateRange.to).toISOString().split("T")[0]
                 }'
                 AND rs.TOTAL_REVENUE > 0
                 AND rs.LOCATIONNAME = '${filters.selectedAreas[0].replace(
@@ -183,12 +207,12 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
             FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
             LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
               ON rs.LOCATIONNAME = adp.AREA_NAME
-            WHERE rs.DATE >= '${
-              filters.dateRange.from.toISOString().split("T")[0]
+           WHERE rs.DATE >= '${
+             addOneDay(filters.dateRange.from).toISOString().split("T")[0]
+           }'
+            AND rs.DATE <= '${
+              addOneDay(filters.dateRange.to).toISOString().split("T")[0]
             }'
-              AND rs.DATE <= '${
-                filters.dateRange.to.toISOString().split("T")[0]
-              }'
               AND rs.TOTAL_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.LOCATIONNAME

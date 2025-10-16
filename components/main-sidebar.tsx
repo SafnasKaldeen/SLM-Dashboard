@@ -26,6 +26,7 @@ import {
   Zap,
   BarChart3,
   AlertTriangle,
+  Package,
   Route,
   FileBarChart,
   Layers,
@@ -356,6 +357,11 @@ export function MainSidebar() {
           path: "/revenue/analytics",
           label: "Analytics",
           icon: <TrendingUp className="h-4 w-4" />,
+        },
+        {
+          path: "/revenue/package",
+          label: "Packages",
+          icon: <Package className="h-4 w-4" />,
         },
 
         // {

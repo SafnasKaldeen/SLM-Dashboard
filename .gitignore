@@ -12,6 +12,9 @@
 # production
 /build
 
+snowflake.log
+/snowflake.log
+
 /components/gps/geojson
 
 # debug

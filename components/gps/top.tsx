@@ -344,7 +344,10 @@ export default function TopPerformingScooters({
       <CardContent>
         <ScrollArea className="h-[600px] w-full rounded-md">
           <div className="space-y-4 pr-4">
-            {sortedScooters.map((scooter, index) => {
+            {(isDescending
+              ? sortedScooters.slice(0, 100)
+              : sortedScooters.slice(Math.max(sortedScooters.length - 100, 0))
+            ).map((scooter, index) => {
               const displayPercentage =
                 maxDistance > 0
                   ? (scooter.TOTAL_DISTANCE / maxDistance) * 100

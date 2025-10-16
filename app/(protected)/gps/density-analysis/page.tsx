@@ -532,6 +532,23 @@ export default function StationAllocationPage() {
     return `'${values.join("', '")}'`;
   };
 
+  function getDynamicDateRange() {
+    const now = new Date();
+
+    // Start = first day of same month last year
+    const start = new Date(now.getFullYear() - 1, now.getMonth(), 1, 0, 0, 0);
+
+    // End = last day of previous month this year
+    const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const format = (d: Date) => d.toISOString().slice(0, 19).replace("T", " "); // "YYYY-MM-DD HH:mm:ss"
+
+    return {
+      start: format(start),
+      end: format(end),
+    };
+  }
+
   const handleCoverageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -548,7 +565,8 @@ export default function StationAllocationPage() {
       const provinceParam = formatSqlParam(selectedProvinces);
       const districtParam = formatSqlParam(selectedDistricts);
 
-      // Build the SQL query with correct parameter formatting
+      const { start, end } = getDynamicDateRange();
+
       const query = `
         CALL REPORT_DB.GPS_DASHBOARD.COVERAGE_OPTIMIZATION_STATIONS_COST_OPTIMIZED(
           ${serviceRadius},
@@ -557,8 +575,8 @@ export default function StationAllocationPage() {
           ${maxStations},
           ${zoomLevel},
           '${stageName.replace(/'/g, "''")}',
-          '2024-08-01 00:00:00'::TIMESTAMP_NTZ,
-          '2025-07-31 23:59:59'::TIMESTAMP_NTZ,
+          '${start}'::TIMESTAMP_NTZ,
+          '${end}'::TIMESTAMP_NTZ,
           ${areaParam},
           ${provinceParam},
           ${districtParam},
