@@ -131,8 +131,8 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
               SELECT 
                 rs.LOCATIONNAME as AREA,
                 rs.STATIONNAME as STATION,
-                SUM(rs.TOTAL_REVENUE) as TOTAL_REVENUE,
-                AVG(rs.TOTAL_REVENUE) as AVG_REVENUE,
+                SUM(rs.GROSS_REVENUE) as TOTAL_REVENUE,
+                AVG(rs.GROSS_REVENUE) as AVG_REVENUE,
                 COUNT(*) as TRIP_COUNT
               FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
               LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
@@ -143,7 +143,7 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
                 AND rs.DATE <= '${
                   addOneDay(filters.dateRange.to).toISOString().split("T")[0]
                 }'
-                AND rs.TOTAL_REVENUE > 0
+                AND rs.GROSS_REVENUE > 0
                 AND rs.LOCATIONNAME = '${filters.selectedAreas[0].replace(
                   /'/g,
                   "''"
@@ -162,12 +162,12 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
                 SELECT 
                   STATIONNAME,
                   DATE,
-                  SUM(TOTAL_REVENUE) as DAILY_REVENUE
+                  SUM(GROSS_REVENUE) as DAILY_REVENUE
                 FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY
                 WHERE DATE < '${
                   filters.dateRange.from.toISOString().split("T")[0]
                 }'
-                  AND TOTAL_REVENUE > 0
+                  AND GROSS_REVENUE > 0
                 GROUP BY STATIONNAME, DATE
               ) daily_rev ON rs.STATIONNAME = daily_rev.STATIONNAME
               WHERE rs.LOCATIONNAME = '${filters.selectedAreas[0].replace(
@@ -197,10 +197,10 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
             SELECT 
               rs.LOCATIONNAME as AREA,
               NULL as STATION,
-              SUM(rs.TOTAL_REVENUE) as TOTAL_REVENUE,
-              SUM(rs.TOTAL_REVENUE) as REVENUE,
+              SUM(rs.GROSS_REVENUE) as TOTAL_REVENUE,
+              SUM(rs.GROSS_REVENUE) as REVENUE,
               AVG(CASE 
-                WHEN rs.TOTAL_REVENUE > 0 THEN 75.0 
+                WHEN rs.GROSS_REVENUE > 0 THEN 75.0 
                 ELSE 0 
               END) as UTILIZATION,
               COUNT(*) as TRIPS
@@ -213,10 +213,10 @@ export function RevenueByArea({ filters, chartTitle }: RevenueByAreaProps) {
             AND rs.DATE <= '${
               addOneDay(filters.dateRange.to).toISOString().split("T")[0]
             }'
-              AND rs.TOTAL_REVENUE > 0
+              AND rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.LOCATIONNAME
-            ORDER BY SUM(rs.TOTAL_REVENUE) DESC
+            ORDER BY SUM(rs.GROSS_REVENUE) DESC
           `;
         }
 

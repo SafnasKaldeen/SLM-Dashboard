@@ -348,10 +348,47 @@ const BaselineView = ({
       </div>
       {/* Detailed Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Revenue */}
+        {/* <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700">
+          <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
+            <PieChart className="w-5 h-5 text-green-400" />
+            Revenue Breakdown
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Swap Revenue</span>
+              <span className="text-slate-100 font-semibold">
+                LKR {selectedBaseline?.annualSwapRevenue.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Home Charge Revenue</span>
+              <span className="text-slate-100 font-semibold">
+                LKR {selectedBaseline?.annualHomeRevenue.toLocaleString()}
+              </span>
+            </div>
+            <div className="pt-3 border-t border-slate-700 flex justify-between items-center">
+              <span className="text-slate-200 font-semibold">
+                Total Annual Revenue
+              </span>
+              <span className="text-green-400 font-bold text-lg">
+                LKR {selectedBaseline?.annualRevenue.toLocaleString()}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500">
+              Revenue per customer: LKR{" "}
+              {Math.round(
+                selectedBaseline?.revenuePerCustomer
+              ).toLocaleString()}
+            </div>
+          </div>
+        </div> */}
+
+        {/* Cost */}
         <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700">
           <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
             <Activity className="w-5 h-5 text-green-400" />
-            Revenue Breakdown
+            Cost Breakdown
           </h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -1216,7 +1253,7 @@ const ComparisonView = ({
             </div>
 
             {/* Waterfall Chart */}
-            <div className="mt-6 bg-slate-800/50 rounded-lg p-6 border border-slate-700">
+            {/* <div className="mt-6 bg-slate-800/50 rounded-lg p-6 border border-slate-700">
               <h4 className="text-lg font-semibold text-slate-100 mb-4">
                 Profit Waterfall Analysis
               </h4>
@@ -1294,7 +1331,7 @@ const ComparisonView = ({
                   />
                 </ComposedChart>
               </ResponsiveContainer>
-            </div>
+            </div> */}
 
             {/* Adoption Sensitivity Analysis */}
             <div className="mt-6 bg-slate-800/50 rounded-lg p-6 border border-slate-700">

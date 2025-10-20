@@ -671,7 +671,7 @@ const QueryCacheVisualization = () => {
             Temporary)
           </div>
           <div className="space-y-4">
-            {candidates.slice(0, 30).map((query, idx) => (
+            {candidates.map((query, idx) => (
               <div
                 key={query.queryHash}
                 className={`bg-slate-800/50 border rounded-lg p-4 hover:border-cyan-500/50 transition ${

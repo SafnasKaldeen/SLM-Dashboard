@@ -135,7 +135,7 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
             SELECT 
               rs.STATIONNAME,
               ${aggregationFormat} as PERIOD,
-              SUM(rs.TOTAL_REVENUE) as PERIOD_REVENUE
+              SUM(rs.GROSS_REVENUE) as PERIOD_REVENUE
             FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
             LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
               ON rs.LOCATIONNAME = adp.AREA_NAME
@@ -145,7 +145,7 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
             AND rs.DATE <= '${
               addOneDay(filters.dateRange.to).toISOString().split("T")[0]
             }'
-              AND rs.TOTAL_REVENUE > 0
+              AND rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME, ${aggregationFormat}
           ),
@@ -160,15 +160,15 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
               SELECT 
                 STATIONNAME,
                 ${aggregationFormat} as PERIOD,
-                SUM(TOTAL_REVENUE) as PERIOD_REVENUE
+                SUM(GROSS_REVENUE) as PERIOD_REVENUE
               FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY
               WHERE DATE <= '${
                 filters.dateRange.from.toISOString().split("T")[0]
               }'
-                AND TOTAL_REVENUE > 0
+                AND GROSS_REVENUE > 0
               GROUP BY STATIONNAME, ${aggregationFormat}
             ) period_sum ON rs.STATIONNAME = period_sum.STATIONNAME
-            WHERE rs.TOTAL_REVENUE > 0
+            WHERE rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME
           )
@@ -220,7 +220,7 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
             SELECT 
               rs.STATIONNAME,
               ${aggregationFormat} as PERIOD,
-              SUM(rs.TOTAL_REVENUE) as PERIOD_REVENUE
+              SUM(rs.GROSS_REVENUE) as PERIOD_REVENUE
             FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
             LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
               ON rs.LOCATIONNAME = adp.AREA_NAME
@@ -228,7 +228,7 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
               AND rs.DATE < '${
                 filters.dateRange.from.toISOString().split("T")[0]
               }'
-              AND rs.TOTAL_REVENUE > 0
+              AND rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME, ${aggregationFormat}
           ),
@@ -243,13 +243,13 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
               SELECT 
                 STATIONNAME,
                 ${aggregationFormat} as PERIOD,
-                SUM(TOTAL_REVENUE) as PERIOD_REVENUE
+                SUM(GROSS_REVENUE) as PERIOD_REVENUE
               FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY
               WHERE DATE < '${previousFromDate.toISOString().split("T")[0]}'
-                AND TOTAL_REVENUE > 0
+                AND GROSS_REVENUE > 0
               GROUP BY STATIONNAME, ${aggregationFormat}
             ) period_sum ON rs.STATIONNAME = period_sum.STATIONNAME
-            WHERE rs.TOTAL_REVENUE > 0
+            WHERE rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME
           ),

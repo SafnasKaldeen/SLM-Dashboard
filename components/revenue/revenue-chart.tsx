@@ -123,7 +123,7 @@ export function RevenueChart({ filters }: RevenueChartProps) {
         const chartQuery = `
           SELECT 
             ${aggregationFormat} as PERIOD,
-            SUM(rs.TOTAL_REVENUE) as NET_REVENUE
+            SUM(rs.GROSS_REVENUE) as NET_REVENUE
           FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
           LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
             ON rs.LOCATIONNAME = adp.AREA_NAME
@@ -133,7 +133,7 @@ export function RevenueChart({ filters }: RevenueChartProps) {
             AND rs.DATE <= '${
               addOneDay(filters.dateRange.to).toISOString().split("T")[0]
             }'
-            AND rs.TOTAL_REVENUE > 0
+            AND rs.GROSS_REVENUE > 0
             ${geographicFilters}
           GROUP BY ${aggregationFormat}
           ORDER BY ${aggregationFormat}

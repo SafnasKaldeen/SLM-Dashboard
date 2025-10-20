@@ -2,59 +2,35 @@
 
 import { useState, useMemo } from "react";
 
-// Sample customer segments data with detailed information
+// Simplified customer segments data with only aggregations
 export const SAMPLE_SEGMENTS = [
   {
     name: "Power Riders",
     count: 125,
-    avgSwaps: 14,
-    avgHomeCharges: 2,
-    avgRevenue: 1840,
-    customers: Array.from({ length: 125 }, (_, i) => ({
-      id: `PR${i + 1}`,
-      avgSwaps: 12 + Math.random() * 6,
-      avgHomeCharges: 1 + Math.random() * 3,
-      avgTotalRevenue: 1600 + Math.random() * 480,
-    })),
+    avgSwaps: 7,
+    avgHomeCharges: 0.8,
+    avgRevenue: 1870,
   },
   {
     name: "Steady Riders",
     count: 200,
-    avgSwaps: 8,
-    avgHomeCharges: 4,
-    avgRevenue: 1280,
-    customers: Array.from({ length: 200 }, (_, i) => ({
-      id: `SR${i + 1}`,
-      avgSwaps: 6 + Math.random() * 4,
-      avgHomeCharges: 3 + Math.random() * 2,
-      avgTotalRevenue: 1100 + Math.random() * 360,
-    })),
+    avgSwaps: 7.8,
+    avgHomeCharges: 1.4,
+    avgRevenue: 1160,
   },
   {
     name: "Casual Commuters",
     count: 300,
-    avgSwaps: 4,
+    avgSwaps: 1.5,
     avgHomeCharges: 2,
-    avgRevenue: 640,
-    customers: Array.from({ length: 300 }, (_, i) => ({
-      id: `CC${i + 1}`,
-      avgSwaps: 3 + Math.random() * 2,
-      avgHomeCharges: 1 + Math.random() * 2,
-      avgTotalRevenue: 500 + Math.random() * 280,
-    })),
+    avgRevenue: 675,
   },
   {
     name: "Home Energizers",
     count: 150,
-    avgSwaps: 2,
+    avgSwaps: 0.3,
     avgHomeCharges: 10,
-    avgRevenue: 1040,
-    customers: Array.from({ length: 150 }, (_, i) => ({
-      id: `HE${i + 1}`,
-      avgSwaps: 1 + Math.random() * 2,
-      avgHomeCharges: 8 + Math.random() * 4,
-      avgTotalRevenue: 900 + Math.random() * 280,
-    })),
+    avgRevenue: 1575,
   },
 ];
 
@@ -63,10 +39,10 @@ export const PRICE_PER_SWAP = 250;
 export const PRICE_PER_HOME_CHARGE = 150;
 export const COST_PER_SWAP = 200;
 export const COST_PER_HOME_CHARGE = 50;
+const ExpectedIncrease = 1.5; // 50% increase
 
 // Calculate baseline for a segment
 export const calculateBaseline = (segment) => {
-  console.log("Calculating baseline for segment:", segment);
   if (
     !segment ||
     segment.count === undefined ||
@@ -115,7 +91,7 @@ export const calculateBaseline = (segment) => {
     weeklyRevenue: isNaN(weeklyRevenue) ? 0 : weeklyRevenue,
     annualRevenue: isNaN(annualRevenue) ? 0 : annualRevenue,
     annualSwapCosts: isNaN(annualSwapCosts) ? 0 : annualSwapCosts,
-    annualHomeCosts: isNaN(annualHomeCosts) ? 0 : annualHomeCosts,
+    annualHomeCosts: isNaN(annualHomeCosts) ? 0 : annualHomeCosts, // FIXED: was annualHomeCharges
     annualCosts: isNaN(annualCosts) ? 0 : annualCosts,
     profit: isNaN(profit) ? 0 : profit,
     margin: isNaN(margin) ? 0 : margin,
@@ -239,9 +215,8 @@ export const calculateCustomerSatisfaction = (strategy, segment) => {
   };
 };
 
-// Calculate package scenario with baseline comparison
+// Calculate package scenario with baseline comparison - FIXED VERSION
 export const calculateStrategy = (strategy, segments) => {
-  console.log("Calculating strategy:", strategy);
   const segment = segments.find((s) => s.name === strategy.targetSegment);
   if (!segment) return null;
 
@@ -253,48 +228,56 @@ export const calculateStrategy = (strategy, segments) => {
 
   if (adopters === 0) return null;
 
-  // Package adopters calculations
+  // Package adopters calculations - FIXED
   let avgSwapsUsed = 0;
   let avgHomeChargesUsed = 0;
 
+  // Calculate swap usage based on package type
   if (
     strategy.packageType === "unlimited-swaps" ||
     strategy.packageType === "unlimited-both"
   ) {
-    avgSwapsUsed = segment.avgSwaps * utilizationRate * 1.5;
+    // For unlimited, assume they increase usage by 50% over current average
+    avgSwapsUsed = segment.avgSwaps * 1.5 * utilizationRate;
   } else if (
     strategy.packageType === "swaps" ||
     strategy.packageType === "combo"
   ) {
-    avgSwapsUsed =
-      Math.min(strategy.swapLimit, segment.avgSwaps) * utilizationRate;
+    // For limited packages, use realistic usage patterns
+    // Customers won't exceed their normal usage patterns significantly
+    const realisticLimit = Math.min(strategy.swapLimit, segment.avgSwaps * 1.5);
+    // avgSwapsUsed = realisticLimit * utilizationRate;
+    const avgSwapsUsed = strategy.swapLimit * utilizationRate;
   }
 
-  const avgHomeChargesFromSegment = segment.avgHomeCharges;
+  // Calculate home charge usage based on package type
   if (
     strategy.packageType === "unlimited-home" ||
     strategy.packageType === "unlimited-both"
   ) {
-    avgHomeChargesUsed = avgHomeChargesFromSegment * utilizationRate * 1.5;
+    avgHomeChargesUsed =
+      segment.avgHomeCharges * ExpectedIncrease * utilizationRate;
   } else if (
     strategy.packageType === "home" ||
     strategy.packageType === "combo"
   ) {
-    avgHomeChargesUsed =
-      Math.min(strategy.homeChargeLimit, avgHomeChargesFromSegment) *
-      utilizationRate;
+    const realisticLimit = Math.min(
+      strategy.homeChargeLimit,
+      segment.avgHomeCharges * 1.5
+    );
+    avgHomeChargesUsed = realisticLimit * utilizationRate;
   }
 
-  // Revenue calculations
+  // Revenue calculations - CONSISTENT: Always use 52 weeks for annual
   const weeklyServiceRevenue = adopters * strategy.price;
   const annualServiceRevenue = weeklyServiceRevenue * 52;
 
   let bikeLeaseRevenue = 0;
   let bikeLeaseCost = 0;
   if (strategy.includeBikeLease) {
-    bikeLeaseRevenue += adopters * strategy.bikeDownPayment;
-    bikeLeaseRevenue +=
-      adopters * strategy.monthlyLeasePayment * strategy.leaseDurationMonths;
+    // Convert bike lease to annual equivalent
+    const annualLeaseRevenue = strategy.monthlyLeasePayment * 12 * adopters;
+    bikeLeaseRevenue = adopters * strategy.bikeDownPayment + annualLeaseRevenue;
     bikeLeaseCost = adopters * strategy.costPerBike;
   }
 
@@ -306,25 +289,22 @@ export const calculateStrategy = (strategy, segments) => {
 
   const totalRevenue = packageAdopterRevenue + nonAdopterAnnualRevenue;
 
-  // Cost calculations
-  const weeksInPeriod = strategy.includeBikeLease
-    ? strategy.leaseDurationMonths * 4.33
-    : 52;
-
-  let swapCost = adopters * avgSwapsUsed * strategy.costPerSwap * weeksInPeriod;
+  // Cost calculations - FIXED: Always use 52 weeks, handle free swaps correctly
+  let swapCost = adopters * avgSwapsUsed * strategy.costPerSwap * 52;
   let homeChargeCost =
-    adopters * avgHomeChargesUsed * strategy.costPerHomeCharge * weeksInPeriod;
+    adopters * avgHomeChargesUsed * strategy.costPerHomeCharge * 52;
 
+  // Handle free swaps - DEDUCT from costs, don't add
   if (strategy.freeSwapsDuration > 0) {
-    const freeWeeks = strategy.freeSwapsDuration * 4.33;
-    const freeSwapCost =
+    const freeWeeks = Math.min(strategy.freeSwapsDuration * 4.33, 52); // Cap at 1 year
+    const freeSwapSavings =
       adopters * avgSwapsUsed * strategy.costPerSwap * freeWeeks;
-    swapCost += freeSwapCost;
+    swapCost = Math.max(0, swapCost - freeSwapSavings); // Subtract the free period costs
   }
 
   const packageAdopterCosts = swapCost + homeChargeCost + bikeLeaseCost;
 
-  // Non-adopters costs
+  // Non-adopters costs - use baseline costs calculation
   const nonAdopterSwapCosts =
     nonAdopters * segment.avgSwaps * COST_PER_SWAP * 52;
   const nonAdopterHomeCosts =
@@ -409,35 +389,19 @@ export const useStrategyData = (customerSegments) => {
     if (!customerSegments || customerSegments.length === 0) {
       return SAMPLE_SEGMENTS;
     }
-    console.log("Using provided customer segments:", customerSegments);
 
-    // Transform the actual customer data to match expected format
-    return customerSegments.map((segment) => {
-      const customers = segment.customers || [];
-      const count = segment.count || customers.length || 0;
-
-      // Calculate average home charges from customer data if not provided
-      let avgHomeCharges = 0;
-      if (customers.length > 0) {
-        const totalHomeCharges = customers.reduce(
-          (sum, c) => sum + (c.avgHomeCharges || 0),
-          0
-        );
-        avgHomeCharges = totalHomeCharges / customers.length;
-      }
-
-      return {
-        name: segment.name,
-        count: count,
-        avgSwaps: segment.avgSwaps || 0,
-        avgHomeCharges: segment.avgHomeCharges || avgHomeCharges,
-        avgRevenue: segment.avgRevenue || 0,
-        customers: customers,
-        color: segment.color,
-        minSwaps: segment.minSwaps,
-        totalRevenue: segment.totalRevenue,
-      };
-    });
+    // Use the provided segments directly - they should have the aggregation data
+    return customerSegments.map((segment) => ({
+      name: segment.name,
+      count: segment.count || 0,
+      avgSwaps: segment.avgSwaps || 0,
+      avgHomeCharges: segment.avgHomeCharges || 0,
+      avgRevenue: segment.avgRevenue || 0,
+      // Include any additional properties that might be needed
+      color: segment.color,
+      minSwaps: segment.minSwaps,
+      totalRevenue: segment.totalRevenue,
+    }));
   }, [customerSegments]);
 
   const [strategies, setStrategies] = useState([]);
@@ -450,15 +414,15 @@ export const useStrategyData = (customerSegments) => {
   const [currentStrategy, setCurrentStrategy] = useState({
     name: "Premium Bike Package",
     targetSegment: segments[0]?.name || "Power Riders",
-    packageType: "unlimited-swaps",
-    swapLimit: 10,
+    packageType: "swaps",
+    swapLimit: 12,
     homeChargeLimit: 5,
-    price: 900,
+    price: 2300,
     adoptionRate: 50,
     utilizationRate: 85,
     costPerSwap: COST_PER_SWAP,
     costPerHomeCharge: COST_PER_HOME_CHARGE,
-    includeBikeLease: true,
+    includeBikeLease: false,
     bikeDownPayment: 60000,
     monthlyLeasePayment: 55000,
     leaseDurationMonths: 12,

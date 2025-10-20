@@ -7,7 +7,6 @@ import { useDataAnalysis } from "./hooks/useDataAnalysis";
 import { OverviewDashboard } from "./components/OverviewDashboard";
 import { PatternAnalysis } from "./components/PatternAnalysis";
 import { CustomerInsights } from "./components/CustomerInsights";
-import { StrategyBuilder } from "./components/StrategyBuilder";
 
 // ============================================================================
 // MAIN APP COMPONENT
@@ -84,7 +83,6 @@ const BatterySwapAnalytics = () => {
             { id: "eda", label: "Overview", icon: BarChart3 },
             { id: "patterns", label: "Patterns", icon: TrendingUp },
             { id: "predictions", label: "Insights", icon: Target },
-            { id: "strategy", label: "Strategy", icon: Lightbulb },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -138,10 +136,6 @@ const BatterySwapAnalytics = () => {
 
       {activeTab === "predictions" && (
         <CustomerInsights predictions={predictions} />
-      )}
-
-      {activeTab === "strategy" && (
-        <StrategyBuilder customerSegments={customerSegments} />
       )}
     </div>
   );
