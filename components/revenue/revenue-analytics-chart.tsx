@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Line,
   LineChart,
@@ -43,16 +43,33 @@ export function RevenueAnalyticsChart({
   const [swapData, setSwapData] = useState(null);
   const [swapLoading, setSwapLoading] = useState(false);
   const [swapError, setSwapError] = useState(null);
+  const prevFiltersRef = useRef<string>("");
+  const isFetchingRef = useRef(false);
 
-  // Fetch swap data with all filters applied
   useEffect(() => {
     const fetchSwapData = async () => {
-      if (!filters?.dateRange?.from || !filters?.dateRange?.to) {
+      if (!filters.dateRange?.from || !filters.dateRange?.to) {
         return;
       }
 
-      setSwapLoading(true);
-      setSwapError(null);
+      // Check if filters are the same
+      const currentFiltersString = JSON.stringify(filters);
+      if (prevFiltersRef.current === currentFiltersString) {
+        console.log("Filters unchanged, skipping update");
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log("Already fetching, skipping duplicate request");
+        return;
+      }
+
+      console.log("Fetching revenue metrics with filters:", filters);
+      isFetchingRef.current = true;
+
+      swapLoading(true);
+      swapError(null);
 
       try {
         // Build geographic filter conditions (same as revenue chart)
@@ -110,6 +127,12 @@ export function RevenueAnalyticsChart({
 
         const aggregationFormat = getAggregationFormat();
 
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
+        };
+
         // Enhanced swap query with all filters applied
         const swapQuery = `
           SELECT 
@@ -124,10 +147,10 @@ export function RevenueAnalyticsChart({
             LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
               ON ss.LOCATIONNAME = adp.AREA_NAME
             WHERE ss.DATE >= '${
-              filters.dateRange.from.toISOString().split("T")[0]
+              addOneDay(filters.dateRange.from).toISOString().split("T")[0]
             }'
               AND ss.DATE <= '${
-                filters.dateRange.to.toISOString().split("T")[0]
+                addOneDay(filters.dateRange.to).toISOString().split("T")[0]
               }'
               AND ss.TOTAL_SWAPS > 0
               ${geographicFilters}

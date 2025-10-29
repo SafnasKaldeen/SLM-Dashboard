@@ -35,7 +35,7 @@ QUERY OPTIMIZATION:
 - Filter FACT_PAYMENT by date ranges using epoch
 - Use session-based aggregation for high-volume telemetry
 - Exclude inactive records (ACTIVE = 0 or DELETED = 1)
-- PAYMENT_STATUS is a string field; use string literals like 'PAID', 'COMPLETED', 'SUCCESS'
+- PAYMENT_STATUS is a string field; use string literals like 'PAID', 'VOIDED'
 
 PERFORMANCE METRICS:
 - Vehicle distance and session data in FACT_VEHICLE_DISTANCE

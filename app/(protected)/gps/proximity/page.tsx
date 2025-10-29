@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import {
   Card,
   CardContent,
@@ -123,6 +129,7 @@ interface CoverageResponse {
 
 export default function CoverageAreaDashboard() {
   const [currentLocation, setCurrentLocation] = useState("6.9271,79.8612");
+  const [currentLocationDisplay, setCurrentLocationDisplay] = useState("");
   const [battery, setBattery] = useState(80);
   const [efficiency, setEfficiency] = useState(70);
   const [safetyMargin, setSafetyMargin] = useState(35);
@@ -133,6 +140,10 @@ export default function CoverageAreaDashboard() {
     null
   );
   const [error, setError] = useState<string | null>(null);
+
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const locationAutocompleteRef =
+    useRef<google.maps.places.Autocomplete | null>(null);
 
   const getCompassDirection = (degrees: number) => {
     const directions = [
@@ -159,6 +170,40 @@ export default function CoverageAreaDashboard() {
 
   useEffect(() => {
     handleAnalyze();
+  }, []);
+
+  // Initialize Google Places Autocomplete
+  useEffect(() => {
+    if (!window.google || !window.google.maps) {
+      console.error("Google Maps API not loaded");
+      return;
+    }
+
+    // Initialize location autocomplete
+    if (locationInputRef.current && !locationAutocompleteRef.current) {
+      const autocomplete = new google.maps.places.Autocomplete(
+        locationInputRef.current,
+        {
+          fields: ["formatted_address", "geometry", "name"],
+          componentRestrictions: { country: ["lk"] },
+        }
+      );
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const placeName =
+            place.name || place.formatted_address || "Selected Location";
+
+          setCurrentLocation(`${lat.toFixed(6)},${lng.toFixed(6)}`);
+          setCurrentLocationDisplay(placeName);
+        }
+      });
+
+      locationAutocompleteRef.current = autocomplete;
+    }
   }, []);
 
   const handleAnalyze = useCallback(async () => {
@@ -202,6 +247,12 @@ export default function CoverageAreaDashboard() {
       setIsLoading(false);
     }
   }, [currentLocation, battery, efficiency, safetyMargin, maxHops, heading]);
+
+  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCurrentLocationDisplay(value);
+    setCurrentLocation(value);
+  };
 
   const handleCompassClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -410,7 +461,7 @@ export default function CoverageAreaDashboard() {
                 Location & Battery
               </CardTitle>
               <CardDescription className="text-slate-400">
-                Enter your current status
+                Search for your location or enter coordinates
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -423,12 +474,16 @@ export default function CoverageAreaDashboard() {
                   Current Location
                 </Label>
                 <Input
+                  ref={locationInputRef}
                   id="location"
-                  placeholder="6.9271,79.8612"
-                  value={currentLocation}
-                  onChange={(e) => setCurrentLocation(e.target.value)}
+                  placeholder="Search location or enter coordinates"
+                  value={currentLocationDisplay}
+                  onChange={handleLocationChange}
                   className="bg-slate-800/50 border-slate-700 text-slate-300"
                 />
+                <p className="text-xs text-slate-500">
+                  Try: "Colombo" or "6.9271,79.8612"
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -448,60 +503,6 @@ export default function CoverageAreaDashboard() {
                   className="py-4"
                 />
               </div>
-
-              {/* <div className="space-y-2">
-                <Label className="text-slate-300 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Zap className="h-4 w-4 mr-2 text-cyan-500" />
-                    Efficiency
-                  </div>
-                  <span className="text-cyan-400">{efficiency}%</span>
-                </Label>
-                <Slider
-                  min={50}
-                  max={100}
-                  step={1}
-                  value={[efficiency]}
-                  onValueChange={(v) => setEfficiency(v[0])}
-                  className="py-4"
-                />
-              </div> */}
-
-              {/* <div className="space-y-2">
-                <Label className="text-slate-300 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Shield className="h-4 w-4 mr-2 text-cyan-500" />
-                    Safety Margin
-                  </div>
-                  <span className="text-cyan-400">{safetyMargin}%</span>
-                </Label>
-                <Slider
-                  min={10}
-                  max={50}
-                  step={5}
-                  value={[safetyMargin]}
-                  onValueChange={(v) => setSafetyMargin(v[0])}
-                  className="py-4"
-                />
-              </div> */}
-
-              {/* <div className="space-y-2">
-                <Label className="text-slate-300 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Route className="h-4 w-4 mr-2 text-cyan-500" />
-                    Max Hops
-                  </div>
-                  <span className="text-cyan-400">{maxHops}</span>
-                </Label>
-                <Slider
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={[maxHops]}
-                  onValueChange={(v) => setMaxHops(v[0])}
-                  className="py-4"
-                />
-              </div> */}
 
               <div className="space-y-3">
                 <Label className="text-slate-300 flex items-center justify-between">
@@ -562,20 +563,6 @@ export default function CoverageAreaDashboard() {
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/50 border-2 border-slate-900"></div>
                   </div>
                 </div>
-
-                {/* <div className="text-center">
-                  <Slider
-                    min={0}
-                    max={359}
-                    step={1}
-                    value={[heading]}
-                    onValueChange={(v) => setHeading(v[0])}
-                    className="py-4"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Click compass or drag slider to set direction
-                  </p>
-                </div> */}
               </div>
 
               <Button

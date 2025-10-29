@@ -277,6 +277,41 @@ const ChartTypeSelector = ({
   </Card>
 );
 
+const handleDownloadCSV = () => {
+  console.log("Downloading CSV...");
+  if (!filteredData || filteredData.length === 0) {
+    alert("No data available to export");
+    return;
+  }
+
+  // Use the original columns, excluding the internal _index field
+  const headers = columns.filter((col) => col !== "_index");
+  const csvRows = [headers.join(",")];
+
+  for (const row of filteredData) {
+    const values = headers.map((header) => {
+      const escaped = ("" + (row[header] ?? "")).replace(/"/g, '""');
+      return `"${escaped}"`;
+    });
+    csvRows.push(values.join(","));
+  }
+
+  // Add BOM for Excel compatibility
+  const csvContent = "\uFEFF" + csvRows.join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  const fileName = `chart_data_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.href = url;
+  link.setAttribute("download", fileName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+};
+
 // Field Configuration Component
 const FieldConfiguration = ({
   chartConfig,
@@ -1776,6 +1811,7 @@ export default function ChartRenderer({
                     variant="outline"
                     size="sm"
                     className="border-slate-600 text-slate-300 bg-transparent"
+                    onClick={handleDownloadCSV}
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Export

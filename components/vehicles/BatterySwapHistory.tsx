@@ -56,7 +56,7 @@ interface PaymentTransaction {
   TRANSACTION_ID: string;
   LOCATION_NAME: string;
   STATION_NAME: string;
-  PAID_AT: number;
+  CREATED_EPOCH: number;
   CREATED_AT: number;
   AMOUNT_PAID: number;
   CHARGE_AMOUNT: number;
@@ -136,14 +136,21 @@ function formatCurrency(amount: number, currency: string = "LKR"): string {
 }
 
 function formatDate(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleDateString("en-US", {
+  // Handle both 10-digit (seconds) and 13-digit (milliseconds) timestamps
+  const date =
+    timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
   });
 }
 
 function formatDateTime(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleString("en-US", {
+  // Handle both 10-digit (seconds) and 13-digit (milliseconds) timestamps
+  const date =
+    timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
+  return date.toLocaleString("en-US", {
+    year: "2-digit",
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -176,7 +183,7 @@ function processPaymentData(rawData: PaymentTransaction[]) {
     const dailyData: Record<string, DailyRevenue> = {};
 
     swapPayments.forEach((payment) => {
-      const date = new Date(payment.PAID_AT * 1000).toISOString().split("T")[0];
+      const date = new Date(payment.CREATED_EPOCH).toISOString().split("T")[0];
 
       if (!dailyData[date]) {
         dailyData[date] = {
@@ -209,9 +216,9 @@ function processPaymentData(rawData: PaymentTransaction[]) {
       day.avgAmount = day.swapCount > 0 ? day.revenue / day.swapCount : 0;
     });
 
-    const dailyRevenue = Object.values(dailyData).sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    const dailyRevenue = Object.values(dailyData)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .reverse(); // Most recent first
 
     // Payment method analysis
     const methodStats: Record<string, PaymentMethodStats> = {};
@@ -458,7 +465,7 @@ export default function BatterySwapHistory({
       setRefreshing(true);
       setError(null);
 
-      const cutoffUnix = Math.floor(Date.now() / 1000) - 100 * 24 * 60 * 60; // 100 days ago in seconds
+      const cutoffUnix = Date.now() - 100 * 24 * 60 * 60 * 1000; // 100 days ago in ms
 
       const response = await fetch("/api/query", {
         method: "POST",
@@ -470,9 +477,9 @@ export default function BatterySwapHistory({
             SELECT *
               FROM SOURCE_DATA.DYNAMO_DB.FACT_PAYMENT
               WHERE CUSTOMER_ID = '${CustomerID}'
-                AND PAID_AT >= ${cutoffUnix}
+                AND CREATED_EPOCH >= ${cutoffUnix}
                 AND PAYMENT_TYPE = 'BATTERY_SWAP'
-              ORDER BY PAID_AT DESC
+              ORDER BY CREATED_EPOCH DESC
               LIMIT 200;
             `,
         }),
@@ -485,7 +492,7 @@ export default function BatterySwapHistory({
       }
 
       const data = await response.json();
-      // console.log("Fetched payment data:", data);
+      console.log("Fetched payment data:", data);
       if (data.error) {
         throw new Error(data.error);
       }
@@ -504,7 +511,7 @@ export default function BatterySwapHistory({
           "PAYMENT_ID",
           "CUSTOMER_ID",
           "PAYMENT_STATUS",
-          "PAID_AT",
+          "CREATED_EPOCH",
         ];
         const missingFields = requiredFields.filter(
           (field) => !(field in firstRecord)
@@ -551,7 +558,7 @@ export default function BatterySwapHistory({
   const currentPageData = useMemo(
     () =>
       analytics.swapPayments
-        .sort((a, b) => b.PAID_AT - a.PAID_AT)
+        .sort((a, b) => b.CREATED_EPOCH - a.CREATED_EPOCH)
         .slice(startIndex, endIndex),
     [analytics.swapPayments, startIndex, endIndex]
   );
@@ -724,7 +731,7 @@ export default function BatterySwapHistory({
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={analytics.dailyRevenue.slice(-30)}>
+            <AreaChart data={analytics.dailyRevenue.slice(0, 30).reverse()}>
               <defs>
                 <linearGradient
                   id="revenueGradient"
@@ -750,6 +757,7 @@ export default function BatterySwapHistory({
                 tick={{ fontSize: 12, fill: "#94a3b8" }}
                 tickFormatter={(value) =>
                   new Date(value).toLocaleDateString("en-US", {
+                    year: "2-digit",
                     month: "short",
                     day: "numeric",
                   })
@@ -860,68 +868,6 @@ export default function BatterySwapHistory({
           <CardContent>
             {analytics.paymentMethods.length > 0 ? (
               <div className="grid grid-cols-1 gap-6">
-                {/* Donut Chart */}
-                {/* <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={analytics.paymentMethods}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={30}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="totalAmount"
-                      >
-                        {analytics.paymentMethods.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="rounded-lg border bg-slate-900/95 backdrop-blur-sm p-3 shadow-xl border-slate-700">
-                                <div className="font-medium text-slate-200 mb-2">
-                                  {data.method}
-                                </div>
-                                <div className="grid gap-1 text-xs">
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">
-                                      Transactions:
-                                    </span>
-                                    <span className="text-slate-200 font-medium">
-                                      {data.count}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">
-                                      Total Revenue:
-                                    </span>
-                                    <span className="text-green-400 font-medium">
-                                      {formatCurrency(data.totalAmount)}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">
-                                      Success Rate:
-                                    </span>
-                                    <span className="text-cyan-400 font-medium">
-                                      {data.successRate.toFixed(1)}%
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div> */}
-
                 {/* Payment Method Cards */}
                 <div className="space-y-3">
                   {analytics.paymentMethods
@@ -1239,7 +1185,6 @@ export default function BatterySwapHistory({
                   <th className="text-left py-3 px-4 text-slate-400 font-medium">
                     Payment ID
                   </th>
-
                   <th className="text-left py-3 px-4 text-slate-400 font-medium">
                     Amount
                   </th>
@@ -1269,7 +1214,6 @@ export default function BatterySwapHistory({
                     <td className="py-3 px-4 text-slate-200 font-mono text-xs">
                       {payment.PAYMENT_ID}
                     </td>
-
                     <td className="py-3 px-4 text-slate-200 font-medium">
                       {formatCurrency(payment.AMOUNT)}
                       {payment.REFUND_AMOUNT > 0 && (
@@ -1327,7 +1271,7 @@ export default function BatterySwapHistory({
                       </div>
                     </td>
                     <td className="py-3 px-4 text-slate-300 font-mono text-xs">
-                      {formatDateTime(payment.PAID_AT)}
+                      {formatDateTime(payment.CREATED_EPOCH)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span

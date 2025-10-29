@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DollarSign,
@@ -33,12 +33,30 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
   const [data, setData] = useState<RevenueData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
+  const prevFiltersRef = useRef<string>("");
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     const fetchRevenueData = async () => {
       if (!filters.dateRange?.from || !filters.dateRange?.to) {
         return;
       }
+
+      // Check if filters are the same
+      const currentFiltersString = JSON.stringify(filters);
+      if (prevFiltersRef.current === currentFiltersString) {
+        console.log("Filters unchanged, skipping update");
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log("Already fetching, skipping duplicate request");
+        return;
+      }
+
+      console.log("Fetching revenue metrics with filters:", filters);
+      isFetchingRef.current = true;
 
       setLoading(true);
       setError(null);
@@ -85,6 +103,12 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
           return conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
         };
 
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
+        };
+
         const geographicFilters = buildGeographicFilters();
 
         // Get aggregation format - simplified for Snowflake compatibility
@@ -111,17 +135,17 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
             SELECT 
               rs.STATIONNAME,
               ${aggregationFormat} as PERIOD,
-              SUM(rs.TOTAL_REVENUE) as PERIOD_REVENUE
+              SUM(rs.GROSS_REVENUE) as PERIOD_REVENUE
             FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
             LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
               ON rs.LOCATIONNAME = adp.AREA_NAME
-            WHERE rs.DATE >= '${
-              filters.dateRange.from.toISOString().split("T")[0]
+           WHERE rs.DATE >= '${
+             addOneDay(filters.dateRange.from).toISOString().split("T")[0]
+           }'
+            AND rs.DATE <= '${
+              addOneDay(filters.dateRange.to).toISOString().split("T")[0]
             }'
-              AND rs.DATE <= '${
-                filters.dateRange.to.toISOString().split("T")[0]
-              }'
-              AND rs.TOTAL_REVENUE > 0
+              AND rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME, ${aggregationFormat}
           ),
@@ -136,15 +160,15 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
               SELECT 
                 STATIONNAME,
                 ${aggregationFormat} as PERIOD,
-                SUM(TOTAL_REVENUE) as PERIOD_REVENUE
+                SUM(GROSS_REVENUE) as PERIOD_REVENUE
               FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY
-              WHERE DATE < '${
+              WHERE DATE <= '${
                 filters.dateRange.from.toISOString().split("T")[0]
               }'
-                AND TOTAL_REVENUE > 0
+                AND GROSS_REVENUE > 0
               GROUP BY STATIONNAME, ${aggregationFormat}
             ) period_sum ON rs.STATIONNAME = period_sum.STATIONNAME
-            WHERE rs.TOTAL_REVENUE > 0
+            WHERE rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME
           )
@@ -173,7 +197,7 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
           metrics AS (
             SELECT 
               COUNT(DISTINCT STATIONNAME) as ACTIVE_STATIONS,
-              AVG(PERIOD_REVENUE) as AVG_NET_REVENUE_PER_PERIOD,
+              SUM(PERIOD_REVENUE) / NULLIF(COUNT(DISTINCT PERIOD), 0) as AVG_NET_REVENUE_PER_PERIOD,
               SUM(PERIOD_REVENUE) as "TOTAL REVENUE",
               AVG(UTILIZATION_RATE) as UTILIZATION_RATE
             FROM utilization_data
@@ -196,7 +220,7 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
             SELECT 
               rs.STATIONNAME,
               ${aggregationFormat} as PERIOD,
-              SUM(rs.TOTAL_REVENUE) as PERIOD_REVENUE
+              SUM(rs.GROSS_REVENUE) as PERIOD_REVENUE
             FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
             LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
               ON rs.LOCATIONNAME = adp.AREA_NAME
@@ -204,7 +228,7 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
               AND rs.DATE < '${
                 filters.dateRange.from.toISOString().split("T")[0]
               }'
-              AND rs.TOTAL_REVENUE > 0
+              AND rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME, ${aggregationFormat}
           ),
@@ -219,13 +243,13 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
               SELECT 
                 STATIONNAME,
                 ${aggregationFormat} as PERIOD,
-                SUM(TOTAL_REVENUE) as PERIOD_REVENUE
+                SUM(GROSS_REVENUE) as PERIOD_REVENUE
               FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY
               WHERE DATE < '${previousFromDate.toISOString().split("T")[0]}'
-                AND TOTAL_REVENUE > 0
+                AND GROSS_REVENUE > 0
               GROUP BY STATIONNAME, ${aggregationFormat}
             ) period_sum ON rs.STATIONNAME = period_sum.STATIONNAME
-            WHERE rs.TOTAL_REVENUE > 0
+            WHERE rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME
           ),
@@ -278,10 +302,6 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
           previousData = await previousResponse.json();
         }
 
-        // Optional: Update personal best records in a separate table/process
-        // This would require a mechanism to persist the new personal best values
-        // You might want to implement this as a separate API call or background process
-
         // Merge current and previous data
         const mergedData = {
           ...currentData[0],
@@ -296,24 +316,20 @@ export function RevenueMetrics({ filters }: RevenueMetricsProps) {
         };
 
         setData(mergedData);
+
+        // Update the previous filters reference after successful fetch
+        prevFiltersRef.current = currentFiltersString;
       } catch (err: any) {
         console.error("Error fetching revenue metrics:", err);
         setError(err);
       } finally {
         setLoading(false);
+        isFetchingRef.current = false;
       }
     };
 
     fetchRevenueData();
-  }, [
-    filters.dateRange?.from,
-    filters.dateRange?.to,
-    filters.selectedProvinces,
-    filters.selectedDistricts,
-    filters.selectedAreas,
-    filters.selectedStations,
-    filters.aggregation,
-  ]);
+  }, [filters]);
 
   // Show loading state
   if (loading) {

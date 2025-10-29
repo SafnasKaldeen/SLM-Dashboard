@@ -342,7 +342,7 @@ export class SemanticBuilderUtils {
     // Updated default filters
     const default_filters: Record<string, Record<string, DefaultFilter>> = {
       FACT_PAYMENT: {
-        PAYMENT_STATUS: { operator: "IN", value: ["PAID", "COMPLETED", "SUCCESS"] }
+        PAYMENT_STATUS: { operator: "IN", value: ["PAID", "VOIDED"] }
       },
       FACT_EXPENSES: { 
         DATE: { operator: ">=", value: "2024-01-01" } 

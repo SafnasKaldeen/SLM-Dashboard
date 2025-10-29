@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Battery,
@@ -31,12 +31,30 @@ export function BatterySwapMetrics({ filters }: BatterySwapMetricsProps) {
   const [data, setData] = useState<SwapMetricsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
+  const prevFiltersRef = useRef<string>("");
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     const fetchSwapMetrics = async () => {
       if (!filters.dateRange?.from || !filters.dateRange?.to) {
         return;
       }
+
+      // Check if filters are the same
+      const currentFiltersString = JSON.stringify(filters);
+      if (prevFiltersRef.current === currentFiltersString) {
+        console.log("Filters unchanged, skipping update");
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log("Already fetching, skipping duplicate request");
+        return;
+      }
+
+      console.log("Fetching revenue metrics with filters:", filters);
+      isFetchingRef.current = true;
 
       setLoading(true);
       setError(null);
@@ -85,6 +103,12 @@ export function BatterySwapMetrics({ filters }: BatterySwapMetricsProps) {
 
         const geographicFilters = buildGeographicFilters();
 
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
+        };
+
         // Current period metrics
         const currentQuery = `
           SELECT 
@@ -96,20 +120,27 @@ export function BatterySwapMetrics({ filters }: BatterySwapMetricsProps) {
           LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
             ON rs.LOCATIONNAME = adp.AREA_NAME
           WHERE rs.DATE >= '${
-            filters.dateRange.from.toISOString().split("T")[0]
+            addOneDay(filters.dateRange.from).toISOString().split("T")[0]
           }'
-            AND rs.DATE <= '${filters.dateRange.to.toISOString().split("T")[0]}'
+            AND rs.DATE <= '${
+              addOneDay(filters.dateRange.to).toISOString().split("T")[0]
+            }'
             AND rs.TOTAL_REVENUE > 0
             ${geographicFilters}
         `;
 
-        // Previous period metrics for comparison
+        // Compute the number of days in the current range
         const daysDiff = getDaysDifference(
           filters.dateRange.from,
           filters.dateRange.to
         );
+
+        // Previous period: subtract the same number of days
         const previousFromDate = new Date(filters.dateRange.from);
-        previousFromDate.setDate(previousFromDate.getDate() - daysDiff);
+        previousFromDate.setDate(previousFromDate.getDate() - daysDiff - 1);
+
+        const previousToDate = new Date(filters.dateRange.to);
+        previousToDate.setDate(previousToDate.getDate() - daysDiff);
 
         const previousQuery = `
           SELECT 
@@ -121,9 +152,7 @@ export function BatterySwapMetrics({ filters }: BatterySwapMetricsProps) {
           LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
             ON rs.LOCATIONNAME = adp.AREA_NAME
           WHERE rs.DATE >= '${previousFromDate.toISOString().split("T")[0]}'
-            AND rs.DATE < '${
-              filters.dateRange.from.toISOString().split("T")[0]
-            }'
+            AND rs.DATE <= '${previousToDate.toISOString().split("T")[0]}'
             AND rs.TOTAL_REVENUE > 0
             ${geographicFilters}
         `;

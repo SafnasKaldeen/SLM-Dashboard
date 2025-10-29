@@ -138,14 +138,22 @@ function formatCurrency(amount: number, currency: string = "LKR"): string {
 }
 
 function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("en-US", {
+  // Handle both 10-digit (seconds) and 13-digit (milliseconds) timestamps
+  const date =
+    timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
+  return date.toLocaleDateString("en-US", {
+    year: "2-digit",
     month: "short",
     day: "numeric",
   });
 }
 
 function formatDateTime(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleString("en-US", {
+  // Handle both 10-digit (seconds) and 13-digit (milliseconds) timestamps
+  const date =
+    timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
+  return date.toLocaleString("en-US", {
+    year: "2-digit",
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -228,9 +236,7 @@ function processHomeChargingData(rawData: PaymentTransaction[]) {
     const weeklyCount: Record<string, { charges: number; cost: number }> = {};
 
     chargingPayments.forEach((payment) => {
-      const timestamp = payment.PAID_AT
-        ? payment.PAID_AT * 1000
-        : payment.CREATED_EPOCH;
+      const timestamp = payment.CREATED_EPOCH;
       const date = new Date(timestamp).toISOString().split("T")[0];
       const hour = new Date(timestamp).getHours();
       const dayOfWeek = new Date(timestamp).toLocaleDateString("en-US", {
@@ -553,7 +559,7 @@ export default function HomeChargingHistory({
               FROM SOURCE_DATA.DYNAMO_DB.FACT_PAYMENT
               WHERE CUSTOMER_ID = '${CustomerID}'
                 AND PAYMENT_TYPE in ('HOME_CHARGING')
-              ORDER BY PAID_AT DESC;
+              ORDER BY CREATED_EPOCH DESC;
             `,
           }),
         }
@@ -603,11 +609,7 @@ export default function HomeChargingHistory({
   const currentPageData = useMemo(
     () =>
       analytics.chargingPayments
-        .sort(
-          (a, b) =>
-            (b.PAID_AT || b.CREATED_EPOCH / 1000) -
-            (a.PAID_AT || a.CREATED_EPOCH / 1000)
-        )
+        .sort((a, b) => b.CREATED_EPOCH / 1000 - a.CREATED_EPOCH / 1000)
         .slice(startIndex, endIndex),
     [analytics.chargingPayments, startIndex, endIndex]
   );
@@ -826,6 +828,7 @@ export default function HomeChargingHistory({
                 tick={{ fontSize: 12, fill: "#94a3b8" }}
                 tickFormatter={(value) =>
                   new Date(value).toLocaleDateString("en-US", {
+                    year: "2-digit",
                     month: "short",
                     day: "numeric",
                   })
@@ -1147,26 +1150,21 @@ export default function HomeChargingHistory({
                   >
                     <td className="py-3 px-4 text-slate-200">
                       <div>
-                        {payment.PAID_AT
-                          ? formatDateTime(payment.PAID_AT)
-                          : new Date(payment.CREATED_EPOCH).toLocaleString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }
-                            )}
+                        {new Date(payment.CREATED_EPOCH).toLocaleString(
+                          "en-US",
+                          {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )}
                       </div>
                       <div className="text-xs text-slate-500">
-                        {payment.PAID_AT
-                          ? getTimeOfDay(
-                              new Date(payment.PAID_AT * 1000).getHours()
-                            )
-                          : getTimeOfDay(
-                              new Date(payment.CREATED_EPOCH).getHours()
-                            )}
+                        {getTimeOfDay(
+                          new Date(payment.CREATED_EPOCH).getHours()
+                        )}
                       </div>
                     </td>
                     <td className="py-3 px-4 text-slate-200 font-medium">

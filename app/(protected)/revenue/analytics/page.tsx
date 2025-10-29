@@ -54,9 +54,18 @@ export default function RevenueAnalyticsPage() {
     paymentMethods: [],
     aggregation: "monthly",
   });
+
   const [activeTab, setActiveTab] = useState("trends");
 
   const handleFiltersChange = (newFilters: RevenueFiltersType) => {
+    // Check if filters are the same
+    const filtersAreSame =
+      JSON.stringify(newFilters) === JSON.stringify(filters);
+    if (filtersAreSame) {
+      console.log("Filters unchanged, skipping update");
+      return; // Do nothing
+    }
+
     setFilters(newFilters);
   };
 

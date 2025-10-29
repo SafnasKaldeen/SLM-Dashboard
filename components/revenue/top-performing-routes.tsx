@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,8 @@ export function TopPerformingStations({ filters }: TopPerformingStationsProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
   const [isDescending, setIsDescending] = useState(true);
+  const prevFiltersRef = useRef<string>("");
+  const isFetchingRef = useRef(false);
 
   const toggleOrder = () => setIsDescending((prev) => !prev);
 
@@ -37,6 +39,22 @@ export function TopPerformingStations({ filters }: TopPerformingStationsProps) {
       if (!filters.dateRange?.from || !filters.dateRange?.to) {
         return;
       }
+
+      // Check if filters are the same
+      const currentFiltersString = JSON.stringify(filters);
+      if (prevFiltersRef.current === currentFiltersString) {
+        console.log("Filters unchanged, skipping update");
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log("Already fetching, skipping duplicate request");
+        return;
+      }
+
+      console.log("Fetching revenue metrics with filters:", filters);
+      isFetchingRef.current = true;
 
       setLoading(true);
       setError(null);
@@ -95,6 +113,12 @@ export function TopPerformingStations({ filters }: TopPerformingStationsProps) {
           }
         };
 
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
+        };
+
         const aggregationFormat = getAggregationFormat();
 
         // Query to get all stations with their performance metrics
@@ -104,17 +128,17 @@ export function TopPerformingStations({ filters }: TopPerformingStationsProps) {
               rs.STATIONNAME,
               rs.LOCATIONNAME,
               ${aggregationFormat} as PERIOD,
-              SUM(rs.TOTAL_REVENUE) as PERIOD_REVENUE
+              SUM(rs.GROSS_REVENUE) as PERIOD_REVENUE
             FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
             LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
               ON rs.LOCATIONNAME = adp.AREA_NAME
-            WHERE rs.DATE >= '${
-              filters.dateRange.from.toISOString().split("T")[0]
+           WHERE rs.DATE >= '${
+             addOneDay(filters.dateRange.from).toISOString().split("T")[0]
+           }'
+            AND rs.DATE <= '${
+              addOneDay(filters.dateRange.to).toISOString().split("T")[0]
             }'
-              AND rs.DATE <= '${
-                filters.dateRange.to.toISOString().split("T")[0]
-              }'
-              AND rs.TOTAL_REVENUE > 0
+              AND rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME, rs.LOCATIONNAME, ${aggregationFormat}
           ),
@@ -139,15 +163,15 @@ export function TopPerformingStations({ filters }: TopPerformingStationsProps) {
               SELECT 
                 STATIONNAME,
                 ${aggregationFormat} as PERIOD,
-                SUM(TOTAL_REVENUE) as PERIOD_REVENUE
+                SUM(GROSS_REVENUE) as PERIOD_REVENUE
               FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY
-              WHERE DATE < '${
+              WHERE DATE <= '${
                 filters.dateRange.from.toISOString().split("T")[0]
               }'
-                AND TOTAL_REVENUE > 0
+                AND GROSS_REVENUE > 0
               GROUP BY STATIONNAME, ${aggregationFormat}
             ) period_sum ON rs.STATIONNAME = period_sum.STATIONNAME
-            WHERE rs.TOTAL_REVENUE > 0
+            WHERE rs.GROSS_REVENUE > 0
               ${geographicFilters}
             GROUP BY rs.STATIONNAME
           )
@@ -156,8 +180,10 @@ export function TopPerformingStations({ filters }: TopPerformingStationsProps) {
             st.LOCATIONNAME,
             st.LATEST_NET_REVENUE,
             COALESCE(hb.HISTORICAL_BEST, st.PERSONALBEST) as PERSONALBEST,
-            '${filters.dateRange.from.toISOString().split("T")[0]} to ${
-          filters.dateRange.to.toISOString().split("T")[0]
+            '${
+              addOneDay(filters.dateRange.from).toISOString().split("T")[0]
+            } to ${
+          addOneDay(filters.dateRange.to).toISOString().split("T")[0]
         }' as PERIOD,
             NULL as "PREVIOUS YEARS revenue percentage",
             CASE 

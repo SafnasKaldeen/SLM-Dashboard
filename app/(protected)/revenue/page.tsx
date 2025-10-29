@@ -32,25 +32,16 @@ export default function RevenuePage() {
     aggregation: "monthly",
   });
 
-  // Set default date range to past year if not already set
-  useEffect(() => {
-    if (!filters.dateRange?.from || !filters.dateRange?.to) {
-      const today = new Date();
-
-      const from = new Date(today);
-      from.setMonth(today.getMonth() - 12);
-      from.setDate(1);
-
-      const to = new Date(today.getFullYear(), today.getMonth(), 0);
-
-      setFilters((prev) => ({
-        ...prev,
-        dateRange: { from, to },
-      }));
-    }
-  }, [filters.dateRange?.from, filters.dateRange?.to]);
-
   const handleFiltersChange = (newFilters: RevenueFiltersType) => {
+    // Check if filters are the same
+    const filtersAreSame =
+      JSON.stringify(newFilters) === JSON.stringify(filters);
+
+    if (filtersAreSame) {
+      console.log("Filters unchanged, skipping update");
+      return; // Do nothing
+    }
+
     console.log("Filters changed:", newFilters); // Debug log
     setFilters(newFilters);
   };

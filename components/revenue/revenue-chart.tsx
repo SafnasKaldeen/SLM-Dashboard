@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Line,
   LineChart,
@@ -29,12 +29,30 @@ export function RevenueChart({ filters }: RevenueChartProps) {
   const [data, setData] = useState<RevenueChartData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
+  const prevFiltersRef = useRef<string>("");
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
-    const fetchRevenueChartData = async () => {
+    const fetchRevenueData = async () => {
       if (!filters.dateRange?.from || !filters.dateRange?.to) {
         return;
       }
+
+      // Check if filters are the same
+      const currentFiltersString = JSON.stringify(filters);
+      if (prevFiltersRef.current === currentFiltersString) {
+        console.log("Filters unchanged, skipping update");
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log("Already fetching, skipping duplicate request");
+        return;
+      }
+
+      console.log("Fetching revenue data with filters:", filters);
+      isFetchingRef.current = true;
 
       setLoading(true);
       setError(null);
@@ -75,6 +93,12 @@ export function RevenueChart({ filters }: RevenueChartProps) {
           return conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
         };
 
+        const addOneDay = (date: Date) => {
+          const newDate = new Date(date);
+          newDate.setDate(newDate.getDate() + 1);
+          return newDate;
+        };
+
         const geographicFilters = buildGeographicFilters();
 
         // Get aggregation format - simplified for Snowflake compatibility
@@ -99,15 +123,17 @@ export function RevenueChart({ filters }: RevenueChartProps) {
         const chartQuery = `
           SELECT 
             ${aggregationFormat} as PERIOD,
-            SUM(rs.TOTAL_REVENUE) as NET_REVENUE
+            SUM(rs.GROSS_REVENUE) as NET_REVENUE
           FROM DB_DUMP.PUBLIC.MY_REVENUESUMMARY rs
           LEFT JOIN SOURCE_DATA.MASTER_DATA.AREA_DISTRICT_PROVICE_LOOKUP adp 
             ON rs.LOCATIONNAME = adp.AREA_NAME
-          WHERE rs.DATE >= '${
-            filters.dateRange.from.toISOString().split("T")[0]
-          }'
-            AND rs.DATE <= '${filters.dateRange.to.toISOString().split("T")[0]}'
-            AND rs.TOTAL_REVENUE > 0
+           WHERE rs.DATE >= '${
+             addOneDay(filters.dateRange.from).toISOString().split("T")[0]
+           }'
+            AND rs.DATE <= '${
+              addOneDay(filters.dateRange.to).toISOString().split("T")[0]
+            }'
+            AND rs.GROSS_REVENUE > 0
             ${geographicFilters}
           GROUP BY ${aggregationFormat}
           ORDER BY ${aggregationFormat}
@@ -152,10 +178,12 @@ export function RevenueChart({ filters }: RevenueChartProps) {
         setError(err);
       } finally {
         setLoading(false);
+        isFetchingRef.current = false;
+        prevFiltersRef.current = currentFiltersString;
       }
     };
 
-    fetchRevenueChartData();
+    fetchRevenueData();
   }, [
     filters.dateRange?.from,
     filters.dateRange?.to,
