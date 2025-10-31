@@ -57,6 +57,7 @@ export default function TaskNotificationsPanel() {
           MESSAGE,
           IS_READ
         FROM SOURCE_DATA.LOGS.TASK_EXECUTION_LOG
+        WHERE START_TIME >= DATEADD(day, -10, CURRENT_TIMESTAMP())
         ORDER BY START_TIME DESC
         LIMIT 50
       `;
@@ -114,7 +115,7 @@ export default function TaskNotificationsPanel() {
       const sql = `
         UPDATE SOURCE_DATA.LOGS.TASK_EXECUTION_LOG
         SET IS_READ = TRUE
-        WHERE IS_READ = FALSE
+        WHERE IS_READ = FALSE and PROCESSED_AT >= DATEADD(day, -10, CURRENT_TIMESTAMP())
       `;
 
       await fetch("/api/snowflake/query", {
