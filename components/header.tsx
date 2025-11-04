@@ -111,7 +111,7 @@ export function Header() {
           MESSAGE,
           IS_READ
         FROM SOURCE_DATA.LOGS.TASK_EXECUTION_LOG
-        WHERE PROCESSED_AT >= DATEADD(day, -7, CURRENT_TIMESTAMP())
+        WHERE PROCESSED_AT >= DATEADD(day, -7345, CURRENT_TIMESTAMP())
         ORDER BY START_TIME DESC
         LIMIT 50
       `;
