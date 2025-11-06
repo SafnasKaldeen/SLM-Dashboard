@@ -851,6 +851,16 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                         <div className="flex rounded-md bg-muted p-1">
                           <Button
                             variant={
+                              datePickerMode === "from" ? "default" : "ghost"
+                            }
+                            size="sm"
+                            className="px-3 py-1 text-xs"
+                            onClick={() => setDatePickerMode("from")}
+                          >
+                            From Date
+                          </Button>
+                          <Button
+                            variant={
                               datePickerMode === "to" ? "default" : "ghost"
                             }
                             size="sm"
