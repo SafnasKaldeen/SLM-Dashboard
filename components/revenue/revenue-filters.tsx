@@ -145,8 +145,13 @@ const useGeographicHierarchy = (filters?: RevenueFilters) => {
 
 export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
   const today = new Date();
-  const defaultFrom = new Date(today.getFullYear() - 1, 9, 1);
-  const defaultTo = new Date(today.getFullYear(), 8, 30);
+
+  // FIRST day of CURRENT month last year
+  const defaultFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+
+  // LAST day of LAST month this year
+  const defaultTo = new Date(today.getFullYear(), today.getMonth(), 0);
+
   const defaultRange: DateRange = { from: defaultFrom, to: defaultTo };
 
   const [isExpanded, setIsExpanded] = useState(false);
