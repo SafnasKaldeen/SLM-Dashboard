@@ -145,13 +145,8 @@ const useGeographicHierarchy = (filters?: RevenueFilters) => {
 
 export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
   const today = new Date();
-
-  // FIRST day of CURRENT month last year
-  const defaultFrom = new Date(today.getFullYear() - 1, today.getMonth(), 1);
-
-  // LAST day of LAST month this year
-  const defaultTo = new Date(today.getFullYear(), today.getMonth(), 0);
-
+  const defaultFrom = new Date(today.getFullYear() - 1, 9, 1);
+  const defaultTo = new Date(today.getFullYear(), 8, 30);
   const defaultRange: DateRange = { from: defaultFrom, to: defaultTo };
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -779,7 +774,8 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
             )}
             <Button
               variant="ghost"
-              size="sm"
+              disabled={true} // React way
+              className=""
               onClick={() => setIsExpanded(!isExpanded)}
             >
               {isExpanded ? "Less" : "More"} Filters
@@ -849,16 +845,6 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                     <div className="p-4 space-y-4">
                       <div className="flex justify-center">
                         <div className="flex rounded-md bg-muted p-1">
-                          <Button
-                            variant={
-                              datePickerMode === "from" ? "default" : "ghost"
-                            }
-                            size="sm"
-                            className="px-3 py-1 text-xs"
-                            onClick={() => setDatePickerMode("from")}
-                          >
-                            From Date
-                          </Button>
                           <Button
                             variant={
                               datePickerMode === "to" ? "default" : "ghost"
@@ -1004,7 +990,12 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
           <div className="space-y-2">
             <Label>Province</Label>
             <Select
-              onValueChange={(value) => handleProvinceChange(value, true)}
+              value=""
+              onValueChange={(value) => {
+                if (!filters.selectedProvinces.includes(value)) {
+                  handleProvinceChange(value, true);
+                }
+              }}
             >
               <SelectTrigger>
                 <span>
@@ -1014,11 +1005,15 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                 </span>
               </SelectTrigger>
               <SelectContent>
-                {availableProvinces.map((province) => (
-                  <SelectItem key={province} value={province}>
-                    {province}
-                  </SelectItem>
-                ))}
+                {availableProvinces
+                  .filter(
+                    (province) => !filters.selectedProvinces.includes(province)
+                  )
+                  .map((province) => (
+                    <SelectItem key={province} value={province}>
+                      {province}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <div className="flex flex-wrap gap-1">
@@ -1038,7 +1033,12 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
           <div className="space-y-2">
             <Label>District</Label>
             <Select
-              onValueChange={(value) => handleDistrictChange(value, true)}
+              value=""
+              onValueChange={(value) => {
+                if (!filters.selectedDistricts.includes(value)) {
+                  handleDistrictChange(value, true);
+                }
+              }}
             >
               <SelectTrigger>
                 <span>
@@ -1048,11 +1048,15 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                 </span>
               </SelectTrigger>
               <SelectContent>
-                {availableDistricts.map((district) => (
-                  <SelectItem key={district} value={district}>
-                    {district}
-                  </SelectItem>
-                ))}
+                {availableDistricts
+                  .filter(
+                    (district) => !filters.selectedDistricts.includes(district)
+                  )
+                  .map((district) => (
+                    <SelectItem key={district} value={district}>
+                      {district}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <div className="flex flex-wrap gap-1">
@@ -1071,7 +1075,14 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
           {/* Area */}
           <div className="space-y-2">
             <Label>Area</Label>
-            <Select onValueChange={(value) => handleAreaChange(value, true)}>
+            <Select
+              value=""
+              onValueChange={(value) => {
+                if (!filters.selectedAreas.includes(value)) {
+                  handleAreaChange(value, true);
+                }
+              }}
+            >
               <SelectTrigger>
                 <span>
                   {filters.selectedAreas.length > 0
@@ -1080,11 +1091,13 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                 </span>
               </SelectTrigger>
               <SelectContent>
-                {availableAreas.map((area) => (
-                  <SelectItem key={area} value={area}>
-                    {area}
-                  </SelectItem>
-                ))}
+                {availableAreas
+                  .filter((area) => !filters.selectedAreas.includes(area))
+                  .map((area) => (
+                    <SelectItem key={area} value={area}>
+                      {area}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <div className="flex flex-wrap gap-1">
@@ -1105,7 +1118,12 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
             <div className="space-y-2">
               <Label>BSS Stations</Label>
               <Select
-                onValueChange={(value) => handleStationChange(value, true)}
+                value=""
+                onValueChange={(value) => {
+                  if (!filters.selectedStations.includes(value)) {
+                    handleStationChange(value, true);
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue
@@ -1117,11 +1135,15 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableStations.map((station) => (
-                    <SelectItem key={station} value={station}>
-                      {station}
-                    </SelectItem>
-                  ))}
+                  {availableStations
+                    .filter(
+                      (station) => !filters.selectedStations.includes(station)
+                    )
+                    .map((station) => (
+                      <SelectItem key={station} value={station}>
+                        {station}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <div className="flex flex-wrap gap-1">
