@@ -217,16 +217,16 @@ export function MainSidebar() {
           label: "Vehicle Overview",
           icon: <Activity className="h-4 w-4" />,
         },
-        {
-          path: "/batteries",
-          label: "Battery Overview",
-          icon: <Battery className="h-4 w-4" />,
-        },
-        {
-          path: "/stations",
-          label: "BSS Overview",
-          icon: <Zap className="h-4 w-4" />,
-        },
+        // {
+        //   path: "/batteries",
+        //   label: "Battery Overview",
+        //   icon: <Battery className="h-4 w-4" />,
+        // },
+        // {
+        //   path: "/stations",
+        //   label: "BSS Overview",
+        //   icon: <Zap className="h-4 w-4" />,
+        // },
 
         // {
         // {
