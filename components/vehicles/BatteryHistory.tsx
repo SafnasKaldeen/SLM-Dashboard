@@ -367,10 +367,20 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
     () => createBMSSegmentedData(processedData, "current"),
     [processedData]
   );
-  const cellDiffData = useMemo(
-    () => createBMSSegmentedData(processedData, "cellDiff"),
-    [processedData]
-  );
+  const cellDiffData = useMemo(() => {
+    const data = createBMSSegmentedData(processedData, "cellDiff");
+    // Debug: Check if we have any non-zero cell diff values
+    const hasData = data.some((d: any) => {
+      return Object.keys(d).some(
+        (key) => key.startsWith("cellDiff_") && d[key] !== null && d[key] !== 0
+      );
+    });
+    if (!hasData && processedData.length > 0) {
+      console.warn("Cell imbalance data appears to be empty or all zeros");
+      console.log("Sample data point:", processedData[0]);
+    }
+    return data;
+  }, [processedData]);
 
   const uniqueBMSIds = [...new Set(batteryData.map((d) => d.BMS_ID))];
 
@@ -924,82 +934,106 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
               <Activity className="w-5 h-5 text-cyan-400" />
               Cell Imbalance by BMS
             </h3>
-            <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={cellDiffData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                <XAxis
-                  dataKey="CTIME"
-                  tick={{ fontSize: 12, fill: "#94a3b8" }}
-                  tickFormatter={(value) => {
-                    const date = new Date(safeNumber(value) * 1000);
-                    return date.toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    });
-                  }}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: "#94a3b8" }}
-                  label={{
-                    value: "mV",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: { fill: "#94a3b8" },
-                  }}
-                />
-                <Tooltip content={<ScooterTooltip />} />
-
-                {/* Create separate Area for each BMS */}
-                {uniqueBMSIds.map((bmsId) => (
-                  <Area
-                    key={bmsId}
-                    type="monotone"
-                    dataKey={`cellDiff_${bmsId}`}
-                    stackId="cellDiff"
-                    stroke={bmsColors[bmsId]}
-                    fill={bmsColors[bmsId]}
-                    fillOpacity={0.6}
-                    name={`${bmsId} Cell Diff (mV)`}
-                    connectNulls={false}
+            {cellDiffData.length > 0 &&
+            cellDiffData.some((d: any) =>
+              Object.keys(d).some(
+                (key) => key.startsWith("cellDiff_") && d[key] > 0
+              )
+            ) ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <AreaChart data={cellDiffData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+                  <XAxis
+                    dataKey="CTIME"
+                    tick={{ fontSize: 12, fill: "#94a3b8" }}
+                    tickFormatter={(value) => {
+                      const date = new Date(safeNumber(value) * 1000);
+                      return date.toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      });
+                    }}
                   />
-                ))}
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "#94a3b8" }}
+                    label={{
+                      value: "mV",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fill: "#94a3b8" },
+                    }}
+                  />
+                  <Tooltip content={<ScooterTooltip />} />
 
-                <ReferenceLine
-                  y={300}
-                  stroke="#f59e0b"
-                  strokeDasharray="5 5"
-                  label={{
-                    value: "Warning (300mV)",
-                    position: "topRight",
-                    fontSize: 10,
-                    fill: "#f59e0b",
-                  }}
-                />
-                <ReferenceLine
-                  y={500}
-                  stroke="#ef4444"
-                  strokeDasharray="5 5"
-                  label={{
-                    value: "Critical (500mV)",
-                    position: "topRight",
-                    fontSize: 10,
-                    fill: "#ef4444",
-                  }}
-                />
+                  {/* Create separate Area for each BMS */}
+                  {uniqueBMSIds.map((bmsId) => (
+                    <Area
+                      key={bmsId}
+                      type="monotone"
+                      dataKey={`cellDiff_${bmsId}`}
+                      stackId="cellDiff"
+                      stroke={bmsColors[bmsId]}
+                      fill={bmsColors[bmsId]}
+                      fillOpacity={0.6}
+                      name={`${bmsId} Cell Diff (mV)`}
+                      connectNulls={false}
+                    />
+                  ))}
 
-                {/* Swap event markers */}
-                {batterySwaps.map((swap, idx) => (
                   <ReferenceLine
-                    key={idx}
-                    x={safeNumber(swap.timestamp)}
-                    stroke="#a855f7"
-                    strokeDasharray="1 1"
-                    strokeWidth={1}
-                    opacity={0.5}
+                    y={300}
+                    stroke="#f59e0b"
+                    strokeDasharray="5 5"
+                    label={{
+                      value: "Warning (300mV)",
+                      position: "topRight",
+                      fontSize: 10,
+                      fill: "#f59e0b",
+                    }}
                   />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
+                  <ReferenceLine
+                    y={500}
+                    stroke="#ef4444"
+                    strokeDasharray="5 5"
+                    label={{
+                      value: "Critical (500mV)",
+                      position: "topRight",
+                      fontSize: 10,
+                      fill: "#ef4444",
+                    }}
+                  />
+
+                  {/* Swap event markers */}
+                  {batterySwaps.map((swap, idx) => (
+                    <ReferenceLine
+                      key={idx}
+                      x={safeNumber(swap.timestamp)}
+                      stroke="#a855f7"
+                      strokeDasharray="1 1"
+                      strokeWidth={1}
+                      opacity={0.5}
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-80">
+                <div className="text-center text-slate-400">
+                  <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-lg mb-1">
+                    No Cell Imbalance Data Available
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    BATCELLDIFFMAX values may not be present in the telemetry
+                    data
+                  </p>
+                  <p className="text-xs text-slate-600 mt-2">
+                    This could indicate: Missing BMS sensor data, or all cells
+                    are perfectly balanced
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Current Flow Analysis */}

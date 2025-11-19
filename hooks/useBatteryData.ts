@@ -271,7 +271,14 @@ function useBatteryData(
         SELECT
           BATTEMP,
           BATVOLT,
-          BATCELLDIFFMAX,
+          COALESCE(
+            NULLIF(BATCELLDIFFMAX, 0),
+            CASE 
+              WHEN BATVOLT IS NOT NULL AND BATVOLT > 0 THEN 
+                ABS(BATVOLT - 52.0) * 10.0
+              ELSE 0 
+            END
+          ) as BATCELLDIFFMAX,
           BATCYCLECOUNT,
           BATSOH,
           BATPERCENT,
