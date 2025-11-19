@@ -11,15 +11,12 @@ import {
   AreaChart,
   Area,
   ComposedChart,
-  BarChart,
-  Bar,
 } from "recharts";
 import {
   Battery,
   Thermometer,
   Zap,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -29,22 +26,20 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowUpDown,
-  Cpu,
   Target,
   FileText,
   Loader2,
   Filter,
-  Settings,
 } from "lucide-react";
 
-// Import the hook and types
+// Import the optimized hook and types
 import useBatteryData, {
   TboxData,
   BatterySwapEvent,
   BatterySession,
   DiagnosticMetrics,
   BatteryFilters,
-} from "@/hooks/useBatteryData"; // Adjust path as needed
+} from "@/hooks/useBatteryData";
 
 interface ProcessedDataPoint extends TboxData {
   continuousTemp?: number;
@@ -52,7 +47,6 @@ interface ProcessedDataPoint extends TboxData {
   continuousCurrent?: number;
   continuousCellDiff?: number;
   swapTransition?: boolean;
-  transitionProgress?: number;
 }
 
 // Helper function to safely convert values to numbers
@@ -67,9 +61,8 @@ const createContinuousData = (data: TboxData[]): ProcessedDataPoint[] => {
   if (data.length === 0) return [];
 
   const processedData: ProcessedDataPoint[] = [];
-
-  // First, identify swap points
   const swapPoints: number[] = [];
+
   for (let i = 1; i < data.length; i++) {
     if (data[i].BMS_ID !== data[i - 1].BMS_ID) {
       swapPoints.push(i);
@@ -78,17 +71,13 @@ const createContinuousData = (data: TboxData[]): ProcessedDataPoint[] => {
 
   for (let i = 0; i < data.length; i++) {
     const currentPoint = { ...data[i] } as ProcessedDataPoint;
-
-    // Check if this is a swap point
     const isSwapPoint = swapPoints.includes(i);
     const isPreviousSwapPoint = i > 0 && swapPoints.includes(i - 1);
 
     if (isSwapPoint && i > 0) {
-      // This is the new battery after swap
       const prevPoint = data[i - 1];
       const currentBatteryPoint = data[i];
 
-      // Create interpolated values for the swap transition
       currentPoint.continuousTemp =
         (safeNumber(prevPoint.BATTEMP) +
           safeNumber(currentBatteryPoint.BATTEMP)) /
@@ -106,16 +95,7 @@ const createContinuousData = (data: TboxData[]): ProcessedDataPoint[] => {
           safeNumber(currentBatteryPoint.BATCELLDIFFMAX)) /
         2;
       currentPoint.swapTransition = true;
-      currentPoint.transitionProgress = 0.5;
-    } else if (isPreviousSwapPoint) {
-      // This is the hour after swap, gradually transition to new battery values
-      currentPoint.continuousTemp = safeNumber(currentPoint.BATTEMP);
-      currentPoint.continuousVoltage = safeNumber(currentPoint.BATVOLT);
-      currentPoint.continuousCurrent = safeNumber(currentPoint.BATCURRENT);
-      currentPoint.continuousCellDiff = safeNumber(currentPoint.BATCELLDIFFMAX);
-      currentPoint.swapTransition = false;
     } else {
-      // Normal operation - use actual values
       currentPoint.continuousTemp = safeNumber(currentPoint.BATTEMP);
       currentPoint.continuousVoltage = safeNumber(currentPoint.BATVOLT);
       currentPoint.continuousCurrent = safeNumber(currentPoint.BATCURRENT);
@@ -139,7 +119,6 @@ const createBMSSegmentedData = (data: ProcessedDataPoint[], metric: string) => {
   for (let i = 0; i < data.length; i++) {
     const dataPoint = { ...data[i] };
 
-    // For each BMS, set the metric value only if this point belongs to that BMS
     uniqueBMSIds.forEach((bmsId) => {
       const key = `${metric}_${bmsId}`;
       if (data[i].BMS_ID === bmsId) {
@@ -174,7 +153,7 @@ const createBMSSegmentedData = (data: ProcessedDataPoint[], metric: string) => {
             dataPoint[key] = 0;
         }
       } else {
-        dataPoint[key] = null; // Null values create gaps in the area
+        dataPoint[key] = null;
       }
     });
 
@@ -184,7 +163,7 @@ const createBMSSegmentedData = (data: ProcessedDataPoint[], metric: string) => {
   return segmentedData;
 };
 
-// Enhanced tooltip for BMS awareness
+// Enhanced tooltip
 const ScooterTooltip: React.FC<any> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload as ProcessedDataPoint;
@@ -221,21 +200,6 @@ const ScooterTooltip: React.FC<any> = ({ active, payload, label }) => {
                 </div>
               )
           )}
-          <div className="border-t border-slate-600 mt-2 pt-2 text-xs text-slate-400">
-            <div>
-              SOH: {safeNumber(data.BATSOH).toFixed(1)}% | Cycles:{" "}
-              {safeNumber(data.BATCYCLECOUNT)}
-            </div>
-            <div>
-              State: {data.STATE} | Distance:{" "}
-              {safeNumber(data.TOTAL_DISTANCE_KM).toFixed(1)}km
-            </div>
-            {data.swapTransition && (
-              <div className="text-purple-400 font-semibold">
-                Battery Swap Transition
-              </div>
-            )}
-          </div>
         </div>
       </div>
     );
@@ -350,12 +314,12 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
   const [selectedTboxId, setSelectedTboxId] = useState<string>(IMEI || "");
   const [inputTboxId, setInputTboxId] = useState<string>("");
   const [filters, setFilters] = useState<BatteryFilters>({
-    timeRange: 700, // 500 hours default
+    timeRange: 168, // 7 days default
     includeIdleData: false,
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  // Use the real data hook
+  // Use the optimized hook
   const {
     batteryData,
     batterySwaps,
@@ -367,7 +331,7 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
     refetch,
   } = useBatteryData(selectedTboxId, filters);
 
-  // Process the real data for continuous charts
+  // Process the data for continuous charts
   const processedData = useMemo(() => {
     return createContinuousData(batteryData);
   }, [batteryData]);
@@ -376,14 +340,14 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
   const bmsColors = useMemo(() => {
     const uniqueBmsIds = [...new Set(batteryData.map((d) => d.BMS_ID))];
     const colors = [
-      "#8b5cf6", // Purple
-      "#06b6d4", // Cyan
-      "#10b981", // Emerald
-      "#f59e0b", // Amber
-      "#ef4444", // Red
-      "#ec4899", // Pink
-      "#84cc16", // Lime
-      "#f97316", // Orange
+      "#8b5cf6",
+      "#06b6d4",
+      "#10b981",
+      "#f59e0b",
+      "#ef4444",
+      "#ec4899",
+      "#84cc16",
+      "#f97316",
     ];
     return uniqueBmsIds.reduce((acc, bmsId, index) => {
       acc[bmsId] = colors[index % colors.length];
@@ -408,14 +372,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
     () => createBMSSegmentedData(processedData, "cellDiff"),
     [processedData]
   );
-  const sohData = useMemo(
-    () => createBMSSegmentedData(processedData, "soh"),
-    [processedData]
-  );
-  const chargeData = useMemo(
-    () => createBMSSegmentedData(processedData, "charge"),
-    [processedData]
-  );
 
   const uniqueBMSIds = [...new Set(batteryData.map((d) => d.BMS_ID))];
 
@@ -427,13 +383,13 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
     }
   };
 
-  // Loading state
-  if (loading && selectedTboxId) {
+  // Loading state - only show when loading is true
+  if (loading) {
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="text-center">
           <Loader2 className="w-16 h-16 mx-auto mb-4 animate-spin text-purple-400" />
-          <p className="text-slate-400 text-lg mb-2">
+          <p className="text-slate-300 text-lg mb-2">
             Loading battery diagnostics...
           </p>
           <p className="text-slate-500 text-sm">
@@ -442,7 +398,9 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
           {debugInfo && (
             <div className="mt-4 text-xs text-slate-500 space-y-1">
               <p>Telemetry Records: {safeNumber(debugInfo.telemetryCount)}</p>
-              <p>Battery Swaps: {safeNumber(debugInfo.swapCount)}</p>
+              <p>
+                Battery Swaps: {safeNumber(debugInfo.consolidatedSwapCount)}
+              </p>
               <p>Battery Sessions: {safeNumber(debugInfo.sessionCount)}</p>
               <p>Unique Batteries: {safeNumber(debugInfo.uniqueBatteries)}</p>
             </div>
@@ -455,7 +413,7 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
   // Error state
   if (error && selectedTboxId) {
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="text-center max-w-lg">
           <XCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
           <h2 className="text-xl font-semibold text-red-300 mb-4">
@@ -487,7 +445,7 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
   // No TBOX ID selected state
   if (!selectedTboxId) {
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <Battery className="w-20 h-20 mx-auto mb-6 text-purple-400" />
           <h2 className="text-2xl font-semibold text-slate-200 mb-4">
@@ -527,10 +485,10 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
     );
   }
 
-  // No data available
-  if (!diagnostics || batteryData.length === 0) {
+  // No data available - only show after loading completes
+  if (!loading && batteryData.length === 0) {
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="text-center max-w-lg">
           <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-yellow-400" />
           <h2 className="text-xl font-semibold text-slate-200 mb-4">
@@ -549,13 +507,29 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
               {debugInfo && <p>Database Query: Executed successfully</p>}
             </div>
           </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => setSelectedTboxId("")}
+              className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Change TBOX ID
+            </button>
+            <button
+              onClick={refetch}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Main dashboard view with data
   return (
-    <div className="min-h-screen text-slate-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -630,68 +604,70 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
           </div>
         </div>
 
-        {/* Quick Status Overview */}
-        <div
-          className={`rounded-lg p-6 border-2 ${
-            diagnostics.overallHealth === "Excellent"
-              ? "bg-green-900/20 border-green-700"
-              : diagnostics.overallHealth === "Good"
-              ? "bg-blue-900/20 border-blue-700"
-              : diagnostics.overallHealth === "Fair"
-              ? "bg-yellow-900/20 border-yellow-700"
-              : "bg-red-900/20 border-red-700"
-          }`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Target className="w-6 h-6" />
-              Overall Health: {diagnostics.overallHealth}
-            </h2>
-            <div className="text-sm text-slate-400">
-              {safeNumber(diagnostics.totalBatteries)} batteries tracked |{" "}
-              {safeNumber(diagnostics.totalSwaps)} swaps detected
+        {/* Quick Status Overview - Only show if diagnostics exist */}
+        {diagnostics && (
+          <div
+            className={`rounded-lg p-6 border-2 ${
+              diagnostics.overallHealth === "Excellent"
+                ? "bg-green-900/20 border-green-700"
+                : diagnostics.overallHealth === "Good"
+                ? "bg-blue-900/20 border-blue-700"
+                : diagnostics.overallHealth === "Fair"
+                ? "bg-yellow-900/20 border-yellow-700"
+                : "bg-red-900/20 border-red-700"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Target className="w-6 h-6" />
+                Overall Health: {diagnostics.overallHealth}
+              </h2>
+              <div className="text-sm text-slate-400">
+                {safeNumber(diagnostics.totalBatteries)} batteries tracked |{" "}
+                {safeNumber(diagnostics.totalSwaps)} swaps detected
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-400">
-                {safeNumber(diagnostics.totalBatteries)}
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-400">
+                  {safeNumber(diagnostics.totalBatteries)}
+                </div>
+                <div className="text-slate-400 text-sm">Unique Batteries</div>
               </div>
-              <div className="text-slate-400 text-sm">Unique Batteries</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-cyan-400">
-                {safeNumber(diagnostics.totalSwaps)}
+              <div className="text-center">
+                <div className="text-2xl font-bold text-cyan-400">
+                  {safeNumber(diagnostics.totalSwaps)}
+                </div>
+                <div className="text-slate-400 text-sm">Battery Swaps</div>
               </div>
-              <div className="text-slate-400 text-sm">Battery Swaps</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-400">
-                {safeNumber(diagnostics.swapFrequency).toFixed(1)}
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-400">
+                  {safeNumber(diagnostics.swapFrequency).toFixed(1)}
+                </div>
+                <div className="text-slate-400 text-sm">Swaps/Day</div>
               </div>
-              <div className="text-slate-400 text-sm">Swaps/Day</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-400">
-                {safeNumber(diagnostics.avgSessionDuration).toFixed(1)}h
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-400">
+                  {safeNumber(diagnostics.avgSessionDuration).toFixed(1)}h
+                </div>
+                <div className="text-slate-400 text-sm">Avg Session</div>
               </div>
-              <div className="text-slate-400 text-sm">Avg Session</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-400">
-                {diagnostics.thermalPerformance}
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-400">
+                  {diagnostics.thermalPerformance}
+                </div>
+                <div className="text-slate-400 text-sm">Thermal Status</div>
               </div>
-              <div className="text-slate-400 text-sm">Thermal Status</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-pink-400">
-                {diagnostics.voltageStability}
+              <div className="text-center">
+                <div className="text-2xl font-bold text-pink-400">
+                  {diagnostics.voltageStability}
+                </div>
+                <div className="text-slate-400 text-sm">Voltage Status</div>
               </div>
-              <div className="text-slate-400 text-sm">Voltage Status</div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Battery Usage Timeline */}
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
@@ -1614,22 +1590,26 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
             <span>Time Range: {filters.timeRange}h</span>
             <span>•</span>
             <span>
-              Batteries Tracked: {safeNumber(diagnostics.totalBatteries)}
+              Batteries Tracked: {safeNumber(diagnostics?.totalBatteries)}
             </span>
-            <span>•</span>
-            <span
-              className={`px-2 py-1 rounded ${
-                diagnostics.overallHealth === "Excellent"
-                  ? "bg-green-900/50 text-green-400"
-                  : diagnostics.overallHealth === "Good"
-                  ? "bg-blue-900/50 text-blue-400"
-                  : diagnostics.overallHealth === "Fair"
-                  ? "bg-yellow-900/50 text-yellow-400"
-                  : "bg-red-900/50 text-red-400"
-              }`}
-            >
-              {diagnostics.overallHealth.toUpperCase()}
-            </span>
+            {diagnostics && (
+              <>
+                <span>•</span>
+                <span
+                  className={`px-2 py-1 rounded ${
+                    diagnostics.overallHealth === "Excellent"
+                      ? "bg-green-900/50 text-green-400"
+                      : diagnostics.overallHealth === "Good"
+                      ? "bg-blue-900/50 text-blue-400"
+                      : diagnostics.overallHealth === "Fair"
+                      ? "bg-yellow-900/50 text-yellow-400"
+                      : "bg-red-900/50 text-red-400"
+                  }`}
+                >
+                  {diagnostics.overallHealth.toUpperCase()}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
