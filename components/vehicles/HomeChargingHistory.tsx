@@ -138,7 +138,6 @@ function formatCurrency(amount: number, currency: string = "LKR"): string {
 }
 
 function formatDate(timestamp: number): string {
-  // Handle both 10-digit (seconds) and 13-digit (milliseconds) timestamps
   const date =
     timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
   return date.toLocaleDateString("en-US", {
@@ -149,7 +148,6 @@ function formatDate(timestamp: number): string {
 }
 
 function formatDateTime(timestamp: number): string {
-  // Handle both 10-digit (seconds) and 13-digit (milliseconds) timestamps
   const date =
     timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
   return date.toLocaleString("en-US", {
@@ -656,6 +654,111 @@ export default function HomeChargingHistory({
             >
               Try Again
             </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Check if there are no home charging records
+  if (!loading && analytics.chargingPayments.length === 0) {
+    return (
+      <div className="min-h-screen">
+        <div className="flex items-center justify-between mb-6">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-slate-100 flex items-center gap-3">
+              <Home className="w-8 h-8 text-cyan-400" />
+              Home Charging Analytics
+            </h1>
+            <p className="text-slate-400">
+              Personal charging insights, costs, and usage patterns for your
+              home EV charger
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </button>
+        </div>
+
+        <Card className="bg-gradient-to-br from-slate-900/70 to-slate-800/70 border-slate-700">
+          <CardContent className="p-12 text-center">
+            <div className="max-w-md mx-auto space-y-6">
+              <div className="w-24 h-24 mx-auto bg-slate-800/50 rounded-full flex items-center justify-center">
+                <Home className="w-12 h-12 text-cyan-400" />
+              </div>
+
+              <div className="space-y-3">
+                <h2 className="text-2xl font-bold text-slate-100">
+                  No Home Charging Records Yet
+                </h2>
+                <p className="text-slate-400 text-lg leading-relaxed">
+                  We haven't detected any home charging sessions for this
+                  account yet. Once start using your home charger, you'll see
+                  detailed analytics here including:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 text-left bg-slate-800/30 rounded-lg p-6">
+                <div className="flex items-start gap-3">
+                  <DollarSign className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-slate-200 font-medium">
+                      Cost Tracking
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      Monitor your daily, weekly, and monthly charging expenses
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Battery className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-slate-200 font-medium">
+                      Energy Insights
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      Track kWh consumption and charging patterns
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <TrendingUp className="w-5 h-5 text-purple-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-slate-200 font-medium">
+                      Usage Patterns
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      Discover your peak charging hours and weekly trends
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Activity className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-slate-200 font-medium">
+                      Savings Calculator
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      See how much you save vs public charging
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-700">
+                <p className="text-sm text-slate-500">
+                  Start charging at home to unlock personalized insights and
+                  track your EV charging journey!
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -549,28 +549,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
               {debugInfo && <p>Database Query: Executed successfully</p>}
             </div>
           </div>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => setSelectedTboxId("")}
-              className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Change TBOX ID
-            </button>
-            <button
-              onClick={() =>
-                setFilters((prev) => ({ ...prev, timeRange: 720 }))
-              }
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Try 30 Days
-            </button>
-            <button
-              onClick={refetch}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Retry
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -848,22 +826,10 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                 stroke="#f59e0b"
                 strokeDasharray="5 5"
                 label={{
-                  value: "Warning (85%)",
+                  value: "LOH SOH (85%)",
                   position: "topRight",
                   fontSize: 10,
                   fill: "#f59e0b",
-                }}
-              />
-              <ReferenceLine
-                yAxisId="soh"
-                y={75}
-                stroke="#ef4444"
-                strokeDasharray="5 5"
-                label={{
-                  value: "Critical (75%)",
-                  position: "topRight",
-                  fontSize: 10,
-                  fill: "#ef4444",
                 }}
               />
 
