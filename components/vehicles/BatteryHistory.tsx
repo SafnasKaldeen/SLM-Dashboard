@@ -711,6 +711,23 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                 name="Battery Health (%)"
               />
 
+              {/* Battery indicator line at the bottom */}
+              {uniqueBMSIds.map((bmsId) => (
+                <Line
+                  key={`indicator_${bmsId}`}
+                  yAxisId="percent"
+                  type="stepAfter"
+                  dataKey={(data: ProcessedDataPoint) =>
+                    data.BMS_ID === bmsId ? -5 : null
+                  }
+                  stroke={bmsColors[bmsId]}
+                  strokeWidth={6}
+                  dot={false}
+                  connectNulls={false}
+                  name={`${bmsId} Active`}
+                />
+              ))}
+
               {batterySwaps.map((swap, idx) => (
                 <ReferenceLine
                   key={idx}
