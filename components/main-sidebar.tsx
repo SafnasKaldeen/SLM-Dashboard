@@ -255,7 +255,7 @@ export function MainSidebar() {
       id: "sales",
       label: "Sales Management",
       icon: categoryIcons.sales,
-      show: true,
+      // show: true,
       items: [
         {
           path: "/sales",
