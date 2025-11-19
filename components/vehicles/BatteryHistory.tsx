@@ -72,7 +72,6 @@ const createContinuousData = (data: TboxData[]): ProcessedDataPoint[] => {
   for (let i = 0; i < data.length; i++) {
     const currentPoint = { ...data[i] } as ProcessedDataPoint;
     const isSwapPoint = swapPoints.includes(i);
-    const isPreviousSwapPoint = i > 0 && swapPoints.includes(i - 1);
 
     if (isSwapPoint && i > 0) {
       const prevPoint = data[i - 1];
@@ -445,7 +444,7 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
   // No TBOX ID selected state
   if (!selectedTboxId) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center">
         <div className="text-center max-w-md">
           <Battery className="w-20 h-20 mx-auto mb-6 text-purple-400" />
           <h2 className="text-2xl font-semibold text-slate-200 mb-4">
@@ -488,7 +487,7 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
   // No data available - only show after loading completes
   if (!loading && batteryData.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center">
         <div className="text-center max-w-lg">
           <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-yellow-400" />
           <h2 className="text-xl font-semibold text-slate-200 mb-4">
@@ -529,7 +528,7 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
 
   // Main dashboard view with data
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+    <div className="min-h-screen text-slate-100">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -560,47 +559,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <select
-              value={filters.timeRange}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  timeRange: Number(e.target.value),
-                }))
-              }
-              className="bg-slate-800 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:border-purple-500"
-            >
-              <option value={24}>Last 24 Hours</option>
-              <option value={72}>Last 3 Days</option>
-              <option value={168}>Last 7 Days</option>
-              <option value={336}>Last 14 Days</option>
-              <option value={720}>Last 30 Days</option>
-            </select>
-
-            <FiltersPanel
-              filters={filters}
-              onFiltersChange={setFilters}
-              isOpen={showFilters}
-              onToggle={() => setShowFilters(!showFilters)}
-            />
-
-            <button
-              onClick={() => setSelectedTboxId("")}
-              className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg transition-colors"
-            >
-              Change Scooter
-            </button>
-
-            <button
-              onClick={refetch}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
           </div>
         </div>
 
@@ -674,9 +632,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
           <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
             <Activity className="w-5 h-5 text-purple-400" />
             Battery Usage Timeline
-            <span className="text-sm text-slate-400 ml-4">
-              Charge level & health over time with swap transitions
-            </span>
           </h3>
 
           {/* BMS Legend */}
@@ -692,10 +647,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                 </span>
               </div>
             ))}
-            <div className="ml-4 flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-purple-400 opacity-50"></div>
-              <span className="text-sm text-purple-300">Swap Transition</span>
-            </div>
           </div>
 
           <ResponsiveContainer width="100%" height={400}>
@@ -709,7 +660,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                   return date.toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
-                    hour: filters.timeRange <= 72 ? "numeric" : undefined,
                   });
                 }}
               />
@@ -738,7 +688,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
               />
               <Tooltip content={<ScooterTooltip />} />
 
-              {/* Battery charge level area */}
               <Area
                 yAxisId="percent"
                 type="monotone"
@@ -752,37 +701,20 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                 name="Charge Level (%)"
               />
 
-              {/* Battery SOH line */}
               <Line
                 yAxisId="soh"
                 type="monotone"
                 dataKey={(data: ProcessedDataPoint) => safeNumber(data.BATSOH)}
                 stroke="#8b5cf6"
                 strokeWidth={3}
-                dot={(props: any) => {
-                  const { payload } = props;
-                  if (payload && payload.swapTransition) {
-                    return (
-                      <circle
-                        cx={props.cx}
-                        cy={props.cy}
-                        r={5}
-                        fill="#a855f7"
-                        stroke="#8b5cf6"
-                        strokeWidth={2}
-                      />
-                    );
-                  }
-                  return false;
-                }}
+                dot={false}
                 name="Battery Health (%)"
               />
 
-              {/* Swap event markers */}
               {batterySwaps.map((swap, idx) => (
                 <ReferenceLine
                   key={idx}
-                  x={safeNumber(swap.timestamp)}
+                  x={safeNumber(swap.TIMESTAMP)}
                   stroke="#a855f7"
                   strokeDasharray="2 2"
                   strokeWidth={2}
@@ -794,35 +726,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                   }}
                 />
               ))}
-
-              {/* Reference lines for health thresholds */}
-              <ReferenceLine
-                yAxisId="soh"
-                y={85}
-                stroke="#f59e0b"
-                strokeDasharray="5 5"
-                label={{
-                  value: "LOH SOH (85%)",
-                  position: "topRight",
-                  fontSize: 10,
-                  fill: "#f59e0b",
-                }}
-              />
-
-              {/* Low charge warning */}
-              <ReferenceLine
-                yAxisId="percent"
-                y={20}
-                stroke="#f59e0b"
-                strokeDasharray="3 3"
-                opacity={0.7}
-                label={{
-                  value: "Low Charge (20%)",
-                  position: "topLeft",
-                  fontSize: 10,
-                  fill: "#f59e0b",
-                }}
-              />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -1356,226 +1259,6 @@ const BatteryHistory: React.FC<{ IMEI: string }> = ({ IMEI }) => {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-
-        {/* Diagnostic Insights & Recommendations */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-slate-100 mb-6 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-yellow-400" />
-            Diagnostic Insights & Recommendations
-          </h3>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Performance Analysis */}
-            <div>
-              <h4 className="font-semibold text-slate-200 mb-4 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-green-400" />
-                Performance Analysis
-              </h4>
-              <div className="space-y-3">
-                {/* Preferred Batteries */}
-                {diagnostics.preferredBatteries.length > 0 && (
-                  <div className="p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
-                    <div className="font-medium text-green-300 mb-2 flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
-                      Best Performing Batteries
-                    </div>
-                    <div className="text-sm text-green-200 mb-2">
-                      {diagnostics.preferredBatteries.map((batteryId, idx) => (
-                        <span key={batteryId} className="font-mono">
-                          {batteryId}
-                          {idx < diagnostics.preferredBatteries.length - 1
-                            ? ", "
-                            : ""}
-                        </span>
-                      ))}{" "}
-                      show optimal performance
-                    </div>
-                    <div className="text-xs text-green-400 font-medium space-y-1">
-                      <div>→ Prioritize these batteries for extended trips</div>
-                      <div>→ Monitor for degradation patterns</div>
-                      <div>→ Use as performance benchmarks</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Efficiency Metrics */}
-                <div className="p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
-                  <div className="font-medium text-blue-300 mb-2 flex items-center gap-2">
-                    <Gauge className="w-4 h-4" />
-                    Battery Efficiency
-                  </div>
-                  <div className="text-sm text-blue-200 mb-2">
-                    Average:{" "}
-                    {safeNumber(diagnostics.batteryEfficiency).toFixed(1)} km
-                    per % charge
-                  </div>
-                  <div className="text-xs text-blue-400 font-medium">
-                    {safeNumber(diagnostics.batteryEfficiency) > 0.8
-                      ? "→ Excellent efficiency - maintain current usage patterns"
-                      : safeNumber(diagnostics.batteryEfficiency) > 0.5
-                      ? "→ Good efficiency - monitor for improvements"
-                      : "→ Low efficiency - investigate battery degradation"}
-                  </div>
-                </div>
-
-                {/* Swap Pattern Analysis */}
-                <div className="p-4 bg-purple-900/20 border border-purple-800/50 rounded-lg">
-                  <div className="font-medium text-purple-300 mb-2 flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    Swap Pattern Analysis
-                  </div>
-                  <div className="text-sm text-purple-200 mb-2">
-                    {safeNumber(diagnostics.swapFrequency).toFixed(1)} swaps/day
-                    | Avg session:{" "}
-                    {safeNumber(diagnostics.avgSessionDuration).toFixed(1)}h
-                  </div>
-                  <div className="text-xs text-purple-400 font-medium">
-                    {safeNumber(diagnostics.swapFrequency) > 2
-                      ? "→ High swap frequency - check charging infrastructure"
-                      : safeNumber(diagnostics.swapFrequency) > 1
-                      ? "→ Normal swap pattern for active usage"
-                      : "→ Low swap frequency - battery lasting well"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Issues & Maintenance */}
-            <div>
-              <h4 className="font-semibold text-slate-200 mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                Issues & Maintenance
-              </h4>
-              <div className="space-y-3">
-                {/* Problematic Batteries */}
-                {diagnostics.problematicBatteries.length > 0 ? (
-                  <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
-                    <div className="font-medium text-red-300 mb-2 flex items-center gap-2">
-                      <XCircle className="w-4 h-4" />
-                      Batteries Requiring Attention
-                    </div>
-                    <div className="text-sm text-red-200 mb-2">
-                      {diagnostics.problematicBatteries.map(
-                        (batteryId, idx) => (
-                          <span key={batteryId} className="font-mono">
-                            {batteryId}
-                            {idx < diagnostics.problematicBatteries.length - 1
-                              ? ", "
-                              : ""}
-                          </span>
-                        )
-                      )}{" "}
-                      showing issues
-                    </div>
-                    <div className="text-xs text-red-400 font-medium space-y-1">
-                      <div>→ Schedule detailed battery inspection</div>
-                      <div>→ Consider replacement if SOH &lt; 75%</div>
-                      <div>→ Monitor thermal and voltage patterns</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
-                    <div className="font-medium text-green-300 mb-2 flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
-                      No Critical Battery Issues
-                    </div>
-                    <div className="text-sm text-green-200">
-                      All batteries performing within acceptable parameters
-                    </div>
-                  </div>
-                )}
-
-                {/* Thermal Performance */}
-                <div
-                  className={`p-4 border rounded-lg ${
-                    diagnostics.thermalPerformance === "Excellent"
-                      ? "bg-green-900/20 border-green-800/50"
-                      : diagnostics.thermalPerformance === "Good"
-                      ? "bg-blue-900/20 border-blue-800/50"
-                      : diagnostics.thermalPerformance === "Fair"
-                      ? "bg-yellow-900/20 border-yellow-800/50"
-                      : "bg-red-900/20 border-red-800/50"
-                  }`}
-                >
-                  <div
-                    className={`font-medium mb-2 flex items-center gap-2 ${
-                      diagnostics.thermalPerformance === "Excellent"
-                        ? "text-green-300"
-                        : diagnostics.thermalPerformance === "Good"
-                        ? "text-blue-300"
-                        : diagnostics.thermalPerformance === "Fair"
-                        ? "text-yellow-300"
-                        : "text-red-300"
-                    }`}
-                  >
-                    <Thermometer className="w-4 h-4" />
-                    Thermal Management: {diagnostics.thermalPerformance}
-                  </div>
-                  <div
-                    className={`text-xs font-medium ${
-                      diagnostics.thermalPerformance === "Excellent"
-                        ? "text-green-400"
-                        : diagnostics.thermalPerformance === "Good"
-                        ? "text-blue-400"
-                        : diagnostics.thermalPerformance === "Fair"
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                    }`}
-                  >
-                    {diagnostics.thermalPerformance === "Poor"
-                      ? "→ Immediate cooling system inspection required"
-                      : diagnostics.thermalPerformance === "Fair"
-                      ? "→ Monitor thermal patterns, check ventilation"
-                      : "→ Thermal management operating normally"}
-                  </div>
-                </div>
-
-                {/* Voltage Stability */}
-                <div
-                  className={`p-4 border rounded-lg ${
-                    diagnostics.voltageStability === "Stable"
-                      ? "bg-green-900/20 border-green-800/50"
-                      : "bg-red-900/20 border-red-800/50"
-                  }`}
-                >
-                  <div
-                    className={`font-medium mb-2 ${
-                      diagnostics.voltageStability === "Stable"
-                        ? "text-green-300"
-                        : "text-red-300"
-                    }`}
-                  >
-                    Voltage Stability: {diagnostics.voltageStability}
-                  </div>
-                  <div
-                    className={`text-xs font-medium ${
-                      diagnostics.voltageStability === "Stable"
-                        ? "text-green-400"
-                        : "text-red-400"
-                    }`}
-                  >
-                    {diagnostics.voltageStability === "Unstable"
-                      ? "→ Check battery connections and BMS calibration"
-                      : "→ Voltage regulation within normal parameters"}
-                  </div>
-                </div>
-
-                {/* Maintenance Schedule */}
-                <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
-                  <div className="font-medium text-slate-300 mb-2">
-                    Recommended Maintenance
-                  </div>
-                  <div className="text-xs text-slate-400 space-y-1">
-                    <div>Weekly: Visual inspection of battery compartment</div>
-                    <div>Bi-weekly: Connection tightness check</div>
-                    <div>Monthly: Cell balance verification</div>
-                    <div>Quarterly: Full diagnostic cycle test</div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
