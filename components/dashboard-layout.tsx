@@ -56,7 +56,7 @@ export default function DashboardLayout({
             <div className="flex-1 flex flex-col w-full lg:w-auto">
               <Header />
               <main className="flex-1 overflow-auto py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-                <div className="container mx-auto px-4 lg:px-0">{children}</div>
+                <div className="container mx-auto px-4">{children}</div>
               </main>
             </div>
           </SidebarProvider>
