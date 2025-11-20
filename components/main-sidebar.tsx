@@ -55,7 +55,7 @@ import {
   X,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
 export function MainSidebar() {
@@ -72,6 +72,18 @@ export function MainSidebar() {
     revenue: pathname?.startsWith("/revenue") || false,
   });
 
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isMobileMenuOpen]);
+
   const toggleGroup = (group: string) => {
     setOpenGroups((prev) => ({ ...prev, [group]: !prev[group] }));
   };
@@ -80,6 +92,10 @@ export function MainSidebar() {
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
+  };
+
+  const openMobileMenu = () => {
+    setIsMobileMenuOpen(true);
   };
 
   // Define category icons with their colors for consistency
@@ -332,7 +348,7 @@ export function MainSidebar() {
     (category) => category.show === true
   );
 
-  const SidebarContentComponent = () => (
+  const SidebarContentComponent = ({ showCloseButton = false }) => (
     <>
       <SidebarHeader className="h-20 border-b flex px-5 justify-between border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
         <div className="flex items-center gap-x-3 mt-2">
@@ -355,14 +371,16 @@ export function MainSidebar() {
           </a>
         </div>
 
-        {/* Close button for mobile */}
-        <button
-          onClick={closeMobileMenu}
-          className="lg:hidden p-2 hover:bg-slate-800 rounded-md transition-colors"
-          aria-label="Close menu"
-        >
-          <X className="h-5 w-5 text-slate-400" />
-        </button>
+        {/* Close button for mobile only */}
+        {showCloseButton && (
+          <button
+            onClick={closeMobileMenu}
+            className="p-2 hover:bg-slate-800 rounded-md transition-colors"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5 text-slate-400" />
+          </button>
+        )}
       </SidebarHeader>
 
       <SidebarContent className="py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
@@ -591,36 +609,51 @@ export function MainSidebar() {
 
   return (
     <>
-      {/* Left Arrow Button - Only visible on mobile/tablet - Sticky in middle */}
+      {/* Desktop Sidebar - Takes up space in layout */}
+      <aside className="hidden lg:block w-64 shrink-0">
+        <Sidebar className="border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 w-64 shadow-2xl h-screen">
+          <SidebarContentComponent showCloseButton={false} />
+        </Sidebar>
+      </aside>
+
+      {/* Mobile Arrow Button - Only visible when sidebar is closed */}
       <button
-        onClick={() => setIsMobileMenuOpen(true)}
-        className="lg:hidden fixed left-0 top-1/2 -translate-y-1/2 z-[100] p-3 bg-gradient-to-r from-slate-900 to-slate-800 border-r border-t border-b border-slate-700/50 rounded-r-lg hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-200 hover:pr-4"
+        onClick={openMobileMenu}
+        className={`lg:hidden fixed left-0 top-1/2 -translate-y-1/2 z-[100] p-3 bg-gradient-to-r from-slate-900 to-slate-800 border-r border-t border-b border-slate-700/50 rounded-r-lg hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 hover:pr-4 ${
+          isMobileMenuOpen ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
         aria-label="Open menu"
       >
         <ChevronRight className="h-5 w-5 text-cyan-400" />
       </button>
 
-      {/* Overlay - Only visible on mobile/tablet when menu is open */}
-      {isMobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] transition-opacity"
-          onClick={closeMobileMenu}
-        />
-      )}
+      {/* Mobile Overlay - Only visible when menu is open */}
+      <div
+        className={`lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
+          isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={closeMobileMenu}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 60,
+        }}
+      />
 
-      {/* Desktop Sidebar - Normal layout participant */}
-      <Sidebar className="hidden lg:block border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 w-64 shadow-2xl h-screen">
-        <SidebarContentComponent />
-      </Sidebar>
-
-      {/* Mobile/Tablet Sidebar Overlay - Completely independent */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-y-0 left-0 z-[70] w-64">
-          <Sidebar className="h-full border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 shadow-2xl">
-            <SidebarContentComponent />
-          </Sidebar>
-        </div>
-      )}
+      {/* Mobile Sidebar Overlay with slide animation */}
+      <div
+        className="lg:hidden fixed top-0 bottom-0 left-0 w-64 z-[70] transition-transform duration-300 ease-in-out"
+        style={{
+          transform: isMobileMenuOpen ? "translateX(0)" : "translateX(-100%)",
+        }}
+      >
+        <Sidebar className="h-full w-full border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 shadow-2xl">
+          <SidebarContentComponent showCloseButton={true} />
+        </Sidebar>
+      </div>
     </>
   );
 }
