@@ -129,6 +129,8 @@ export default function UsagePatternPage() {
     useState<HeatProvider>("cartodb_dark");
   const [heatPalette, setHeatPalette] = useState<HeatPalette>("YlOrRd");
   const [pointsFetched, setPointsFetched] = useState<boolean>(false);
+  // Add this state at the top of your hook
+  const [refetchCounter, setRefetchCounter] = useState(0);
 
   const isPointsLimitExceeded = useMemo(() => {
     return gpsData && gpsData.totalPoints > POINTS_DISPLAY_LIMIT;

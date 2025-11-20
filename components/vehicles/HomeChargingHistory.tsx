@@ -526,6 +526,36 @@ const Pagination = ({
   );
 };
 
+const generateCSV = (data: PaymentTransaction[]): string => {
+  if (data.length === 0) return "";
+
+  const headers = Object.keys(data[0]);
+
+  const csvRows = [
+    headers.join(","),
+    ...data.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header as keyof PaymentTransaction];
+          if (value === null || value === undefined) return "";
+          const stringValue = String(value);
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          if (
+            stringValue.includes(",") ||
+            stringValue.includes('"') ||
+            stringValue.includes("\n")
+          ) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        })
+        .join(",")
+    ),
+  ];
+
+  return csvRows.join("\n");
+};
+
 // -------------------- Main Component --------------------
 export default function HomeChargingHistory({
   CustomerID,
@@ -793,15 +823,18 @@ export default function HomeChargingHistory({
           <button
             className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors"
             onClick={() => {
-              const csvContent = analytics.chargingPayments
-                .map((payment) => Object.values(payment).join(","))
-                .join("\n");
+              const csvContent = generateCSV(analytics.chargingPayments);
+              if (!csvContent) return;
+
               const blob = new Blob([csvContent], { type: "text/csv" });
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
-              a.download = "my_home_charging_history.csv";
+              a.download = `home_charging_sessions_${
+                new Date().toISOString().split("T")[0]
+              }.csv`;
               a.click();
+              window.URL.revokeObjectURL(url);
             }}
           >
             <Download className="w-4 h-4" />

@@ -136,6 +136,36 @@ function formatDate(timestamp: number): string {
   });
 }
 
+const generateCSV = (data: PaymentTransaction[]): string => {
+  if (data.length === 0) return "";
+
+  const headers = Object.keys(data[0]);
+
+  const csvRows = [
+    headers.join(","),
+    ...data.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header as keyof PaymentTransaction];
+          if (value === null || value === undefined) return "";
+          const stringValue = String(value);
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          if (
+            stringValue.includes(",") ||
+            stringValue.includes('"') ||
+            stringValue.includes("\n")
+          ) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        })
+        .join(",")
+    ),
+  ];
+
+  return csvRows.join("\n");
+};
+
 function formatDateTime(timestamp: number): string {
   const date =
     timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
@@ -715,15 +745,18 @@ export default function BatterySwapHistory({
           <button
             className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors"
             onClick={() => {
-              const csvContent = analytics.swapPayments
-                .map((payment) => Object.values(payment).join(","))
-                .join("\n");
+              const csvContent = generateCSV(analytics.swapPayments);
+              if (!csvContent) return;
+
               const blob = new Blob([csvContent], { type: "text/csv" });
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
-              a.download = "battery_swap_payments.csv";
+              a.download = `battery_swap_payments_${
+                new Date().toISOString().split("T")[0]
+              }.csv`;
               a.click();
+              window.URL.revokeObjectURL(url);
             }}
           >
             <Download className="w-4 h-4" />
