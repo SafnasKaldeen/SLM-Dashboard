@@ -883,7 +883,7 @@ export default function UsagePatternPage() {
                         </Select>
                       </div>
 
-                      <div className="space-y-3">
+                      {/* <div className="space-y-3">
                         <Label className="text-slate-300 text-xs font-medium">
                           Map Style
                         </Label>
@@ -930,7 +930,7 @@ export default function UsagePatternPage() {
                             <SelectItem value="Cividis">Cividis</SelectItem>
                           </SelectContent>
                         </Select>
-                      </div>
+                      </div> */}
 
                       <div className="space-y-4">
                         <div className="space-y-2">
