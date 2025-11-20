@@ -348,42 +348,143 @@ export function MainSidebar() {
     (category) => category.show === true
   );
 
-  const SidebarContentComponent = ({ showCloseButton = false }) => (
+  const SidebarContentComponent = ({
+    showCloseButton = false,
+    isMobile = false,
+  }) => (
     <>
-      <SidebarHeader className="h-20 border-b flex px-5 justify-between border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
-        <div className="flex items-center gap-x-3 mt-2">
-          {/* Icon with glow */}
-          <div className="relative flex items-center justify-center h-10 w-10">
-            <Image src="/icon.png" alt="Logo" width={40} height={40} />
-            <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-md"></div>
-          </div>
+      <div
+        className={
+          isMobile
+            ? "h-20 border-b flex px-5 justify-between border-slate-800/60 bg-slate-900/50 backdrop-blur-sm"
+            : ""
+        }
+      >
+        {isMobile ? (
+          // Mobile header without SidebarHeader wrapper
+          <>
+            <div className="flex items-center gap-x-3 mt-2">
+              {/* Icon with glow */}
+              <div className="relative flex items-center justify-center h-10 w-10">
+                <Image src="/icon.png" alt="Logo" width={40} height={40} />
+                <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-md"></div>
+              </div>
 
-          {/* Text block */}
-          <a href="/" className="inline-block" onClick={closeMobileMenu}>
-            <div className="flex flex-col self-center leading-none cursor-pointer">
-              <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-500 bg-clip-text text-transparent tracking-wide">
-                SL-MOBILITY
-              </span>
-              <span className="text-xs text-slate-400 font-medium tracking-wider mt-0.5">
-                ANALYTICS PLATFORM
-              </span>
+              {/* Text block */}
+              <a href="/" className="inline-block" onClick={closeMobileMenu}>
+                <div className="flex flex-col self-center leading-none cursor-pointer">
+                  <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-500 bg-clip-text text-transparent tracking-wide">
+                    SL-MOBILITY
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium tracking-wider mt-0.5">
+                    ANALYTICS PLATFORM
+                  </span>
+                </div>
+              </a>
             </div>
-          </a>
-        </div>
 
-        {/* Close button for mobile only */}
-        {showCloseButton && (
-          <button
-            onClick={closeMobileMenu}
-            className="p-2 hover:bg-slate-800 rounded-md transition-colors"
-            aria-label="Close menu"
-          >
-            <X className="h-5 w-5 text-slate-400" />
-          </button>
+            {/* Close button for mobile */}
+            {showCloseButton && (
+              <button
+                onClick={closeMobileMenu}
+                className="p-2 hover:bg-slate-800 rounded-md transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            )}
+          </>
+        ) : (
+          // Desktop header with SidebarHeader wrapper
+          <SidebarHeader className="h-20 border-b flex px-5 justify-between border-slate-800/60 bg-slate-900/50 backdrop-blur-sm">
+            <div className="flex items-center gap-x-3 mt-2">
+              {/* Icon with glow */}
+              <div className="relative flex items-center justify-center h-10 w-10">
+                <Image src="/icon.png" alt="Logo" width={40} height={40} />
+                <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-md"></div>
+              </div>
+
+              {/* Text block */}
+              <a href="/" className="inline-block" onClick={closeMobileMenu}>
+                <div className="flex flex-col self-center leading-none cursor-pointer">
+                  <span className="text-xl font-bold bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-500 bg-clip-text text-transparent tracking-wide">
+                    SL-MOBILITY
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium tracking-wider mt-0.5">
+                    ANALYTICS PLATFORM
+                  </span>
+                </div>
+              </a>
+            </div>
+          </SidebarHeader>
         )}
-      </SidebarHeader>
+      </div>
 
-      <SidebarContent className="py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+      <div
+        className={
+          isMobile
+            ? "py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900 flex-1"
+            : ""
+        }
+      >
+        {isMobile ? (
+          // Mobile content without SidebarContent wrapper
+          <div className="py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+            {renderMenuContent()}
+          </div>
+        ) : (
+          // Desktop content with SidebarContent wrapper
+          <SidebarContent className="py-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+            {renderMenuContent()}
+          </SidebarContent>
+        )}
+      </div>
+
+      <div className={isMobile ? "p-4 border-t border-slate-800" : ""}>
+        {isMobile ? (
+          // Mobile footer without SidebarFooter wrapper
+          <div className="flex items-center space-x-3">
+            <Avatar className="h-9 w-9 border border-slate-700">
+              <AvatarImage
+                src="/placeholder.svg?height=32&width=32"
+                alt="User"
+              />
+              <AvatarFallback className="bg-slate-800 text-cyan-500">
+                SK
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Safnas Kaldeen</span>
+              <span className="text-xs text-slate-400">Data Analyst</span>
+            </div>
+          </div>
+        ) : (
+          // Desktop footer with SidebarFooter wrapper
+          <SidebarFooter className="p-4 border-t border-slate-800">
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-9 w-9 border border-slate-700">
+                <AvatarImage
+                  src="/placeholder.svg?height=32&width=32"
+                  alt="User"
+                />
+                <AvatarFallback className="bg-slate-800 text-cyan-500">
+                  SK
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">Safnas Kaldeen</span>
+                <span className="text-xs text-slate-400">Data Analyst</span>
+              </div>
+            </div>
+          </SidebarFooter>
+        )}
+      </div>
+    </>
+  );
+
+  const renderMenuContent = () => (
+    <>
+      <SidebarContent>
         {/* Real-Time Analytics Section */}
         <SidebarGroup className="px-2 py-1">
           <SidebarMenu>
@@ -645,14 +746,12 @@ export function MainSidebar() {
 
       {/* Mobile Sidebar Overlay with slide animation */}
       <div
-        className="lg:hidden fixed top-0 bottom-0 left-0 w-64 z-[70] transition-transform duration-300 ease-in-out"
+        className="lg:hidden fixed top-0 bottom-0 left-0 w-64 z-[70] transition-transform duration-300 ease-in-out bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-800/80 shadow-2xl"
         style={{
           transform: isMobileMenuOpen ? "translateX(0)" : "translateX(-100%)",
         }}
       >
-        <Sidebar className="h-full w-full border-r border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 shadow-2xl">
-          <SidebarContentComponent showCloseButton={true} />
-        </Sidebar>
+        <SidebarContentComponent showCloseButton={true} />
       </div>
     </>
   );
