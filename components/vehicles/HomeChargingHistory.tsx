@@ -531,14 +531,53 @@ const generateCSV = (data: PaymentTransaction[]): string => {
 
   const headers = Object.keys(data[0]);
 
+  // Helper function to check if a field is a timestamp
+  const isEpochTimestamp = (key: string, value: any): boolean => {
+    const timestampFields = [
+      "CREATED_EPOCH",
+      "CREATED_AT",
+      "PAID_AT",
+      "UPDATED_AT",
+      "TIMESTAMP",
+    ];
+    return (
+      timestampFields.includes(key) && typeof value === "number" && value > 0
+    );
+  };
+
+  // Helper function to convert epoch to readable date
+  const formatEpochToDateTime = (timestamp: number): string => {
+    const date =
+      timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
+
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  };
+
   const csvRows = [
     headers.join(","),
     ...data.map((row) =>
       headers
         .map((header) => {
           const value = row[header as keyof PaymentTransaction];
+
+          // Handle null/undefined
           if (value === null || value === undefined) return "";
+
+          // Convert epoch timestamps to readable dates
+          if (isEpochTimestamp(header, value)) {
+            return formatEpochToDateTime(value as number);
+          }
+
           const stringValue = String(value);
+
           // Escape quotes and wrap in quotes if contains comma, quote, or newline
           if (
             stringValue.includes(",") ||
@@ -547,6 +586,7 @@ const generateCSV = (data: PaymentTransaction[]): string => {
           ) {
             return `"${stringValue.replace(/"/g, '""')}"`;
           }
+
           return stringValue;
         })
         .join(",")
