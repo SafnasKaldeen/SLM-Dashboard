@@ -609,7 +609,7 @@ const VehicleOverviewPage: React.FC = () => {
   // ============================================================================
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen px-6">
       <div className="max-w-7xl mx-auto space-y-12">
         {/* Page Header */}
         <div className="text-center space-y-4">

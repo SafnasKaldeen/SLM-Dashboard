@@ -383,17 +383,6 @@ export function MainSidebar() {
                 </div>
               </a>
             </div>
-
-            {/* Close button for mobile */}
-            {showCloseButton && (
-              <button
-                onClick={closeMobileMenu}
-                className="p-2 hover:bg-slate-800 rounded-md transition-colors"
-                aria-label="Close menu"
-              >
-                <X className="h-5 w-5 text-slate-400" />
-              </button>
-            )}
           </>
         ) : (
           // Desktop header with SidebarHeader wrapper
