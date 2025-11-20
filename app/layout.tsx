@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     title: "Lencar E-Mobility Analytics Dashboard",
     description:
       "Performance and data analysis for Lencar's e-mobility fleet and charging infrastructure.",
-    images: ["/og-image.png"], 
+    images: ["/og-image.png"], // IMPORTANT: Update this URL for deployment
   },
 };
 

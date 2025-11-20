@@ -49,16 +49,16 @@ export default function DashboardLayout({
 
         <div className="flex h-screen">
           <SidebarProvider>
-            {/* Fixed width sidebar */}
-            <div className="w-64 shrink-0">
+            {/* Sidebar - Fixed width on desktop, overlay on mobile */}
+            <div className="hidden lg:block w-64 shrink-0">
               <MainSidebar />
             </div>
 
-            {/* Main content with left margin to avoid overlap */}
-            <div className="flex-1 flex flex-col">
+            {/* Main content - Full width on mobile, adjusts on desktop */}
+            <div className="flex-1 flex flex-col w-full lg:w-auto">
               <Header />
               <main className="flex-1 overflow-auto py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-                <div className="container mx-auto">{children}</div>
+                <div className="container mx-auto px-4 lg:px-0">{children}</div>
               </main>
             </div>
           </SidebarProvider>
