@@ -135,13 +135,11 @@ function formatDate(timestamp: number): string {
     day: "numeric",
   });
 }
-
 const generateCSV = (data: PaymentTransaction[]): string => {
   if (data.length === 0) return "";
 
   const headers = Object.keys(data[0]);
 
-  // Helper function to check if a value is an epoch timestamp
   const isEpochTimestamp = (key: string, value: any): boolean => {
     const timestampFields = [
       "CREATED_EPOCH",
@@ -154,7 +152,6 @@ const generateCSV = (data: PaymentTransaction[]): string => {
     );
   };
 
-  // Helper function to convert epoch to readable date
   const formatEpochToDateTime = (timestamp: number): string => {
     const date =
       timestamp > 9999999999 ? new Date(timestamp) : new Date(timestamp * 1000);
@@ -177,17 +174,16 @@ const generateCSV = (data: PaymentTransaction[]): string => {
         .map((header) => {
           const value = row[header as keyof PaymentTransaction];
 
-          // Handle null/undefined
           if (value === null || value === undefined) return "";
 
-          // Convert epoch timestamps to readable dates
+          // Convert epoch timestamps → ALWAYS wrap in quotes
           if (isEpochTimestamp(header, value)) {
-            return formatEpochToDateTime(value as number);
+            const formatted = formatEpochToDateTime(value as number);
+            return `"${formatted.replace(/"/g, '""')}"`;
           }
 
           const stringValue = String(value);
 
-          // Escape quotes and wrap in quotes if contains comma, quote, or newline
           if (
             stringValue.includes(",") ||
             stringValue.includes('"') ||
