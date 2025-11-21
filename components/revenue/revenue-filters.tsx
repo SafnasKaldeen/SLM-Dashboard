@@ -680,7 +680,12 @@ export function RevenueFilters({ onFiltersChange }: RevenueFiltersProps) {
     };
 
     setDateRange(filterRange);
-    updateFilters({ dateRange: filterRange });
+
+    // Update both filters and appliedFilters
+    const updatedFilters = { ...filters, dateRange: filterRange };
+    setFilters(updatedFilters);
+    setAppliedFilters(updatedFilters); // Add this line
+
     autoFixAggregation(filterRange);
     setQuickTime("custom");
     setIsCalendarOpen(false);
