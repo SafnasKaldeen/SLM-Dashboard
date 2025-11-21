@@ -117,7 +117,7 @@ export function HourlyPaymentsChart({ filters }: HourlyPaymentsChartProps) {
             AND fp.CREATED_EPOCH <= ${toTimestamp}
             AND fp.CREATED_EPOCH IS NOT NULL
             AND fp.PAYMENT_TYPE = 'BATTERY_SWAP'
-            AND fp.PAYMENT_STATUS IN ('PAID', 'VOIDED')
+            AND fp.PAYMENT_STATUS != 'CANCELLED'
             ${geographicFilters}
           GROUP BY HOUR(TO_TIMESTAMP_NTZ(fp.CREATED_EPOCH / 1000))
           ORDER BY HOUR(TO_TIMESTAMP_NTZ(fp.CREATED_EPOCH / 1000))
