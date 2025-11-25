@@ -1,44 +1,14 @@
-// app/api/RunSQLQuery/route.ts
+// app/api/RunSQLQuery/route.ts  (Next.js 13+ app router example)
 
 import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import snowflake from "snowflake-sdk";
 
-// Map user email to Snowflake username
-function mapEmailToSnowflakeUsername(email: string): string | null {
-  const emailToSnowflakeMap: Record<string, string> = {
-    'safnas@slmobility.com': 'SAFNAS',
-    'hansika@slmobility.com': 'HANSIKA',
-    'janaka@ascensionit.com': 'JANAKA',
-    'rifkhan@slmobility.com': 'RIFKHAN',
-    'zaid@slmobility.com': 'ZAID',
-    'udara@slmobility.com': 'UDARA',
-    'rasika@slmobility.com': 'RASIKA',
-    'oshani@slmobility.com': 'OSHANI',
-    'zainab@slmobility.com': 'ZAINAB',
-  };
-
-  return emailToSnowflakeMap[email.toLowerCase()] || null;
-}
-
-// Load your private key PEM string once
+// Load your private key PEM string once (adjust path)
 const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function POST(request: NextRequest) {
   try {
-    // ✅ Get the authenticated user's session
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || !session.user.email) {
-      console.log("[RunSQLQuery] ❌ Authentication failed - no session or email");
-      return NextResponse.json(
-        { error: "Unauthorized - Please sign in" },
-        { status: 401 }
-      );
-    }
-
-    const { sql } = await request.json();
+    const { sql, username } = await request.json();
 
     if (!sql) {
       return NextResponse.json(
@@ -47,23 +17,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✅ Map logged-in user email to Snowflake username
-    const snowflakeUsername = mapEmailToSnowflakeUsername(session.user.email);
-
-    if (!snowflakeUsername) {
-      console.log("[RunSQLQuery] ❌ No Snowflake mapping found for:", session.user.email);
+    // Use provided username or fall back to env variable
+    const effectiveUsername = username || process.env.SNOWFLAKE_USERNAME;
+    console.log("Effective username:", effectiveUsername);
+    if (!effectiveUsername) {
       return NextResponse.json(
-        { error: `No Snowflake account mapping found for ${session.user.email}` },
-        { status: 403 }
+        { error: "Username is required either in request body or environment variable" },
+        { status: 400 }
       );
     }
 
-    console.log(`[RunSQLQuery] ✅ Executing query as Snowflake user: ${snowflakeUsername} (${session.user.email})`);
-
-    // ✅ Use the dynamically mapped username
+    // console.log("Executing SQL:", sql);
+    // console.log("Using username:", effectiveUsername);
+    
+    // Hardcoded Snowflake config
     const config = {
       account: process.env.SNOWFLAKE_ACCOUNT,
-      username: snowflakeUsername, // ← Dynamic username based on logged-in user
+      username: effectiveUsername,
       privateKey: privateKey,
       warehouse: "ADHOC",
       database: "ADHOC",
@@ -75,13 +45,9 @@ export async function POST(request: NextRequest) {
     // Execute SQL query on Snowflake
     const result = await executeSnowflakeQuery(config, sql);
 
-    return NextResponse.json({ 
-      success: true, 
-      result,
-      executedBy: snowflakeUsername // ← Return who executed the query
-    });
+    return NextResponse.json({ success: true, result });
   } catch (error: any) {
-    console.error("[RunSQLQuery] ❌ Query execution failed:", error);
+    console.error("Query execution failed:", error);
     return NextResponse.json(
       { error: "Query execution failed", details: error.message || error.toString() },
       { status: 500 }
@@ -104,13 +70,8 @@ async function executeSnowflakeQuery(config: any, sql: string) {
   // Connect to Snowflake
   await new Promise<void>((resolve, reject) => {
     connection.connect((err) => {
-      if (err) {
-        console.error("[Snowflake] Connection failed:", err);
-        reject(err);
-      } else {
-        console.log("[Snowflake] ✅ Connected successfully as:", config.username);
-        resolve();
-      }
+      if (err) reject(err);
+      else resolve();
     });
   });
 
@@ -129,16 +90,14 @@ async function executeSnowflakeQuery(config: any, sql: string) {
         connection.destroy();
 
         if (err) {
-          console.error("[Snowflake] Query failed:", err);
           reject(err);
         } else {
           const columns = stmt.getColumns().map((col) => col.getName());
-          console.log("[Snowflake] ✅ Query succeeded, rows:", rows?.length || 0);
           resolve({
             columns,
-            rows: rows || [],
+            rows,
             executionTime: (Date.now() - startTime) / 1000,
-            rowCount: rows?.length || 0,
+            rowCount: rows.length,
           });
         }
       },

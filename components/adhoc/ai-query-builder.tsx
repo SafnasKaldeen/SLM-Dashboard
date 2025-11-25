@@ -517,6 +517,7 @@ export default function AIQueryBuilder({
         body: JSON.stringify({
           sql: sqlToExecute,
           connectionId: "snowflake_1751620346752",
+          // username: "HANSIKA",
         }),
       });
 

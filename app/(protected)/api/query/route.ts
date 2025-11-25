@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import UserSnowflakeConnectionManager from "@/lib/auth/user-connection-manager";
+import SnowflakeConnectionManager from "@/lib/snowflake";
 import crypto from "crypto";
 import { getRedis } from "@/lib/redis";
 
@@ -11,7 +9,6 @@ interface QueryLogEntry {
   shortHash: string;
   sql: string;
   userId?: string;
-  snowflakeUser?: string;
   cacheStatus: "HIT" | "MISS" | "REVALIDATED";
   rowCount: number;
   duration: number;
@@ -46,23 +43,6 @@ interface CacheMetadata {
   dataChangeCount: number;
 }
 
-// -------------------- User Mapping --------------------
-function mapEmailToSnowflakeUsername(email: string): string | null {
-  const emailToSnowflakeMap: Record<string, string> = {
-    'safnas@slmobility.com': 'SAFNAS',
-    'hansika@slmobility.com': 'HANSIKA',
-    'janaka@ascensionit.com': 'JANAKA',
-    'rifkhan@slmobility.com': 'RIFKHAN',
-    'zaid@slmobility.com': 'ZAID',
-    'udara@slmobility.com': 'UDARA',
-    'rasika@slmobility.com': 'RASIKA',
-    'oshani@slmobility.com': 'OSHANI',
-    'zainab@slmobility.com': 'ZAINAB',
-  };
-
-  return emailToSnowflakeMap[email.toLowerCase()] || null;
-}
-
 // -------------------- Query Normalization --------------------
 const DYNAMIC_DATE_FUNCTIONS = [
   'current_date', 'current_timestamp', 'current_time',
@@ -79,8 +59,8 @@ function hasDynamicDates(sql: string): boolean {
 
 function normalizeSQL(sql: string): string {
   let normalized = sql.trim().toLowerCase().replace(/\s+/g, " ");
-  normalized = normalized.replace(/--[^\n]*/g, '');
-  normalized = normalized.replace(/\/\*[\s\S]*?\*\//g, '');
+  normalized = normalized.replace(/--[^\n]*/g, ''); // Remove comments
+  normalized = normalized.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove block comments
   normalized = normalized.replace(/current_date\s*\(\s*\)/gi, 'current_date()');
   normalized = normalized.replace(/current_timestamp\s*\(\s*\)/gi, 'current_timestamp()');
   normalized = normalized.replace(/now\s*\(\s*\)/gi, 'now()');
@@ -88,10 +68,10 @@ function normalizeSQL(sql: string): string {
   return normalized.trim();
 }
 
-// CHANGED: Removed userId parameter - cache is now shared across all users
-function generateQueryHash(sql: string): string {
+function generateQueryHash(sql: string, userId?: string): string {
   const normalizedSql = normalizeSQL(sql);
-  return crypto.createHash("sha256").update(normalizedSql).digest("hex");
+  const queryString = userId ? `${userId}:${normalizedSql}` : normalizedSql;
+  return crypto.createHash("sha256").update(queryString).digest("hex");
 }
 
 function generateCacheKey(queryHash: string, sql: string, forceDynamic?: boolean): string {
@@ -134,6 +114,8 @@ async function acquireRevalidationLock(cacheKey: string): Promise<boolean> {
   const redis = await getRedis();
   const lockKey = `lock:revalidate:${cacheKey}`;
   const lockValue = Date.now().toString();
+  
+  // Try to acquire lock with 5 minute expiration
   const acquired = await redis.set(lockKey, lockValue, { NX: true, EX: 300 });
   return acquired === 'OK';
 }
@@ -175,6 +157,7 @@ async function performRevalidation(
   const metaKey = `${cacheKey}:meta`;
   
   try {
+    // Execute query to get fresh data
     const freshData = await new Promise<any[]>((resolve, reject) => {
       connection.execute({
         sqlText: sql,
@@ -193,6 +176,7 @@ async function performRevalidation(
     
     const dataChanged = !existingMeta || existingMeta.dataHash !== freshDataHash;
     
+    // Update metadata with TTL matching cache
     const cachedData = await redis.get(cacheKey);
     const cacheTTL = cachedData ? await redis.ttl(cacheKey) : null;
     
@@ -230,6 +214,7 @@ async function logQueryAnalytics(entry: QueryLogEntry): Promise<void> {
   try {
     const today = new Date().toISOString().slice(0, 10);
     
+    // Log entry with 7 day expiration
     const logKey = `query:log:${entry.shortHash}:${Date.now()}`;
     await redis.set(logKey, JSON.stringify(entry), { EX: 604800 });
 
@@ -255,6 +240,7 @@ async function logQueryAnalytics(entry: QueryLogEntry): Promise<void> {
       isPersistent: false,
     };
     
+    // Update execution counts
     stats.totalExecutions++;
     if (entry.cacheStatus === "HIT" || entry.cacheStatus === "REVALIDATED") {
       stats.totalHits++;
@@ -268,25 +254,32 @@ async function logQueryAnalytics(entry: QueryLogEntry): Promise<void> {
       stats.totalMisses++;
     }
     
+    // Update averages
     stats.avgDuration = ((stats.avgDuration * (stats.totalExecutions - 1)) + entry.duration) / stats.totalExecutions;
     stats.avgRowCount = ((stats.avgRowCount * (stats.totalExecutions - 1)) + entry.rowCount) / stats.totalExecutions;
     stats.lastExecuted = entry.timestamp.toISOString();
     stats.cacheHitRate = (stats.totalHits / stats.totalExecutions) * 100;
     
+    // Clean history to last 14 days only
     cleanOldHistory(stats, 14);
+    
+    // Calculate consecutive days without hits
     stats.consecutiveDaysNoHits = calculateConsecutiveDaysNoHits(stats, today);
+    
+    // Calculate score and persistence
     stats = applyDecayAndCalculateScore(stats);
     stats.isPersistent = shouldBePersistent(stats);
     
     await redis.set(statsKey, JSON.stringify(stats));
+    
+    // Update sorted set for candidates
     await redis.zAdd('query:prewarm:candidates', {
       score: stats.preWarmScore,
       value: entry.queryHash
     });
     
     const statusLabel = entry.cacheStatus === 'REVALIDATED' ? 'REVALIDATED' : entry.cacheStatus;
-    const userLabel = entry.snowflakeUser ? ` [${entry.snowflakeUser}]` : '';
-    console.log(`[${entry.shortHash}]${userLabel} ${statusLabel} | Score: ${stats.preWarmScore.toFixed(2)} | Persistent: ${stats.isPersistent}`);
+    console.log(`[${entry.shortHash}] ${statusLabel} | Score: ${stats.preWarmScore.toFixed(2)} | Persistent: ${stats.isPersistent} | No-hit: ${stats.consecutiveDaysNoHits}d`);
     
   } catch (error) {
     console.error("Failed to log analytics:", error);
@@ -312,10 +305,12 @@ function calculateConsecutiveDaysNoHits(stats: QueryStats, today: string): numbe
   
   const lastHitDate = new Date(stats.lastCacheHit).toISOString().slice(0, 10);
   
+  // Reset counter if there was activity today
   if (lastHitDate === today) {
     return 0;
   }
   
+  // Calculate days since last hit
   const daysSinceLastHit = Math.floor(
     (new Date(today).getTime() - new Date(lastHitDate).getTime()) / 86400000
   );
@@ -324,6 +319,7 @@ function calculateConsecutiveDaysNoHits(stats: QueryStats, today: string): numbe
 }
 
 function shouldBePersistent(stats: QueryStats): boolean {
+  // Don't persist if no activity for a week
   if (stats.consecutiveDaysNoHits >= 7) {
     return false;
   }
@@ -339,6 +335,7 @@ function shouldBePersistent(stats: QueryStats): boolean {
   const totalHitsLast7Days = activeDays.reduce((sum, date) => sum + (dailyHitHistory[date] || 0), 0);
   const avgHitsPerActiveDay = totalHitsLast7Days / activeDays.length;
   
+  // Need consistent usage pattern
   return avgHitsPerActiveDay >= 2;
 }
 
@@ -360,6 +357,7 @@ function applyDecayAndCalculateScore(stats: QueryStats): QueryStats {
   const recentHits = last7Days.reduce((sum, date) => sum + (dailyHitHistory[date] || 0), 0);
   const activeDaysLast7 = last7Days.filter(date => (dailyHitHistory[date] || 0) > 0).length;
   
+  // Scoring components (sum to 1.0)
   const frequencyScore = Math.min(totalExecutions / 100, 1) * 0.2;
   const durationScore = Math.min(avgDuration / 5000, 1) * 0.15;
   const dataSizeScore = Math.min(avgRowCount / 100000, 1) * 0.1;
@@ -367,6 +365,7 @@ function applyDecayAndCalculateScore(stats: QueryStats): QueryStats {
   const recentActivityScore = Math.min(recentHits / 20, 1) * 0.25;
   const consistencyScore = (activeDaysLast7 / 7) * 0.1;
   
+  // Apply decay for inactivity
   let decayMultiplier = 1.0;
   if (consecutiveDaysNoHits > 0) {
     decayMultiplier = Math.pow(0.75, consecutiveDaysNoHits);
@@ -381,6 +380,7 @@ function applyDecayAndCalculateScore(stats: QueryStats): QueryStats {
     consistencyScore
   ) * 100;
   
+  // Cap at 100
   stats.preWarmScore = Math.min(100, Math.max(0, baseScore * decayMultiplier));
   
   return stats;
@@ -408,6 +408,7 @@ async function writeToCache(
     if (strategy.type === 'static' && stats?.isPersistent) {
       await redis.set(cacheKey, JSON.stringify(data));
       
+      // Initialize/update metadata
       if (!isRevalidation) {
         const metaKey = `${cacheKey}:meta`;
         const meta: CacheMetadata = {
@@ -425,6 +426,7 @@ async function writeToCache(
     } else if (strategy.ttl) {
       await redis.set(cacheKey, JSON.stringify(data), { EX: strategy.ttl });
       
+      // Add metadata with matching TTL
       const metaKey = `${cacheKey}:meta`;
       const meta: CacheMetadata = {
         lastVerified: new Date().toISOString(),
@@ -451,34 +453,12 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    // Get logged-in user session
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { error: "Unauthorized - Please sign in" },
-        { status: 401 }
-      );
-    }
-
-    const { sql, forceDynamic, warehouse, database, schema } = await req.json();
+    const { sql, userId, forceDynamic } = await req.json();
     if (!sql || typeof sql !== "string") {
       return NextResponse.json({ error: "Missing or invalid SQL" }, { status: 400 });
     }
 
-    // Map user email to Snowflake username
-    const snowflakeUsername = mapEmailToSnowflakeUsername(session.user.email || '');
-    
-    if (!snowflakeUsername) {
-      return NextResponse.json(
-        { error: "Unable to map user to Snowflake account" },
-        { status: 403 }
-      );
-    }
-
-    const userId = session.user.email;
-    // CHANGED: No longer passing userId to generateQueryHash - cache is shared
-    const queryHash = generateQueryHash(sql);
+    const queryHash = generateQueryHash(sql, userId);
     const cacheKey = generateCacheKey(queryHash, sql, forceDynamic);
     const shortHash = queryHash.substring(0, 8);
     const strategy = getCacheStrategy(sql, forceDynamic);
@@ -492,6 +472,7 @@ export async function POST(req: NextRequest) {
     const cachedData = await readFromCache(cacheKey);
     
     if (cachedData) {
+      // Check if revalidation needed for persistent queries
       const shouldRevalidate = await needsRevalidation(cacheKey, isPersistent);
       
       if (shouldRevalidate) {
@@ -499,25 +480,13 @@ export async function POST(req: NextRequest) {
         
         if (lockAcquired) {
           const duration = Date.now() - startTime;
-          console.log(`🟡 [CACHE HIT] [${shortHash}] [${snowflakeUsername}] [PERSISTENT] - Revalidating in background - ${cachedData.length} rows - ${duration}ms`);
+          console.log(`🟡   [CACHE HIT] [${shortHash}] [PERSISTENT] - Revalidating in background - ${cachedData.length} rows - ${duration}ms`);
           
+          // Return cached data immediately, revalidate in background
           (async () => {
             try {
-              const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-              await UserSnowflakeConnectionManager.connect(snowflakeUsername, {
-                username: snowflakeUsername,
-                privateKey: privateKey,
-                warehouse: warehouse || 'ADHOC',
-                database: database || 'ADHOC',
-                schema: schema || 'PUBLIC',
-              });
-              
-              const connection = UserSnowflakeConnectionManager.getConnection(snowflakeUsername, {
-                username: snowflakeUsername,
-                warehouse: warehouse || 'ADHOC',
-                database: database || 'ADHOC',
-                schema: schema || 'PUBLIC',
-              });
+              await SnowflakeConnectionManager.connect();
+              const connection = SnowflakeConnectionManager.getConnection();
               
               const revalidationResult = await performRevalidation(
                 cacheKey,
@@ -545,7 +514,6 @@ export async function POST(req: NextRequest) {
             shortHash,
             sql,
             userId,
-            snowflakeUser: snowflakeUsername,
             cacheStatus: "REVALIDATED",
             rowCount: cachedData.length,
             duration,
@@ -560,22 +528,22 @@ export async function POST(req: NextRequest) {
               "X-Cache-Hash": queryHash,
               "X-Cache-Type": strategy.type,
               "X-Persistent": "true",
-              "X-Snowflake-User": snowflakeUsername,
+              "X-Revalidation": "background"
             },
           });
         }
       }
       
+      // Standard cache hit
       const duration = Date.now() - startTime;
       const persistentLabel = isPersistent ? " [PERSISTENT]" : "";
-      console.log(`🟢 [CACHE HIT] [${shortHash}] [${snowflakeUsername}] (${strategy.type})${persistentLabel} - ${cachedData.length} rows - ${duration}ms`);
-      
+      console.log(`🟢 [CACHE HIT] [${shortHash}] (${strategy.type})${persistentLabel} - ${cachedData.length} rows - ${duration}ms`);
+      console.log(`Query: ${sql}`);
       await logQueryAnalytics({
         queryHash,
         shortHash,
         sql,
         userId,
-        snowflakeUser: snowflakeUsername,
         cacheStatus: "HIT",
         rowCount: cachedData.length,
         duration,
@@ -589,30 +557,15 @@ export async function POST(req: NextRequest) {
           "X-Cache-Status": "HIT", 
           "X-Cache-Hash": queryHash,
           "X-Cache-Type": strategy.type,
-          "X-Persistent": isPersistent ? "true" : "false",
-          "X-Snowflake-User": snowflakeUsername,
+          "X-Persistent": isPersistent ? "true" : "false"
         },
       });
     }
 
-    // Cache miss - execute query with user's Snowflake account
-    console.log(`🔴 [CACHE MISS] [${shortHash}] [${snowflakeUsername}] (${strategy.type}) - Executing Snowflake`);
-    
-    const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-    await UserSnowflakeConnectionManager.connect(snowflakeUsername, {
-      username: snowflakeUsername,
-      privateKey: privateKey,
-      warehouse: warehouse || 'ADHOC',
-      database: database || 'ADHOC',
-      schema: schema || 'PUBLIC',
-    });
-
-    const connection = UserSnowflakeConnectionManager.getConnection(snowflakeUsername, {
-      username: snowflakeUsername,
-      warehouse: warehouse || 'ADHOC',
-      database: database || 'ADHOC',
-      schema: schema || 'PUBLIC',
-    });
+    // Cache miss - execute query
+    console.log(`🔴 [CACHE MISS] [${shortHash}] (${strategy.type}) - Executing Snowflake`);
+    await SnowflakeConnectionManager.connect();
+    const connection = SnowflakeConnectionManager.getConnection();
 
     const rows = await new Promise<any[]>((resolve, reject) => {
       connection.execute({
@@ -624,10 +577,11 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // Cache empty results with shorter TTL (1 hour)
     if (!rows || rows.length === 0) {
       const emptyResult: any[] = [];
       await redis.set(cacheKey, JSON.stringify(emptyResult), { EX: 3600 });
-      console.log(`[EMPTY RESULT] [${shortHash}] [${snowflakeUsername}] - Cached for 1h`);
+      console.log(`[EMPTY RESULT] [${shortHash}] - Cached for 1h`);
       
       const duration = Date.now() - startTime;
       await logQueryAnalytics({
@@ -635,7 +589,6 @@ export async function POST(req: NextRequest) {
         shortHash,
         sql,
         userId,
-        snowflakeUser: snowflakeUsername,
         cacheStatus: "MISS",
         rowCount: 0,
         duration,
@@ -649,8 +602,7 @@ export async function POST(req: NextRequest) {
           "X-Cache-Status": "MISS",
           "X-Cache-Hash": queryHash,
           "X-Cache-Type": "hourly",
-          "X-Row-Count": "0",
-          "X-Snowflake-User": snowflakeUsername,
+          "X-Row-Count": "0"
         },
       });
     }
@@ -658,7 +610,7 @@ export async function POST(req: NextRequest) {
     await writeToCache(cacheKey, rows, shortHash, { strategy, stats });
 
     const totalDuration = Date.now() - startTime;
-    console.log(`✅ [QUERY COMPLETE] [${shortHash}] [${snowflakeUsername}] - ${rows.length} rows - ${totalDuration}ms`);
+    console.log(`✅ [QUERY COMPLETE] [${shortHash}] - ${rows.length} rows - ${totalDuration}ms`);
 
     const dataSize = Buffer.byteLength(JSON.stringify(rows), "utf-8");
     await logQueryAnalytics({
@@ -666,7 +618,6 @@ export async function POST(req: NextRequest) {
       shortHash,
       sql,
       userId,
-      snowflakeUser: snowflakeUsername,
       cacheStatus: "MISS",
       rowCount: rows.length,
       duration: totalDuration,
@@ -681,8 +632,7 @@ export async function POST(req: NextRequest) {
         "X-Cache-Hash": queryHash,
         "X-Cache-Type": strategy.type,
         "X-Row-Count": rows.length.toString(),
-        "X-Query-Duration": totalDuration.toString(),
-        "X-Snowflake-User": snowflakeUsername,
+        "X-Query-Duration": totalDuration.toString()
       },
     });
   } catch (err: any) {
