@@ -27,17 +27,18 @@ const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function POST(request: NextRequest) {
   try {
-    // Get logged-in user session (THIS WAS MISSING!)
+    // ✅ Get the authenticated user's session
     const session = await getServerSession(authOptions);
     
-    if (!session || !session.user) {
+    if (!session || !session.user || !session.user.email) {
+      console.log("[RunSQLQuery] ❌ Authentication failed - no session or email");
       return NextResponse.json(
         { error: "Unauthorized - Please sign in" },
         { status: 401 }
       );
     }
 
-    const { sql, warehouse, database, schema } = await request.json();
+    const { sql } = await request.json();
 
     if (!sql) {
       return NextResponse.json(
@@ -46,26 +47,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Map user email to Snowflake username
-    const snowflakeUsername = mapEmailToSnowflakeUsername(session.user.email || '');
+    // ✅ Map logged-in user email to Snowflake username
+    const snowflakeUsername = mapEmailToSnowflakeUsername(session.user.email);
 
     if (!snowflakeUsername) {
+      console.log("[RunSQLQuery] ❌ No Snowflake mapping found for:", session.user.email);
       return NextResponse.json(
-        { error: "Unable to map user to Snowflake account" },
+        { error: `No Snowflake account mapping found for ${session.user.email}` },
         { status: 403 }
       );
     }
 
-    console.log(`[RunSQLQuery] Executing as Snowflake user: ${snowflakeUsername}`);
+    console.log(`[RunSQLQuery] ✅ Executing query as Snowflake user: ${snowflakeUsername} (${session.user.email})`);
 
-    // Snowflake config
+    // ✅ Use the dynamically mapped username
     const config = {
       account: process.env.SNOWFLAKE_ACCOUNT,
-      username: snowflakeUsername,
+      username: snowflakeUsername, // ← Dynamic username based on logged-in user
       privateKey: privateKey,
-      warehouse: warehouse || "ADHOC",
-      database: database || "ADHOC",
-      schema: schema || "PUBLIC",
+      warehouse: "ADHOC",
+      database: "ADHOC",
+      schema: "PUBLIC",
       role: "ACCOUNTADMIN",
       authenticator: "SNOWFLAKE_JWT",
     };
@@ -76,10 +78,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       result,
-      executedBy: snowflakeUsername 
+      executedBy: snowflakeUsername // ← Return who executed the query
     });
   } catch (error: any) {
-    console.error("[RunSQLQuery] Query execution failed:", error);
+    console.error("[RunSQLQuery] ❌ Query execution failed:", error);
     return NextResponse.json(
       { error: "Query execution failed", details: error.message || error.toString() },
       { status: 500 }
@@ -102,8 +104,13 @@ async function executeSnowflakeQuery(config: any, sql: string) {
   // Connect to Snowflake
   await new Promise<void>((resolve, reject) => {
     connection.connect((err) => {
-      if (err) reject(err);
-      else resolve();
+      if (err) {
+        console.error("[Snowflake] Connection failed:", err);
+        reject(err);
+      } else {
+        console.log("[Snowflake] ✅ Connected successfully as:", config.username);
+        resolve();
+      }
     });
   });
 
@@ -122,14 +129,16 @@ async function executeSnowflakeQuery(config: any, sql: string) {
         connection.destroy();
 
         if (err) {
+          console.error("[Snowflake] Query failed:", err);
           reject(err);
         } else {
           const columns = stmt.getColumns().map((col) => col.getName());
+          console.log("[Snowflake] ✅ Query succeeded, rows:", rows?.length || 0);
           resolve({
             columns,
-            rows,
+            rows: rows || [],
             executionTime: (Date.now() - startTime) / 1000,
-            rowCount: rows.length,
+            rowCount: rows?.length || 0,
           });
         }
       },
