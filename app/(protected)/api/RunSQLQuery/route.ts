@@ -1,15 +1,31 @@
-// app/api/RunSQLQuery/route.ts  (Next.js 13+ app router example)
+// app/api/RunSQLQuery/route.ts
 
 import { type NextRequest, NextResponse } from "next/server";
 import snowflake from "snowflake-sdk";
-import fs from "fs";
 
-// Load your private key PEM string once (adjust path)
+// Map user email to Snowflake username
+function mapEmailToSnowflakeUsername(email: string): string | null {
+  const emailToSnowflakeMap: Record<string, string> = {
+    'safnas@slmobility.com': 'SAFNAS',
+    'hansika@slmobility.com': 'HANSIKA',
+    'janaka@ascensionit.com': 'JANAKA',
+    'rifkhan@slmobility.com': 'RIFKHAN',
+    'zaid@slmobility.com': 'ZAID',
+    'udara@slmobility.com': 'UDARA',
+    'rasika@slmobility.com': 'RASIKA',
+    'oshani@slmobility.com': 'OSHANI',
+    'zainab@slmobility.com': 'ZAINAB',
+  };
+
+  return emailToSnowflakeMap[email.toLowerCase()] || null;
+}
+
+// Load your private key PEM string once
 const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function POST(request: NextRequest) {
   try {
-    const { sql } = await request.json();
+    const { sql, warehouse, database, schema } = await request.json();
 
     if (!sql) {
       return NextResponse.json(
@@ -18,16 +34,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // console.log("Executing SQL:", sql);
-    
-    // Hardcoded Snowflake config
+    // For now, use the default user from env
+    // The route is already protected by your (protected) folder middleware
+    const snowflakeUsername = process.env.SNOWFLAKE_USERNAME;
+
+    if (!snowflakeUsername) {
+      return NextResponse.json(
+        { error: "Snowflake username not configured" },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[RunSQLQuery] Executing as Snowflake user: ${snowflakeUsername}`);
+
+    // Snowflake config
     const config = {
       account: process.env.SNOWFLAKE_ACCOUNT,
-        username: process.env.SNOWFLAKE_USERNAME,
-        privateKey: privateKey,
-      warehouse: "ADHOC",
-      database: "ADHOC",
-      schema: "PUBLIC",
+      username: snowflakeUsername,
+      privateKey: privateKey,
+      warehouse: warehouse || "ADHOC",
+      database: database || "ADHOC",
+      schema: schema || "PUBLIC",
       role: "ACCOUNTADMIN",
       authenticator: "SNOWFLAKE_JWT",
     };
@@ -35,9 +62,13 @@ export async function POST(request: NextRequest) {
     // Execute SQL query on Snowflake
     const result = await executeSnowflakeQuery(config, sql);
 
-    return NextResponse.json({ success: true, result });
+    return NextResponse.json({ 
+      success: true, 
+      result,
+      executedBy: snowflakeUsername 
+    });
   } catch (error: any) {
-    console.error("Query execution failed:", error);
+    console.error("[RunSQLQuery] Query execution failed:", error);
     return NextResponse.json(
       { error: "Query execution failed", details: error.message || error.toString() },
       { status: 500 }
