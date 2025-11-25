@@ -1,6 +1,8 @@
 // app/api/RunSQLQuery/route.ts
 
 import { type NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import snowflake from "snowflake-sdk";
 
 // Map user email to Snowflake username
@@ -25,6 +27,16 @@ const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function POST(request: NextRequest) {
   try {
+    // Get logged-in user session (THIS WAS MISSING!)
+    const session = await getServerSession(authOptions);
+    
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: "Unauthorized - Please sign in" },
+        { status: 401 }
+      );
+    }
+
     const { sql, warehouse, database, schema } = await request.json();
 
     if (!sql) {
@@ -34,14 +46,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, use the default user from env
-    // The route is already protected by your (protected) folder middleware
-    const snowflakeUsername = process.env.SNOWFLAKE_USERNAME;
+    // Map user email to Snowflake username
+    const snowflakeUsername = mapEmailToSnowflakeUsername(session.user.email || '');
 
     if (!snowflakeUsername) {
       return NextResponse.json(
-        { error: "Snowflake username not configured" },
-        { status: 500 }
+        { error: "Unable to map user to Snowflake account" },
+        { status: 403 }
       );
     }
 
