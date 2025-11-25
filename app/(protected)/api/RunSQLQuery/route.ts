@@ -2,13 +2,14 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import snowflake from "snowflake-sdk";
+import fs from "fs";
 
 // Load your private key PEM string once (adjust path)
 const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function POST(request: NextRequest) {
   try {
-    const { sql, username } = await request.json();
+    const { sql } = await request.json();
 
     if (!sql) {
       return NextResponse.json(
@@ -17,24 +18,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use provided username or fall back to env variable
-    const effectiveUsername = username || process.env.SNOWFLAKE_USERNAME;
-    console.log("Effective username:", effectiveUsername);
-    if (!effectiveUsername) {
-      return NextResponse.json(
-        { error: "Username is required either in request body or environment variable" },
-        { status: 400 }
-      );
-    }
-
     // console.log("Executing SQL:", sql);
-    // console.log("Using username:", effectiveUsername);
     
     // Hardcoded Snowflake config
     const config = {
       account: process.env.SNOWFLAKE_ACCOUNT,
-      username: effectiveUsername,
-      privateKey: privateKey,
+        username: process.env.SNOWFLAKE_USERNAME,
+        privateKey: privateKey,
       warehouse: "ADHOC",
       database: "ADHOC",
       schema: "PUBLIC",
