@@ -6,7 +6,7 @@ import SnowflakeConnectionManager from "@/lib/snowflake_adhoc";
 
 export async function POST(request: NextRequest) {
   try {
-    const { sql } = await request.json();
+    const { sql, username: requestedUsername } = await request.json();
 
     if (!sql) {
       return NextResponse.json(
@@ -15,20 +15,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user is authenticated (optional, for logging/auditing)
-    const session = await getServerSession(authOptions);
-    const requestingUser = session?.user?.email || session?.user?.username || "system";
+    // Get username with fallbacks: requested username -> session user -> environment default -> "system"
+    let finalUsername: string;
     
-    console.log(`[RunSQLQuery] User ${requestingUser} executing SQL query`);
+    if (requestedUsername) {
+      // Use the username passed from frontend
+      finalUsername = requestedUsername;
+    } else {
+      // Try to get from session
+      const session = await getServerSession(authOptions);
+      finalUsername = session?.user?.email || session?.user?.name || process.env.SNOWFLAKE_USERNAME || "system";
+    }
+    
+    console.log(`[RunSQLQuery] User ${finalUsername} executing SQL query`);
 
-    // Execute the query (connection manager handles everything)
-    const result = await SnowflakeConnectionManager.executeQuery(sql, true);
+    // Execute the query with the determined username
+    const result = await SnowflakeConnectionManager.executeQuery(sql, finalUsername);
     const status = await SnowflakeConnectionManager.getConnectionStatus();
 
     return NextResponse.json({ 
       success: true, 
       result,
-      executedBy: requestingUser,
+      executedBy: finalUsername,
       snowflakeUser: status.username
     });
   } catch (error: any) {

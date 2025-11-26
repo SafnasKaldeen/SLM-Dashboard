@@ -546,7 +546,7 @@ export function Header() {
             </Tooltip>
           </TooltipProvider>
 
-          <DropdownMenu>
+          {/* <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
@@ -575,7 +575,7 @@ export function Header() {
                 System
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu> */}
 
           {isClient && status === "authenticated" && session?.user ? (
             <DropdownMenu>
