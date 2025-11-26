@@ -40,6 +40,7 @@ class SnowflakeConnectionManager {
     
     throw new Error('No Snowflake username provided and SNOWFLAKE_USERNAME environment variable is not set');
   }
+  
 
   /**
    * Map application username to Snowflake username
@@ -56,7 +57,7 @@ class SnowflakeConnectionManager {
     };
     
     const mapped = usernameMap[appUsername] || appUsername.split('@')[0].toUpperCase();
-    console.log('🔍 Username mapping:', appUsername, '→', mapped);
+    // console.log('🔍 Username mapping:', appUsername, '→', mapped);
     return mapped;
   }
 
@@ -82,7 +83,8 @@ class SnowflakeConnectionManager {
   public static async getConnection(requestedUsername?: string): Promise<snowflake.Connection> {
     this.initializeCleanup();
     
-    const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    // const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    const snowflakeUsername = requestedUsername?.toLocaleLowerCase();
     
     let state = this.connections.get(snowflakeUsername);
 
@@ -330,8 +332,9 @@ class SnowflakeConnectionManager {
    * Disconnect a specific Snowflake connection
    */
   public static async disconnect(requestedUsername?: string): Promise<void> {
-    const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
-    const state = this.connections.get(snowflakeUsername);
+    // const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    const snowflakeUsername = requestedUsername;
+    // const state = this.connections.get(snowflakeUsername);
     
     if (state?.connection) {
       return new Promise<void>((resolve, reject) => {

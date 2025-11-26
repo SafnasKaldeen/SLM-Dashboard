@@ -32,7 +32,7 @@ class SnowflakeConnectionManager {
 
     if (appUsername) {
       const mapped = usernameMap[appUsername] || process.env.SNOWFLAKE_USERNAME;
-      console.log('🔍 Username mapping:', appUsername, '→', mapped);
+      // console.log('🔍 Username mapping:', appUsername, '→', mapped);
       return mapped || process.env.SNOWFLAKE_USERNAME!;
     }
 
@@ -43,7 +43,8 @@ class SnowflakeConnectionManager {
    * Create connection with dynamic username
    */
   private static createConnection(username?: string): Connection {
-    const snowflakeUsername = this.mapToSnowflakeUsername(username?.toLocaleLowerCase());
+    // const snowflakeUsername = this.mapToSnowflakeUsername(username?.toLocaleLowerCase());
+    const snowflakeUsername = username?.toLocaleLowerCase();
     const privateKey = process.env.SNOWFLAKE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!privateKey) throw new Error('SNOWFLAKE_PRIVATE_KEY not set');

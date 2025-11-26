@@ -71,7 +71,7 @@ async function extractUserFromRequest(req: NextRequest): Promise<{
       
       return {
         userId: token.sub || token.id,
-        username: token.username as string || token.name || token.email,
+        username: token.name as string || token.userName || token.email,
         email: token.email as string,
         roles: token.roles as string[] || []
       };
