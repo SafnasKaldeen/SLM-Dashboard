@@ -239,7 +239,7 @@ class SnowflakeConnectionManager {
     rowCount: number;
   }> {
     // const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
-        const snowflakeUsername = requestedUsername?.toLocaleLowerCase();
+    const snowflakeUsername = requestedUsername?.toLocaleLowerCase();
 
     
     try {
