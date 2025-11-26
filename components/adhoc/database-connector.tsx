@@ -337,7 +337,7 @@ export function DatabaseConnector({
 
     try {
       console.log(`Fetching complete data for connection ${conn.name}`);
-      const response = await fetch("/api/RunSQLQuery", {
+      const response = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sql }),
@@ -345,17 +345,20 @@ export function DatabaseConnector({
 
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch complete data: ${response.statusText}`
+          `Failed to fetch complete data: ${response.status} ${response.statusText}`
         );
       }
 
       const json = await response.json();
 
-      if (!json.success || !json.result || !Array.isArray(json.result.rows)) {
-        throw new Error("Invalid response structure");
+      // Handle the response structure from /api/query endpoint
+      // The /api/query endpoint returns the data directly, not wrapped in result.rows
+      if (!Array.isArray(json)) {
+        console.error("Invalid response structure from /api/query:", json);
+        throw new Error("Invalid response structure from query API");
       }
 
-      const tables: TableInfo[] = json.result.rows.map((row: any) => {
+      const tables: TableInfo[] = json.map((row: any) => {
         // Parse columns if they exist in the metadata
         let columns: ColumnInfo[] = [];
         if (row.COLUMNS) {
@@ -423,7 +426,7 @@ export function DatabaseConnector({
           ORDER BY TABLE_NAME
         `;
 
-        const response = await fetch("/api/RunSQLQuery", {
+        const response = await fetch("/api/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sql: fallbackSql }),
@@ -431,8 +434,8 @@ export function DatabaseConnector({
 
         if (response.ok) {
           const json = await response.json();
-          if (json.success && json.result?.rows) {
-            const fallbackTables = json.result.rows.map((row: any) => ({
+          if (Array.isArray(json)) {
+            const fallbackTables = json.map((row: any) => ({
               name: row.TABLE_NAME,
               database: database,
               schema: schema,
@@ -494,7 +497,7 @@ export function DatabaseConnector({
     `;
 
     try {
-      const response = await fetch("/api/RunSQLQuery", {
+      const response = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sql }),
@@ -506,11 +509,11 @@ export function DatabaseConnector({
 
       const json = await response.json();
 
-      if (!json.success || !json.result || !Array.isArray(json.result.rows)) {
+      if (!Array.isArray(json)) {
         return [];
       }
 
-      const columns = json.result.rows.map((row: any) => ({
+      const columns = json.map((row: any) => ({
         name: row.COLUMN_NAME,
         type: row.DATA_TYPE,
         nullable: row.IS_NULLABLE === "YES",
@@ -714,7 +717,7 @@ export function DatabaseConnector({
     setQueryResult(null);
 
     try {
-      const response = await fetch("/api/RunSQLQuery", {
+      const response = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sql: sqlQuery }),
@@ -724,7 +727,7 @@ export function DatabaseConnector({
       if (!response.ok) {
         setQueryError(json.error || "Query failed");
       } else {
-        setQueryResult(json.result);
+        setQueryResult(json);
       }
     } catch (err: any) {
       setQueryError(err.message || "Query failed");
