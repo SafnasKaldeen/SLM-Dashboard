@@ -61,13 +61,13 @@ async function extractUserFromRequest(req: NextRequest): Promise<{
     });
     
     if (token) {
-      // console.log('🔐 Token found:', {
-      //   sub: token.sub,
-      //   name: token.name,
-      //   email: token.email,
-      //   username: token.username,
-      //   roles: token.roles
-      // });
+      console.log('🔐 Token found:', {
+        sub: token.sub,
+        name: token.name,
+        email: token.email,
+        username: token.username,
+        roles: token.roles
+      });
       
       return {
         userId: token.sub || token.id,
