@@ -5,10 +5,24 @@ interface ConnectionState {
   connection: snowflake.Connection;
   isConnecting: boolean;
   isConnected: boolean;
+  lastUsed: number;
+  lastQueryTime: number;
 }
 
 class SnowflakeConnectionManager {
   private static connections: Map<string, ConnectionState> = new Map();
+  private static readonly CONNECTION_TIMEOUT = 10 * 1000; // 10 seconds after last query
+  private static readonly CLEANUP_INTERVAL = 30 * 1000; // Clean up every 30 seconds
+
+  // Start cleanup interval
+  private static initializeCleanup() {
+    if (!(global as any).snowflakeCleanupInitialized) {
+      setInterval(() => {
+        this.cleanupStaleConnections();
+      }, this.CLEANUP_INTERVAL);
+      (global as any).snowflakeCleanupInitialized = true;
+    }
+  }
 
   /**
    * Get Snowflake username with fallback logic
@@ -16,7 +30,6 @@ class SnowflakeConnectionManager {
   private static getSnowflakeUsername(requestedUsername?: string): string {
     // Priority: requested username -> environment default -> fallback
     if (requestedUsername) {
-      // You might want to map application usernames to Snowflake usernames here
       return this.mapToSnowflakeUsername(requestedUsername);
     }
     
@@ -30,25 +43,55 @@ class SnowflakeConnectionManager {
 
   /**
    * Map application username to Snowflake username
-   * You can customize this logic based on your user mapping needs
    */
   private static mapToSnowflakeUsername(appUsername: string): string {
-    // Example mapping logic - customize as needed
     const usernameMap: Record<string, string> = {
-      // Add your username mappings here
-      // 'app-user@company.com': 'SNOWFLAKE_USER',
+      'safnas': 'HANSIKA',
+      'safnas@slmobility.com': 'HANSIKA',
+      'oshani': 'OSHANI',
+      'oshani@slmobility.com': 'OSHANI',
+      'hansika': 'HANSIKA',
+      'hansika@slmobility.com': 'HANSIKA',
+      // Add other mappings as needed
     };
     
-    return usernameMap[appUsername] || appUsername.split('@')[0].toUpperCase();
+    const mapped = usernameMap[appUsername] || appUsername.split('@')[0].toUpperCase();
+    console.log('🔍 Username mapping:', appUsername, '→', mapped);
+    return mapped;
   }
 
   /**
-   * Get or create a Snowflake connection
+   * Clean up stale connections (10 seconds after last query)
+   */
+  private static cleanupStaleConnections(): void {
+    const now = Date.now();
+    for (const [username, state] of this.connections.entries()) {
+      // If connection hasn't been used for 10 seconds since last query, clean it up
+      if (now - state.lastQueryTime > this.CONNECTION_TIMEOUT) {
+        console.log(`[Snowflake] Cleaning up stale connection for: ${username} (inactive for ${(now - state.lastQueryTime) / 1000}s)`);
+        this.disconnect(username).catch(err => {
+          console.error(`[Snowflake] Error cleaning up stale connection for ${username}:`, err.message);
+        });
+      }
+    }
+  }
+
+  /**
+   * Get or create a Snowflake connection with automatic reconnection
    */
   public static async getConnection(requestedUsername?: string): Promise<snowflake.Connection> {
+    this.initializeCleanup();
+    
     const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
     
     let state = this.connections.get(snowflakeUsername);
+
+    // Check if connection exists but is terminated - if so, remove it
+    if (state && this.isConnectionTerminated(state.connection)) {
+      console.log(`[Snowflake] Connection terminated for ${snowflakeUsername}, will create new one`);
+      this.connections.delete(snowflakeUsername);
+      state = undefined;
+    }
 
     if (!state) {
       console.log(`[Snowflake] Initializing new connection for user: ${snowflakeUsername}`);
@@ -81,11 +124,14 @@ class SnowflakeConnectionManager {
         connection,
         isConnecting: false,
         isConnected: false,
+        lastUsed: Date.now(),
+        lastQueryTime: Date.now(),
       };
 
       this.connections.set(snowflakeUsername, state);
       console.log(`[Snowflake] Connection object created for ${snowflakeUsername}`);
     } else {
+      state.lastUsed = Date.now();
       console.log(`[Snowflake] Reusing existing connection for Snowflake user: ${snowflakeUsername}`);
     }
 
@@ -93,18 +139,42 @@ class SnowflakeConnectionManager {
   }
 
   /**
-   * Connect to Snowflake
+   * Check if a connection is terminated
+   */
+  private static isConnectionTerminated(connection: snowflake.Connection): boolean {
+    try {
+      // Try to access connection state - if it throws, connection is terminated
+      const state = (connection as any)._state;
+      return state === 'TERMINATED' || state === 'DESTROYED' || state === 'DISCONNECTED';
+    } catch (error) {
+      return true;
+    }
+  }
+
+  /**
+   * Connect to Snowflake with automatic reconnection for terminated connections
    */
   public static async connect(requestedUsername?: string): Promise<void> {
     const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
-    const state = this.connections.get(snowflakeUsername);
+    let state = this.connections.get(snowflakeUsername);
 
-    if (state?.isConnected) {
+    // If connection is terminated, remove it and create new one
+    if (state && this.isConnectionTerminated(state.connection)) {
+      console.log(`[Snowflake] Connection terminated for ${snowflakeUsername}, creating new connection`);
+      this.connections.delete(snowflakeUsername);
+      state = undefined;
+    }
+
+    // Get fresh connection (will create new one if needed)
+    const connection = await this.getConnection(requestedUsername);
+    state = this.connections.get(snowflakeUsername)!;
+
+    if (state.isConnected) {
       console.log(`[Snowflake] Already connected for user: ${snowflakeUsername}`);
       return;
     }
 
-    if (state?.isConnecting) {
+    if (state.isConnecting) {
       console.log(`[Snowflake] Connection already in progress for user: ${snowflakeUsername}...`);
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -128,22 +198,24 @@ class SnowflakeConnectionManager {
       return;
     }
 
-    const connection = await this.getConnection(requestedUsername);
-    const connectionState = this.connections.get(snowflakeUsername)!;
-    connectionState.isConnecting = true;
+    state.isConnecting = true;
 
     console.log(`[Snowflake] Connecting for user: ${snowflakeUsername}...`);
 
     await new Promise<void>((resolve, reject) => {
       connection.connect((err) => {
-        connectionState.isConnecting = false;
+        state!.isConnecting = false;
         if (err) {
-          connectionState.isConnected = false;
+          state!.isConnected = false;
           console.error(`[Snowflake] ❌ Failed to connect for ${snowflakeUsername}:`, err.message);
+          
+          // Remove failed connection from pool
+          this.connections.delete(snowflakeUsername);
           return reject(err);
         }
 
-        connectionState.isConnected = true;
+        state!.isConnected = true;
+        state!.lastUsed = Date.now();
         console.log(`[Snowflake] ✅ Connection established for ${snowflakeUsername}`);
         resolve();
       });
@@ -151,7 +223,7 @@ class SnowflakeConnectionManager {
   }
 
   /**
-   * Execute a query with optional username
+   * Execute a query with automatic connection management
    */
   public static async executeQuery(
     sql: string,
@@ -163,45 +235,66 @@ class SnowflakeConnectionManager {
     executionTime: number;
     rowCount: number;
   }> {
-    await this.connect(requestedUsername);
-    const connection = await this.getConnection(requestedUsername);
     const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    
+    try {
+      await this.connect(requestedUsername);
+      const connection = await this.getConnection(requestedUsername);
+      const state = this.connections.get(snowflakeUsername)!;
 
-    // Add audit comment
-    let finalSql = sql;
-    if (addAuditComment) {
-      const auditUser = requestedUsername || snowflakeUsername;
-      finalSql = `-- Executed by: ${auditUser}\n${sql}`;
-    }
+      // Add audit comment
+      let finalSql = sql;
+      if (addAuditComment) {
+        const auditUser = requestedUsername || snowflakeUsername;
+        finalSql = `-- Executed by: ${auditUser}\n${sql}`;
+      }
 
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
+      return new Promise((resolve, reject) => {
+        const startTime = Date.now();
 
-      connection.execute({
-        sqlText: finalSql,
-        complete: (err: any, stmt: any, rows: any[]) => {
-          if (err) {
-            console.error("[Snowflake] Query execution error:", err.message);
-            reject(err);
-          } else {
-            const columns = stmt.getColumns().map((col: any) => col.getName());
-            const executionTime = (Date.now() - startTime) / 1000;
-            
-            console.log(`[Snowflake] Query completed in ${executionTime}s, returned ${rows.length} rows`);
-            if (requestedUsername) {
-              console.log(`[Snowflake] Executed by app user: ${requestedUsername}`);
+        connection.execute({
+          sqlText: finalSql,
+          complete: (err: any, stmt: any, rows: any[]) => {
+            // Update last query time
+            if (state) {
+              state.lastQueryTime = Date.now();
+              state.lastUsed = Date.now();
             }
-            
-            resolve({
-              columns,
-              rows,
-              executionTime,
-              rowCount: rows.length,
-            });
-          }
-        },
+
+            if (err) {
+              console.error("[Snowflake] Query execution error:", err.message);
+              
+              // If connection error, remove from pool
+              if (err.code === 405503 || err.message.includes('terminated') || err.message.includes('Cannot connect')) {
+                console.log(`[Snowflake] Removing terminated connection: ${snowflakeUsername}`);
+                this.connections.delete(snowflakeUsername);
+              }
+              
+              reject(err);
+            } else {
+              const columns = stmt.getColumns().map((col: any) => col.getName());
+              const executionTime = (Date.now() - startTime) / 1000;
+              
+              console.log(`[Snowflake] Query completed in ${executionTime}s, returned ${rows.length} rows`);
+              if (requestedUsername) {
+                console.log(`[Snowflake] Executed by app user: ${requestedUsername}`);
+              }
+              
+              resolve({
+                columns,
+                rows,
+                executionTime,
+                rowCount: rows.length,
+              });
+            }
+          },
+        });
       });
-    });
+    } catch (error: any) {
+      // If connection failed, ensure it's removed from pool
+      this.connections.delete(snowflakeUsername);
+      throw error;
+    }
   }
 
   /**
@@ -213,9 +306,13 @@ class SnowflakeConnectionManager {
     username: string;
     snowflakeUser: string;
     appUser?: string;
+    lastUsed: number;
+    lastQueryTime: number;
+    timeSinceLastQuery: number;
   }> {
     const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
     const state = this.connections.get(snowflakeUsername);
+    const now = Date.now();
 
     return {
       isConnected: state?.isConnected || false,
@@ -223,6 +320,9 @@ class SnowflakeConnectionManager {
       username: requestedUsername || 'system',
       snowflakeUser: snowflakeUsername,
       appUser: requestedUsername,
+      lastUsed: state?.lastUsed || 0,
+      lastQueryTime: state?.lastQueryTime || 0,
+      timeSinceLastQuery: state ? now - state.lastQueryTime : 0,
     };
   }
 
@@ -233,15 +333,15 @@ class SnowflakeConnectionManager {
     const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
     const state = this.connections.get(snowflakeUsername);
     
-    if (state?.connection && state.isConnected) {
+    if (state?.connection) {
       return new Promise<void>((resolve, reject) => {
         state.connection.destroy((err) => {
+          this.connections.delete(snowflakeUsername);
           if (err) {
             console.error(`[Snowflake] Error disconnecting ${snowflakeUsername}:`, err.message);
             reject(err);
           } else {
             console.log(`[Snowflake] Disconnected ${snowflakeUsername}`);
-            this.connections.delete(snowflakeUsername);
             resolve();
           }
         });
@@ -257,7 +357,7 @@ class SnowflakeConnectionManager {
     
     const disconnectPromises = Array.from(this.connections.entries()).map(([username, state]) =>
       new Promise<void>((resolve) => {
-        if (state.connection && state.isConnected) {
+        if (state.connection) {
           state.connection.destroy((err) => {
             if (err) {
               console.error(`[Snowflake] Error disconnecting ${username}:`, err.message);
@@ -275,6 +375,38 @@ class SnowflakeConnectionManager {
     await Promise.allSettled(disconnectPromises);
     this.connections.clear();
     console.log('[Snowflake] All connections closed.');
+  }
+
+  /**
+   * Get connection pool stats
+   */
+  public static getPoolStats(): {
+    totalConnections: number;
+    activeConnections: number;
+    connections: Array<{
+      snowflakeUser: string;
+      isConnected: boolean;
+      isConnecting: boolean;
+      lastUsed: number;
+      lastQueryTime: number;
+      timeSinceLastQuery: number;
+    }>;
+  } {
+    const now = Date.now();
+    const connections = Array.from(this.connections.entries()).map(([username, state]) => ({
+      snowflakeUser: username,
+      isConnected: state.isConnected,
+      isConnecting: state.isConnecting,
+      lastUsed: state.lastUsed,
+      lastQueryTime: state.lastQueryTime,
+      timeSinceLastQuery: now - state.lastQueryTime,
+    }));
+
+    return {
+      totalConnections: connections.length,
+      activeConnections: connections.filter(c => c.isConnected).length,
+      connections,
+    };
   }
 }
 
