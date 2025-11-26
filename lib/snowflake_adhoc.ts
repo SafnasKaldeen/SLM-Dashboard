@@ -116,7 +116,7 @@ class SnowflakeConnectionManager {
         warehouse: 'ADHOC',
         database: 'ADHOC',
         schema: 'PUBLIC',
-        role: 'ACCOUNTADMIN',
+        role: 'SYSADMIN',
         authenticator: 'SNOWFLAKE_JWT',
       });
 
