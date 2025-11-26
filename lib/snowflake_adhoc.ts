@@ -48,7 +48,7 @@ class SnowflakeConnectionManager {
     const usernameMap: Record<string, string> = {
       'safnas': 'HANSIKA',
       'safnas@slmobility.com': 'HANSIKA',
-      'oshani': 'OSHANI',
+      'oshaniqa': 'OSHANI',
       'oshani@slmobility.com': 'OSHANI',
       'hansika': 'HANSIKA',
       'hansika@slmobility.com': 'HANSIKA',

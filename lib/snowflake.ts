@@ -24,7 +24,7 @@ class SnowflakeConnectionManager {
       'safnas@slmobility.com': 'SAFNAS',
       'hansika': 'HANSIKA',
       'hansika@slmobility.com': 'HANSIKA',
-      'oshani': 'OSHANI',
+      'oshaniqa': 'OSHANI',
       'oshani@slmobility.com': 'OSHANI',
       // Add other user mappings as needed
     };
