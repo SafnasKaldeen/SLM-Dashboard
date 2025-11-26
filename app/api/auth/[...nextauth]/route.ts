@@ -29,7 +29,7 @@ export const authOptions: NextAuthOptions = {
 
     if (token.email) {
       const roles = getRolesForEmail(token.email);
-      console.log('✅ Roles assigned for:', token.email, '→', roles);
+      // console.log('✅ Roles assigned for:', token.email, '→', roles);
       token.roles = roles;
     } else {
       console.log('⚠️ No roles assigned for:', token.email);
