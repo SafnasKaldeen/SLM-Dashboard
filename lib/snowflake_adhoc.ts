@@ -157,7 +157,8 @@ class SnowflakeConnectionManager {
    * Connect to Snowflake with automatic reconnection for terminated connections
    */
   public static async connect(requestedUsername?: string): Promise<void> {
-    const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    // const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    const snowflakeUsername = requestedUsername?.toLocaleLowerCase();
     let state = this.connections.get(snowflakeUsername);
 
     // If connection is terminated, remove it and create new one
@@ -237,7 +238,9 @@ class SnowflakeConnectionManager {
     executionTime: number;
     rowCount: number;
   }> {
-    const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    // const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+        const snowflakeUsername = requestedUsername?.toLocaleLowerCase();
+
     
     try {
       await this.connect(requestedUsername);
@@ -312,7 +315,9 @@ class SnowflakeConnectionManager {
     lastQueryTime: number;
     timeSinceLastQuery: number;
   }> {
-    const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+    // const snowflakeUsername = this.getSnowflakeUsername(requestedUsername);
+        const snowflakeUsername = requestedUsername?.toLocaleLowerCase();
+
     const state = this.connections.get(snowflakeUsername);
     const now = Date.now();
 
