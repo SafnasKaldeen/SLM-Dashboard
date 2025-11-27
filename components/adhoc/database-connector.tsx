@@ -341,6 +341,7 @@ export function DatabaseConnector({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sql }),
+        credentials: "include", // ✅ Include session cookies
       });
 
       if (!response.ok) {
@@ -430,6 +431,7 @@ export function DatabaseConnector({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sql: fallbackSql }),
+          credentials: "include", // ✅ Include session cookies
         });
 
         if (response.ok) {
@@ -501,6 +503,7 @@ export function DatabaseConnector({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sql }),
+        credentials: "include", // ✅ Include session cookies
       });
 
       if (!response.ok) {
@@ -543,7 +546,9 @@ export function DatabaseConnector({
 
       if (!connectionsMetadata || forceRefresh) {
         // Fetch fresh connections metadata from API
-        const response = await fetch("/api/connections");
+        const response = await fetch("/api/connections", {
+          credentials: "include", // ✅ Include session cookies
+        });
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
 
@@ -721,6 +726,7 @@ export function DatabaseConnector({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sql: sqlQuery }),
+        credentials: "include", // ✅ Include session cookies
       });
       const json = await response.json();
 
@@ -740,6 +746,7 @@ export function DatabaseConnector({
     try {
       await fetch(`/api/connections?id=${connectionId}`, {
         method: "DELETE",
+        credentials: "include", // ✅ Include session cookies
       });
 
       // Invalidate cache for this specific connection

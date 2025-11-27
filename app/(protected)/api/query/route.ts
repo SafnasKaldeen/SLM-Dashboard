@@ -83,7 +83,7 @@ async function extractUserFromRequest(req: NextRequest): Promise<{
       console.log('🔐 Session cookie found but token not decoded');
       return { userId: 'authenticated', username: 'user' };
     }
-
+    
     console.log('🔐 No user session found');
     return {}; // No user info available
   } catch (error) {
@@ -108,8 +108,8 @@ function hasDynamicDates(sql: string): boolean {
 
 function normalizeSQL(sql: string): string {
   let normalized = sql.trim().toLowerCase().replace(/\s+/g, " ");
-  normalized = normalized.replace(/--[^\n]*/g, ''); // Remove comments
-  normalized = normalized.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove block comments
+  normalized = normalized.replace(/--[^\n]*/g, '');
+  normalized = normalized.replace(/\/\*[\s\S]*?\*\//g, '');
   normalized = normalized.replace(/current_date\s*\(\s*\)/gi, 'current_date()');
   normalized = normalized.replace(/current_timestamp\s*\(\s*\)/gi, 'current_timestamp()');
   normalized = normalized.replace(/now\s*\(\s*\)/gi, 'now()');
@@ -117,7 +117,6 @@ function normalizeSQL(sql: string): string {
   return normalized.trim();
 }
 
-// FIXED: Remove userId from query hash generation
 function generateQueryHash(sql: string): string {
   const normalizedSql = normalizeSQL(sql);
   return crypto.createHash("sha256").update(normalizedSql).digest("hex");
@@ -164,7 +163,6 @@ async function acquireRevalidationLock(cacheKey: string): Promise<boolean> {
   const lockKey = `lock:revalidate:${cacheKey}`;
   const lockValue = Date.now().toString();
   
-  // Try to acquire lock with 5 minute expiration
   const acquired = await redis.set(lockKey, lockValue, { NX: true, EX: 300 });
   return acquired === 'OK';
 }
@@ -206,7 +204,6 @@ async function performRevalidation(
   const metaKey = `${cacheKey}:meta`;
   
   try {
-    // Execute query to get fresh data using the stateless connection manager
     const result = await SnowflakeConnectionManager.executeQuery(sql, username, false);
     const freshData = result.rows;
     
@@ -218,7 +215,6 @@ async function performRevalidation(
     
     const dataChanged = !existingMeta || existingMeta.dataHash !== freshDataHash;
     
-    // Update metadata with TTL matching cache
     const cachedData = await redis.get(cacheKey);
     const cacheTTL = cachedData ? await redis.ttl(cacheKey) : null;
     
@@ -256,7 +252,6 @@ async function logQueryAnalytics(entry: QueryLogEntry): Promise<void> {
   try {
     const today = new Date().toISOString().slice(0, 10);
     
-    // Log entry with 7 day expiration
     const logKey = `query:log:${entry.shortHash}:${Date.now()}`;
     await redis.set(logKey, JSON.stringify(entry), { EX: 604800 });
 
@@ -282,7 +277,6 @@ async function logQueryAnalytics(entry: QueryLogEntry): Promise<void> {
       isPersistent: false,
     };
     
-    // Update execution counts
     stats.totalExecutions++;
     if (entry.cacheStatus === "HIT" || entry.cacheStatus === "REVALIDATED") {
       stats.totalHits++;
@@ -296,25 +290,17 @@ async function logQueryAnalytics(entry: QueryLogEntry): Promise<void> {
       stats.totalMisses++;
     }
     
-    // Update averages
     stats.avgDuration = ((stats.avgDuration * (stats.totalExecutions - 1)) + entry.duration) / stats.totalExecutions;
     stats.avgRowCount = ((stats.avgRowCount * (stats.totalExecutions - 1)) + entry.rowCount) / stats.totalExecutions;
     stats.lastExecuted = entry.timestamp.toISOString();
     stats.cacheHitRate = (stats.totalHits / stats.totalExecutions) * 100;
     
-    // Clean history to last 14 days only
     cleanOldHistory(stats, 14);
-    
-    // Calculate consecutive days without hits
     stats.consecutiveDaysNoHits = calculateConsecutiveDaysNoHits(stats, today);
-    
-    // Calculate score and persistence
     stats = applyDecayAndCalculateScore(stats);
     stats.isPersistent = shouldBePersistent(stats);
     
     await redis.set(statsKey, JSON.stringify(stats));
-    
-    // Update sorted set for candidates
     await redis.zAdd('query:prewarm:candidates', {
       score: stats.preWarmScore,
       value: entry.queryHash
@@ -348,12 +334,10 @@ function calculateConsecutiveDaysNoHits(stats: QueryStats, today: string): numbe
   
   const lastHitDate = new Date(stats.lastCacheHit).toISOString().slice(0, 10);
   
-  // Reset counter if there was activity today
   if (lastHitDate === today) {
     return 0;
   }
   
-  // Calculate days since last hit
   const daysSinceLastHit = Math.floor(
     (new Date(today).getTime() - new Date(lastHitDate).getTime()) / 86400000
   );
@@ -362,7 +346,6 @@ function calculateConsecutiveDaysNoHits(stats: QueryStats, today: string): numbe
 }
 
 function shouldBePersistent(stats: QueryStats): boolean {
-  // Don't persist if no activity for a week
   if (stats.consecutiveDaysNoHits >= 7) {
     return false;
   }
@@ -378,7 +361,6 @@ function shouldBePersistent(stats: QueryStats): boolean {
   const totalHitsLast7Days = activeDays.reduce((sum, date) => sum + (dailyHitHistory[date] || 0), 0);
   const avgHitsPerActiveDay = totalHitsLast7Days / activeDays.length;
   
-  // Need consistent usage pattern
   return avgHitsPerActiveDay >= 2;
 }
 
@@ -400,7 +382,6 @@ function applyDecayAndCalculateScore(stats: QueryStats): QueryStats {
   const recentHits = last7Days.reduce((sum, date) => sum + (dailyHitHistory[date] || 0), 0);
   const activeDaysLast7 = last7Days.filter(date => (dailyHitHistory[date] || 0) > 0).length;
   
-  // Scoring components (sum to 1.0)
   const frequencyScore = Math.min(totalExecutions / 100, 1) * 0.2;
   const durationScore = Math.min(avgDuration / 5000, 1) * 0.15;
   const dataSizeScore = Math.min(avgRowCount / 100000, 1) * 0.1;
@@ -408,7 +389,6 @@ function applyDecayAndCalculateScore(stats: QueryStats): QueryStats {
   const recentActivityScore = Math.min(recentHits / 20, 1) * 0.25;
   const consistencyScore = (activeDaysLast7 / 7) * 0.1;
   
-  // Apply decay for inactivity
   let decayMultiplier = 1.0;
   if (consecutiveDaysNoHits > 0) {
     decayMultiplier = Math.pow(0.75, consecutiveDaysNoHits);
@@ -423,7 +403,6 @@ function applyDecayAndCalculateScore(stats: QueryStats): QueryStats {
     consistencyScore
   ) * 100;
   
-  // Cap at 100
   stats.preWarmScore = Math.min(100, Math.max(0, baseScore * decayMultiplier));
   
   return stats;
@@ -451,7 +430,6 @@ async function writeToCache(
     if (strategy.type === 'static' && stats?.isPersistent) {
       await redis.set(cacheKey, JSON.stringify(data));
       
-      // Initialize/update metadata
       if (!isRevalidation) {
         const metaKey = `${cacheKey}:meta`;
         const meta: CacheMetadata = {
@@ -469,7 +447,6 @@ async function writeToCache(
     } else if (strategy.ttl) {
       await redis.set(cacheKey, JSON.stringify(data), { EX: strategy.ttl });
       
-      // Add metadata with matching TTL
       const metaKey = `${cacheKey}:meta`;
       const meta: CacheMetadata = {
         lastVerified: new Date().toISOString(),
@@ -496,24 +473,25 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const { sql, forceDynamic } = await req.json();
+    // ✅ CHANGE 1: Extract systemUser parameter
+    const { sql, forceDynamic, systemUser } = await req.json();
     if (!sql || typeof sql !== "string") {
       return NextResponse.json({ error: "Missing or invalid SQL" }, { status: 400 });
     }
 
     // Extract user information from the request automatically
     const userInfo = await extractUserFromRequest(req);
-    const userId = userInfo.userId;
-    const username = userInfo.username;
+    
+    // ✅ CHANGE 2: Use systemUser if provided, otherwise use extracted user info
+    const userId = systemUser || userInfo.userId;
+    const username = systemUser || userInfo.username || 'ANONYMOUS';
     const email = userInfo.email;
 
-    // FIXED: Remove userId from query hash generation
     const queryHash = generateQueryHash(sql);
     const cacheKey = generateCacheKey(queryHash, sql, forceDynamic);
     const shortHash = queryHash.substring(0, 8);
     const strategy = getCacheStrategy(sql, forceDynamic);
 
-    // Log user context for debugging
     const userLabel = username ? `[${username}]` : email ? `[${email}]` : userId ? `[${userId}]` : '[Anonymous]';
     console.log(`[${shortHash}] ${userLabel} - Processing query`);
 
@@ -526,7 +504,6 @@ export async function POST(req: NextRequest) {
     const cachedData = await readFromCache(cacheKey);
     
     if (cachedData) {
-      // Check if revalidation needed for persistent queries
       const shouldRevalidate = await needsRevalidation(cacheKey, isPersistent);
       
       if (shouldRevalidate) {
@@ -534,9 +511,8 @@ export async function POST(req: NextRequest) {
         
         if (lockAcquired) {
           const duration = Date.now() - startTime;
-          console.log(`🟡   [CACHE HIT] [${shortHash}] ${userLabel} [PERSISTENT] - Revalidating in background - ${cachedData.length} rows - ${duration}ms`);
+          console.log(`🟡 [CACHE HIT] [${shortHash}] ${userLabel} [PERSISTENT] - Revalidating in background - ${cachedData.length} rows - ${duration}ms`);
           
-          // Return cached data immediately, revalidate in background
           (async () => {
             try {
               const revalidationResult = await performRevalidation(
@@ -588,7 +564,6 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      // Standard cache hit
       const duration = Date.now() - startTime;
       const persistentLabel = isPersistent ? " [PERSISTENT]" : "";
       console.log(`🟢 [CACHE HIT] [${shortHash}] ${userLabel} (${strategy.type})${persistentLabel} - ${cachedData.length} rows - ${duration}ms`);
@@ -619,14 +594,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Cache miss - execute query
     console.log(`🔴 [CACHE MISS] [${shortHash}] ${userLabel} (${strategy.type}) - Executing Snowflake`);
     
-    // Use the stateless connection manager to execute the query
     const result = await SnowflakeConnectionManager.executeQuery(sql, username, true);
     const rows = result.rows;
 
-    // Cache empty results with shorter TTL (1 hour)
     if (!rows || rows.length === 0) {
       const emptyResult: any[] = [];
       await redis.set(cacheKey, JSON.stringify(emptyResult), { EX: 3600 });
