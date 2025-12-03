@@ -217,12 +217,12 @@ export class SemanticBuilderUtils {
       { 
         name: "FACT_TBOX_BMS_SESSION", 
         description: "Session mapping between vehicles, TBOX devices, and battery management systems", 
-        columns: ["SESSION_ID", "TBOXID", "BMSID", "START_TIME", "END_TIME"] 
+        columns: ["SESSION_ID", "TBOX_ID", "BMSID", "START_TIME", "END_TIME"] 
       },
       { 
         name: "FACT_VEHICLE_TELEMETRY", 
         description: "Processed vehicle telemetry including battery metrics, motor parameters, and error diagnostics", 
-        columns: ["TELEMETRY_ID", "SESSION_ID", "TBOXID", "BMSID", "GEAR_INFORMATION", "TIME_STAMP", "SIDE_STAND_INFO", "TBOX_MEMS_ERROR_FLAG", "BATTERY_ERROR", "BRAKE_STATUS", "INVERTER_ERROR", "BAT_TEMP", "BAT_VOLT", "BAT_CYCLE_COUNT", "BAT_SOH", "BAT_PERCENT", "THROTTLE_PERCENT", "BAT_CURRENT", "MOTOR_RPM", "MOTOR_TEMP", "INVERTER_TEMP", "TBOX_INTERNAL_BAT_VOLT", "STATE"] 
+        columns: ["TELEMETRY_ID", "SESSION_ID", "TBOX_ID", "BMSID", "GEAR_INFORMATION", "TIME_STAMP", "SIDE_STAND_INFO", "TBOX_MEMS_ERROR_FLAG", "BATTERY_ERROR", "BRAKE_STATUS", "INVERTER_ERROR", "BAT_TEMP", "BAT_VOLT", "BAT_CYCLE_COUNT", "BAT_SOH", "BAT_PERCENT", "THROTTLE_PERCENT", "BAT_CURRENT", "MOTOR_RPM", "MOTOR_TEMP", "INVERTER_TEMP", "TBOX_INTERNAL_BAT_VOLT", "STATE"] 
       }
     ];
 
@@ -275,8 +275,8 @@ export class SemanticBuilderUtils {
       // Telemetry relationships - can now use LOOKUP_VIEW for simplified joins
       { left_table: "FACTTBOXGPS", left_column: "TBOXID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
       { left_table: "FACTTBOXGPS", left_column: "TBOXID", right_table: "LOOKUP_VIEW", right_column: "TBOX_ID", type: "many-to-one" },
-      { left_table: "FACT_TBOX_BMS_SESSION", left_column: "TBOXID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
-      { left_table: "FACT_TBOX_BMS_SESSION", left_column: "TBOXID", right_table: "LOOKUP_VIEW", right_column: "TBOX_ID", type: "many-to-one" },
+      { left_table: "FACT_TBOX_BMS_SESSION", left_column: "TBOX_ID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
+      { left_table: "FACT_TBOX_BMS_SESSION", left_column: "TBOX_ID", right_table: "LOOKUP_VIEW", right_column: "TBOX_ID", type: "many-to-one" },
       { left_table: "FACT_TBOX_BMS_SESSION", left_column: "BMSID", right_table: "DIM_BATTERY", right_column: "BMS_ID", type: "many-to-one" },
       
       // Session relationships
@@ -285,8 +285,8 @@ export class SemanticBuilderUtils {
       { left_table: "FACT_VEHICLE_DISTANCE", left_column: "TBOXID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
       { left_table: "FACT_VEHICLE_DISTANCE", left_column: "TBOX_IMEI_NO", right_table: "LOOKUP_VIEW", right_column: "TBOX_IMEI_NO", type: "many-to-one" },
       { left_table: "FACT_VEHICLE_DISTANCE", left_column: "BMSID", right_table: "DIM_BATTERY", right_column: "BMS_ID", type: "many-to-one" },
-      { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "TBOXID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
-      { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "TBOXID", right_table: "LOOKUP_VIEW", right_column: "TBOX_ID", type: "many-to-one" },
+      { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "TBOX_ID", right_table: "DIM_TBOXES", right_column: "TBOX_ID", type: "many-to-one" },
+      { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "TBOX_ID", right_table: "LOOKUP_VIEW", right_column: "TBOX_IMEI_NO", type: "many-to-one" },     
       { left_table: "FACT_VEHICLE_TELEMETRY", left_column: "BMSID", right_table: "DIM_BATTERY", right_column: "BMS_ID", type: "many-to-one" }
     ];
 
