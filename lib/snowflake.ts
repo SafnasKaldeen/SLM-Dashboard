@@ -43,7 +43,6 @@ class SnowflakeConnectionManager {
       'rasika@slmobility.com': 'RASIKA',
       'rasika': 'RASIKA',
       'rasikafac': 'RASIKA',
-      'DUDE': 'RASIKA',
       'zainab': 'ZAINAB',
       'zainabqanew': 'ZAINAB',
       'zainab@slmobility.com': 'ZAINAB',
