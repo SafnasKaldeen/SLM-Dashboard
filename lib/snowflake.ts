@@ -59,6 +59,8 @@ class SnowflakeConnectionManager {
       'aitadmin': 'janaka',
       'janaka@ascensionit.com.au': 'JANAKA',
       'dinusha@slmobility.com': 'DINUSHA',
+      'dinusha jayakody': 'DINUSHA',
+      'dinusha': 'DINUSHA',
       'Rifkhansiddeek': 'RIFKHAN',
       'rifkhan@slmobility.com': 'RIFKHAN',
       'authenticated-user': process.env.SNOWFLAKE_USERNAME || 'DEFAULT_USER',
