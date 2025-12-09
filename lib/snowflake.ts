@@ -47,6 +47,7 @@ class SnowflakeConnectionManager {
       'zainabqanew': 'ZAINAB',
       'zainab@slmobility.com': 'ZAINAB',
       'nayanaka': 'NAYANAKA',
+      'nayanaka buddhi': 'NAYANAKA',
       'nayanakabuddhi@gmail.com': 'NAYANAKA',
       'fedinusha': 'DINUSHA',
       'mafazfec': 'MAFAZ',

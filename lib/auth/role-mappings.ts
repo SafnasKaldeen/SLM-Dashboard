@@ -13,7 +13,7 @@ export type Role = 'Admin' | 'Manager' | 'Analyst' | 'Viewer' | 'FactoryManager'
  */
 export const ROLE_MAPPINGS: Record<string, Role[]> = {
   // Current Active Users
-  'safnas@slmobility.com': ['FactoryManager'],            // Safnas
+  'safnas@slmobility.com': ['Admin'],            // Safnas
   'hansika@slmobility.com': ['Admin'],           // Hansika
   'oshani@slmobility.com': ['FactoryManager'],   // Oshani
   'rasika@slmobility.com': ['FactoryManager'],   // Rasika
