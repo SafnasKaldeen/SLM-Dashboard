@@ -119,7 +119,7 @@ class SnowflakeNotificationManager {
         warehouse: 'LOG_WH',
         database: 'ADHOC',
         schema: 'PUBLIC',
-        role: 'SYSADMIN',
+        role: 'ACCOUNTADMIN',
         authenticator: 'SNOWFLAKE_JWT',
       });
 
